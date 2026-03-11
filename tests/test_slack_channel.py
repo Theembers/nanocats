@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from nanobot.bus.events import OutboundMessage
-from nanobot.bus.queue import MessageBus
-from nanobot.channels.slack import SlackChannel
-from nanobot.config.schema import SlackConfig
+from nanocats.bus.events import OutboundMessage
+from nanocats.bus.queue import MessageBus
+from nanocats.channels.slack import SlackChannel
+from nanocats.config.schema import SlackConfig
 
 
 class _FakeAsyncWebClient:

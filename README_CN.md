@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="nanobot" width="500">
-  <h1>nanobot: 超轻量级个人 AI 助手</h1>
+  <img src="nanocats_logo.png" alt="nanocats" width="500">
+  <h1>nanocats: 超轻量级个人 AI 助手</h1>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
-    <a href="https://pepy.tech/project/nanobot-ai"><img src="https://static.pepy.tech/badge/nanobot-ai" alt="Downloads"></a>
+    <a href="https://pypi.org/project/nanocats-ai/"><img src="https://img.shields.io/pypi/v/nanocats-ai" alt="PyPI"></a>
+    <a href="https://pepy.tech/project/nanocats-ai"><img src="https://static.pepy.tech/badge/nanocats-ai" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
@@ -12,7 +12,15 @@
   </p>
 </div>
 
-🐈 **nanobot** 是一个**超轻量级**的个人 AI 助手，灵感来源于 [OpenClaw](https://github.com/openclaw/openclaw)。
+> 🙏 **基于 [nanobot](https://github.com/HKUDS/nanobot) 开发** — nanocats 构建在优秀的 nanobot 基础之上，扩展了 Agent Swarm 能力和多智能体编排功能。
+>
+> 本项目继承了 nanobot 的所有核心功能，并新增：
+> - 🤖 **Agent Swarm**: 层级式多智能体系统（Supervisor → User Agent → Task Agent）
+> - 🏢 **独立工作空间**: 每个 Agent 拥有隔离的工作空间
+> - 🔧 **Agent 级 MCP 配置**: MCP 服务器统一安装，但支持按 Agent 独立配置
+> - 📱 **Agent 级渠道绑定**: 每个用户 Agent 可拥有独立的通讯渠道配置
+
+🐈 **nanocats** 是一个**超轻量级**的个人 AI 助手，灵感来源于 [OpenClaw](https://github.com/openclaw/openclaw)。
 
 ⚡️ 以比 OpenClaw **少 99% 的代码量**实现核心 Agent 功能。
 
@@ -20,7 +28,7 @@
 
 ## 📢 新闻
 
-- **2026-03-08** 🚀 发布 **v0.1.4.post4** — 一个注重可靠性的版本，包含更安全的默认设置、更好的多实例支持、更稳健的 MCP，以及重要的渠道和提供商改进。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post4)。
+- **2026-03-08** 🚀 发布 **v0.1.4.post4** — 一个注重可靠性的版本，包含更安全的默认设置、更好的多实例支持、更稳健的 MCP，以及重要的渠道和提供商改进。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.4.post4)。
 - **2026-03-07** 🚀 Azure OpenAI 提供商、WhatsApp 媒体支持、QQ 群聊，以及更多 Telegram/飞书 优化。
 - **2026-03-06** 🪄 更轻量的提供商、更智能的媒体处理，以及更稳健的内存和 CLI 兼容性。
 - **2026-03-05** ⚡️ Telegram 草稿流式输出、MCP SSE 支持，以及更广泛的渠道可靠性修复。
@@ -28,7 +36,7 @@
 - **2026-03-03** 🧠 更清晰的用户消息合并、更安全的多模态保存，以及更强的 Cron 防护。
 - **2026-03-02** 🛡️ 更安全的默认访问控制、更稳健的 Cron 重载，以及更清晰的 Matrix 媒体处理。
 - **2026-03-01** 🌐 Web 代理支持、更智能的 Cron 提醒，以及飞书富文本解析改进。
-- **2026-02-28** 🚀 发布 **v0.1.4.post3** — 更清晰的上下文、更稳健的会话历史，以及更智能的 agent。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post3)。
+- **2026-02-28** 🚀 发布 **v0.1.4.post3** — 更清晰的上下文、更稳健的会话历史，以及更智能的 agent。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.4.post3)。
 - **2026-02-27** 🧠 实验性思考模式支持、钉钉媒体消息、飞书和 QQ 渠道修复。
 - **2026-02-26** 🛡️ 会话投毒修复、WhatsApp 去重、Windows 路径防护、Mistral 兼容性。
 
@@ -36,33 +44,33 @@
 <summary>更早的新闻</summary>
 
 - **2026-02-25** 🧹 新增 Matrix 渠道、更清晰的会话上下文、自动工作区模板同步。
-- **2026-02-24** 🚀 发布 **v0.1.4.post2** — 一个注重可靠性的版本，包含重新设计的心跳机制、提示缓存优化，以及更稳健的提供商和渠道稳定性。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post2)。
+- **2026-02-24** 🚀 发布 **v0.1.4.post2** — 一个注重可靠性的版本，包含重新设计的心跳机制、提示缓存优化，以及更稳健的提供商和渠道稳定性。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.4.post2)。
 - **2026-02-23** 🔧 虚拟工具调用心跳、提示缓存优化、Slack mrkdwn 修复。
 - **2026-02-22** 🛡️ Slack 线程隔离、Discord 输入指示器修复、agent 可靠性改进。
-- **2026-02-21** 🎉 发布 **v0.1.4.post1** — 新提供商、跨渠道媒体支持，以及重大稳定性改进。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4.post1)。
+- **2026-02-21** 🎉 发布 **v0.1.4.post1** — 新提供商、跨渠道媒体支持，以及重大稳定性改进。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.4.post1)。
 - **2026-02-20** 🐦 飞书现已支持接收用户发送的多模态文件。底层内存更可靠。
 - **2026-02-19** ✨ Slack 现可发送文件、Discord 分割长消息、子代理在 CLI 模式下可用。
-- **2026-02-18** ⚡️ nanobot 现支持火山引擎、MCP 自定义认证头、Anthropic 提示缓存。
-- **2026-02-17** 🎉 发布 **v0.1.4** — MCP 支持、进度流式输出、新提供商，以及多渠道改进。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.4)。
-- **2026-02-16** 🦞 nanobot 现集成 [ClawHub](https://clawhub.ai) 技能 — 搜索并安装公开的 agent 技能。
-- **2026-02-15** 🔑 nanobot 现支持 OpenAI Codex 提供商，支持 OAuth 登录。
-- **2026-02-14** 🔌 nanobot 现支持 MCP！详情请查看 [MCP 章节](#mcp-model-context-protocol)。
-- **2026-02-13** 🎉 发布 **v0.1.3.post7** — 包含安全加固和多项改进。**请升级到最新版本以解决安全问题**。详情请查看 [发布说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post7)。
-- **2026-02-12** 🧠 重新设计的内存系统 — 更少代码，更可靠。欢迎参与 [讨论](https://github.com/HKUDS/nanobot/discussions/566)！
+- **2026-02-18** ⚡️ nanocats 现支持火山引擎、MCP 自定义认证头、Anthropic 提示缓存。
+- **2026-02-17** 🎉 发布 **v0.1.4** — MCP 支持、进度流式输出、新提供商，以及多渠道改进。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.4)。
+- **2026-02-16** 🦞 nanocats 现集成 [ClawHub](https://clawhub.ai) 技能 — 搜索并安装公开的 agent 技能。
+- **2026-02-15** 🔑 nanocats 现支持 OpenAI Codex 提供商，支持 OAuth 登录。
+- **2026-02-14** 🔌 nanocats 现支持 MCP！详情请查看 [MCP 章节](#mcp-model-context-protocol)。
+- **2026-02-13** 🎉 发布 **v0.1.3.post7** — 包含安全加固和多项改进。**请升级到最新版本以解决安全问题**。详情请查看 [发布说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.3.post7)。
+- **2026-02-12** 🧠 重新设计的内存系统 — 更少代码，更可靠。欢迎参与 [讨论](https://github.com/HKUDS/nanocats/discussions/566)！
 - **2026-02-11** ✨ 增强版 CLI 体验，新增 MiniMax 支持！
-- **2026-02-10** 🎉 发布 **v0.1.3.post6** 及多项改进！查看 [更新说明](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post6) 和我们的 [路线图](https://github.com/HKUDS/nanobot/discussions/431)。
-- **2026-02-09** 💬 新增 Slack、Email 和 QQ 支持 — nanobot 现支持多个聊天平台！
+- **2026-02-10** 🎉 发布 **v0.1.3.post6** 及多项改进！查看 [更新说明](https://github.com/HKUDS/nanocats/releases/tag/v0.1.3.post6) 和我们的 [路线图](https://github.com/HKUDS/nanocats/discussions/431)。
+- **2026-02-09** 💬 新增 Slack、Email 和 QQ 支持 — nanocats 现支持多个聊天平台！
 - **2026-02-08** 🔧 重构 Providers — 现在添加新的 LLM 提供商只需 2 个简单步骤！查看 [这里](#providers)。
-- **2026-02-07** 🚀 发布 **v0.1.3.post5**，支持通义千问及多项关键改进！详情请查看 [这里](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post5)。
+- **2026-02-07** 🚀 发布 **v0.1.3.post5**，支持通义千问及多项关键改进！详情请查看 [这里](https://github.com/HKUDS/nanocats/releases/tag/v0.1.3.post5)。
 - **2026-02-06** ✨ 新增 Moonshot/Kimi 提供商、Discord 集成，以及增强的安全加固！
 - **2026-02-05** ✨ 新增飞书渠道、DeepSeek 提供商，以及增强的定时任务支持！
-- **2026-02-04** 🚀 发布 **v0.1.3.post4**，支持多提供商和 Docker！详情请查看 [这里](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post4)。
+- **2026-02-04** 🚀 发布 **v0.1.3.post4**，支持多提供商和 Docker！详情请查看 [这里](https://github.com/HKUDS/nanocats/releases/tag/v0.1.3.post4)。
 - **2026-02-03** ⚡ 集成 vLLM 支持本地 LLM，改进自然语言任务调度！
-- **2026-02-02** 🎉 nanobot 正式发布！欢迎体验 🐈 nanobot！
+- **2026-02-02** 🎉 nanocats 正式发布！欢迎体验 🐈 nanocats！
 
 </details>
 
-## nanobot 核心特性
+## nanocats 核心特性
 
 🪶 **超轻量级**：仅约 4,000 行核心 agent 代码 — 比 Clawdbot 小 99%。
 
@@ -75,13 +83,13 @@
 ## 🏗️ 架构
 
 <p align="center">
-  <img src="nanobot_arch.png" alt="nanobot 架构" width="800">
+  <img src="nanocats_arch.png" alt="nanocats 架构" width="800">
 </p>
 
 ## 目录
 
 - [新闻](#-新闻)
-- [核心特性](#nanobot-核心特性)
+- [核心特性](#nanocats-核心特性)
 - [架构](#️-架构)
 - [功能展示](#-功能展示)
 - [安装](#-安装)
@@ -125,21 +133,21 @@
 **从源码安装**（最新功能，推荐开发使用）
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
-cd nanobot
+git clone https://github.com/HKUDS/nanocats.git
+cd nanocats
 pip install -e .
 ```
 
 **使用 [uv](https://github.com/astral-sh/uv) 安装**（稳定版，速度快）
 
 ```bash
-uv tool install nanobot-ai
+uv tool install nanocats-ai
 ```
 
 **从 PyPI 安装**（稳定版）
 
 ```bash
-pip install nanobot-ai
+pip install nanocats-ai
 ```
 
 ### 更新到最新版本
@@ -147,37 +155,37 @@ pip install nanobot-ai
 **PyPI / pip**
 
 ```bash
-pip install -U nanobot-ai
-nanobot --version
+pip install -U nanocats-ai
+nanocats --version
 ```
 
 **uv**
 
 ```bash
-uv tool upgrade nanobot-ai
-nanobot --version
+uv tool upgrade nanocats-ai
+nanocats --version
 ```
 
 **使用 WhatsApp？** 升级后需要重建本地桥接：
 
 ```bash
-rm -rf ~/.nanobot/bridge
-nanobot channels login
+rm -rf ~/.nanocats/bridge
+nanocats channels login
 ```
 
 ## 🚀 快速开始
 
 > [!TIP]
-> 在 `~/.nanobot/config.json` 中设置你的 API 密钥。
+> 在 `~/.nanocats/config.json` 中设置你的 API 密钥。
 > 获取 API 密钥：[OpenRouter](https://openrouter.ai/keys)（全球）· [Brave Search](https://brave.com/search/api/)（可选，用于网页搜索）
 
 **1. 初始化**
 
 ```bash
-nanobot onboard
+nanocats onboard
 ```
 
-**2. 配置**（`~/.nanobot/config.json`）
+**2. 配置**（`~/.nanocats/config.json`）
 
 将以下**两部分**添加或合并到你的配置中（其他选项使用默认值）。
 
@@ -207,14 +215,14 @@ nanobot onboard
 **3. 开始聊天**
 
 ```bash
-nanobot agent
+nanocats agent
 ```
 
 就是这么简单！2 分钟内你就有了一个可用的 AI 助手。
 
 ## 💬 聊天应用
 
-将 nanobot 连接到你喜欢的聊天平台。
+将 nanocats 连接到你喜欢的聊天平台。
 
 | 渠道 | 所需信息 |
 |---------|---------------|
@@ -258,7 +266,7 @@ nanobot agent
 **3. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
@@ -268,30 +276,30 @@ nanobot gateway
 
 默认使用 **Socket.IO WebSocket**，支持 HTTP 轮询回退。
 
-**1. 让 nanobot 为你设置 Mochat**
+**1. 让 nanocats 为你设置 Mochat**
 
-只需向 nanobot 发送以下消息（将 `xxx@xxx` 替换为你的真实邮箱）：
+只需向 nanocats 发送以下消息（将 `xxx@xxx` 替换为你的真实邮箱）：
 
 ```
-Read https://raw.githubusercontent.com/HKUDS/MoChat/refs/heads/main/skills/nanobot/skill.md and register on MoChat. My Email account is xxx@xxx Bind me as your owner and DM me on MoChat.
+Read https://raw.githubusercontent.com/HKUDS/MoChat/refs/heads/main/skills/nanocats/skill.md and register on MoChat. My Email account is xxx@xxx Bind me as your owner and DM me on MoChat.
 ```
 
-nanobot 将自动注册、配置 `~/.nanobot/config.json`，并连接到 Mochat。
+nanocats 将自动注册、配置 `~/.nanocats/config.json`，并连接到 Mochat。
 
 **2. 重启网关**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
-就是这么简单 — nanobot 会处理剩下的工作！
+就是这么简单 — nanocats 会处理剩下的工作！
 
 <br>
 
 <details>
 <summary>手动配置（高级）</summary>
 
-如果你更喜欢手动配置，请在 `~/.nanobot/config.json` 中添加以下内容：
+如果你更喜欢手动配置，请在 `~/.nanocats/config.json` 中添加以下内容：
 
 > 保持 `claw_token` 私密。它只能通过 `X-Claw-Token` 头发送到你的 Mochat API 端点。
 
@@ -365,7 +373,7 @@ nanobot gateway
 **6. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
@@ -376,7 +384,7 @@ nanobot gateway
 首先安装 Matrix 依赖：
 
 ```bash
-pip install nanobot-ai[matrix]
+pip install nanocats-ai[matrix]
 ```
 
 **1. 创建/选择 Matrix 账户**
@@ -387,7 +395,7 @@ pip install nanobot-ai[matrix]
 **2. 获取凭证**
 
 - 你需要：
-  - `userId`（例如：`@nanobot:matrix.org`）
+  - `userId`（例如：`@nanocats:matrix.org`）
   - `accessToken`
   - `deviceId`（推荐，以便在重启之间恢复同步令牌）
 - 你可以从主服务器登录 API（`/_matrix/client/v3/login`）或从客户端的高级会话设置中获取这些信息。
@@ -400,7 +408,7 @@ pip install nanobot-ai[matrix]
     "matrix": {
       "enabled": true,
       "homeserver": "https://matrix.org",
-      "userId": "@nanobot:matrix.org",
+      "userId": "@nanocats:matrix.org",
       "accessToken": "syt_xxx",
       "deviceId": "NANOBOT01",
       "e2eeEnabled": true,
@@ -431,7 +439,7 @@ pip install nanobot-ai[matrix]
 **4. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
@@ -444,7 +452,7 @@ nanobot gateway
 **1. 关联设备**
 
 ```bash
-nanobot channels login
+nanocats channels login
 # 用 WhatsApp 扫描二维码 → 设置 → 已关联的设备
 ```
 
@@ -465,15 +473,15 @@ nanobot channels login
 
 ```bash
 # 终端 1
-nanobot channels login
+nanocats channels login
 
 # 终端 2
-nanobot gateway
+nanocats gateway
 ```
 
 > WhatsApp 桥接更新不会自动应用于现有安装。
-> 升级 nanobot 后，使用以下命令重建本地桥接：
-> `rm -rf ~/.nanobot/bridge && nanobot channels login`
+> 升级 nanocats 后，使用以下命令重建本地桥接：
+> `rm -rf ~/.nanocats/bridge && nanocats channels login`
 
 </details>
 
@@ -487,7 +495,7 @@ nanobot gateway
 - 创建新应用 → 启用 **机器人** 能力
 - **权限**：添加 `im:message`（发送消息）和 `im:message.p2p_msg:readonly`（接收消息）
 - **事件**：添加 `im.message.receive_v1`（接收消息）
-  - 选择 **长连接** 模式（需要先运行 nanobot 建立连接）
+  - 选择 **长连接** 模式（需要先运行 nanocats 建立连接）
 - 从"凭证与基础信息"获取 **App ID** 和 **App Secret**
 - 发布应用
 
@@ -509,12 +517,12 @@ nanobot gateway
 ```
 
 > `encryptKey` 和 `verificationToken` 对于长连接模式是可选的。
-> `allowFrom`：添加你的 open_id（当你给机器人发消息时可以在 nanobot 日志中找到）。使用 `["*"]` 允许所有用户。
+> `allowFrom`：添加你的 open_id（当你给机器人发消息时可以在 nanocats 日志中找到）。使用 `["*"]` 允许所有用户。
 
 **3. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 > [!TIP]
@@ -539,7 +547,7 @@ nanobot gateway
 
 **3. 配置**
 
-> - `allowFrom`：添加你的 openid（当你给机器人发消息时可以在 nanobot 日志中找到）。使用 `["*"]` 允许公开访问。
+> - `allowFrom`：添加你的 openid（当你给机器人发消息时可以在 nanocats 日志中找到）。使用 `["*"]` 允许公开访问。
 > - 生产环境：在机器人控制台提交审核并发布。完整发布流程请参见 [QQ 机器人文档](https://bot.q.qq.com/wiki/)。
 
 ```json
@@ -558,7 +566,7 @@ nanobot gateway
 **4. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 现在从 QQ 给机器人发送消息 — 它应该会回复！
@@ -599,7 +607,7 @@ nanobot gateway
 **3. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
@@ -620,7 +628,7 @@ nanobot gateway
 - **App Home**：滚动到 **Show Tabs** → 启用 **Messages Tab** → 勾选 **"Allow users to send Slash commands and messages from the messages tab"**
 - **Install App**：点击 **Install to Workspace** → 授权 → 复制 **Bot Token**（`xoxb-...`）
 
-**3. 配置 nanobot**
+**3. 配置 nanocats**
 
 ```json
 {
@@ -639,7 +647,7 @@ nanobot gateway
 **4. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 直接给机器人发 DM 或在频道中 @提及它 — 它应该会回复！
@@ -653,10 +661,10 @@ nanobot gateway
 <details>
 <summary><b>Email</b></summary>
 
-给 nanobot 一个专属邮箱账户。它通过 **IMAP** 轮询收件邮件，通过 **SMTP** 回复 — 就像一个私人邮件助手。
+给 nanocats 一个专属邮箱账户。它通过 **IMAP** 轮询收件邮件，通过 **SMTP** 回复 — 就像一个私人邮件助手。
 
 **1. 获取凭证（以 Gmail 为例）**
-- 为你的机器人创建一个专用 Gmail 账户（例如 `my-nanobot@gmail.com`）
+- 为你的机器人创建一个专用 Gmail 账户（例如 `my-nanocats@gmail.com`）
 - 启用两步验证 → 创建一个 [应用专用密码](https://myaccount.google.com/apppasswords)
 - 将此应用密码用于 IMAP 和 SMTP
 
@@ -675,13 +683,13 @@ nanobot gateway
       "consentGranted": true,
       "imapHost": "imap.gmail.com",
       "imapPort": 993,
-      "imapUsername": "my-nanobot@gmail.com",
+      "imapUsername": "my-nanocats@gmail.com",
       "imapPassword": "your-app-password",
       "smtpHost": "smtp.gmail.com",
       "smtpPort": 587,
-      "smtpUsername": "my-nanobot@gmail.com",
+      "smtpUsername": "my-nanocats@gmail.com",
       "smtpPassword": "your-app-password",
-      "fromAddress": "my-nanobot@gmail.com",
+      "fromAddress": "my-nanocats@gmail.com",
       "allowFrom": ["your-real-email@gmail.com"]
     }
   }
@@ -692,7 +700,7 @@ nanobot gateway
 **3. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
@@ -707,7 +715,7 @@ nanobot gateway
 **1. 安装可选依赖**
 
 ```bash
-pip install nanobot-ai[wecom]
+pip install nanocats-ai[wecom]
 ```
 
 **2. 创建企业微信 AI 机器人**
@@ -732,25 +740,25 @@ pip install nanobot-ai[wecom]
 **4. 运行**
 
 ```bash
-nanobot gateway
+nanocats gateway
 ```
 
 </details>
 
 ## 🌐 Agent 社交网络
 
-🐈 nanobot 能够连接到 agent 社交网络（agent 社区）。**只需发送一条消息，你的 nanobot 就会自动加入！**
+🐈 nanocats 能够连接到 agent 社交网络（agent 社区）。**只需发送一条消息，你的 nanocats 就会自动加入！**
 
 | 平台 | 如何加入（向你的机器人发送此消息） |
 |----------|-------------|
 | [**Moltbook**](https://www.moltbook.com/) | `Read https://moltbook.com/skill.md and follow the instructions to join Moltbook` |
 | [**ClawdChat**](https://clawdchat.ai/) | `Read https://clawdchat.ai/skill.md and follow the instructions to join ClawdChat` |
 
-只需将上述命令发送给你的 nanobot（通过 CLI 或任何聊天渠道），它会处理剩下的工作。
+只需将上述命令发送给你的 nanocats（通过 CLI 或任何聊天渠道），它会处理剩下的工作。
 
 ## ⚙️ 配置
 
-配置文件：`~/.nanobot/config.json`
+配置文件：`~/.nanocats/config.json`
 
 ### 提供商
 
@@ -780,8 +788,8 @@ nanobot gateway
 | `zhipu` | LLM（智谱 GLM） | [open.bigmodel.cn](https://open.bigmodel.cn) |
 | `ollama` | LLM（本地，Ollama） | — |
 | `vllm` | LLM（本地，任何 OpenAI 兼容服务器） | — |
-| `openai_codex` | LLM（Codex，OAuth） | `nanobot provider login openai-codex` |
-| `github_copilot` | LLM（GitHub Copilot，OAuth） | `nanobot provider login github-copilot` |
+| `openai_codex` | LLM（Codex，OAuth） | `nanocats provider login openai-codex` |
+| `github_copilot` | LLM（GitHub Copilot，OAuth） | `nanocats provider login github-copilot` |
 
 <details>
 <summary><b>OpenAI Codex（OAuth）</b></summary>
@@ -790,10 +798,10 @@ Codex 使用 OAuth 而非 API 密钥。需要 ChatGPT Plus 或 Pro 账户。
 
 **1. 登录：**
 ```bash
-nanobot provider login openai-codex
+nanocats provider login openai-codex
 ```
 
-**2. 设置模型**（合并到 `~/.nanobot/config.json`）：
+**2. 设置模型**（合并到 `~/.nanocats/config.json`）：
 ```json
 {
   "agents": {
@@ -806,13 +814,13 @@ nanobot provider login openai-codex
 
 **3. 聊天：**
 ```bash
-nanobot agent -m "Hello!"
+nanocats agent -m "Hello!"
 
 # 在本地针对特定工作区/配置
-nanobot agent -c ~/.nanobot-telegram/config.json -m "Hello!"
+nanocats agent -c ~/.nanocats-telegram/config.json -m "Hello!"
 
 # 在该配置基础上一次性覆盖工作区
-nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test -m "Hello!"
+nanocats agent -c ~/.nanocats-telegram/config.json -w /tmp/nanocats-telegram-test -m "Hello!"
 ```
 
 > Docker 用户：使用 `docker run -it` 进行交互式 OAuth 登录。
@@ -854,7 +862,7 @@ nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test -
 ollama run llama3.2
 ```
 
-**2. 添加到配置**（部分 — 合并到 `~/.nanobot/config.json`）：
+**2. 添加到配置**（部分 — 合并到 `~/.nanocats/config.json`）：
 ```json
 {
   "providers": {
@@ -885,7 +893,7 @@ ollama run llama3.2
 vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
 ```
 
-**2. 添加到配置**（部分 — 合并到 `~/.nanobot/config.json`）：
+**2. 添加到配置**（部分 — 合并到 `~/.nanocats/config.json`）：
 
 *提供商（密钥可以是任何非空字符串用于本地）：*
 ```json
@@ -915,23 +923,23 @@ vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000
 <details>
 <summary><b>添加新提供商（开发者指南）</b></summary>
 
-nanobot 使用 **提供商注册表**（`nanobot/providers/registry.py`）作为唯一的真实来源。
+nanocats 使用 **提供商注册表**（`nanocats/providers/registry.py`）作为唯一的真实来源。
 添加新提供商只需 **2 步** — 无需修改 if-elif 链。
 
-**步骤 1.** 在 `nanobot/providers/registry.py` 的 `PROVIDERS` 中添加 `ProviderSpec` 条目：
+**步骤 1.** 在 `nanocats/providers/registry.py` 的 `PROVIDERS` 中添加 `ProviderSpec` 条目：
 
 ```python
 ProviderSpec(
     name="myprovider",                   # 配置字段名
     keywords=("myprovider", "mymodel"),  # 模型名关键词用于自动匹配
     env_key="MYPROVIDER_API_KEY",        # LiteLLM 的环境变量
-    display_name="My Provider",          # 在 `nanobot status` 中显示
+    display_name="My Provider",          # 在 `nanocats status` 中显示
     litellm_prefix="myprovider",         # 自动前缀：model → myprovider/model
     skip_prefixes=("myprovider/",),      # 不要双重前缀
 )
 ```
 
-**步骤 2.** 在 `nanobot/config/schema.py` 的 `ProvidersConfig` 中添加字段：
+**步骤 2.** 在 `nanocats/config/schema.py` 的 `ProvidersConfig` 中添加字段：
 
 ```python
 class ProvidersConfig(BaseModel):
@@ -939,7 +947,7 @@ class ProvidersConfig(BaseModel):
     myprovider: ProviderConfig = ProviderConfig()
 ```
 
-就是这样！环境变量、模型前缀、配置匹配和 `nanobot status` 显示都会自动工作。
+就是这样！环境变量、模型前缀、配置匹配和 `nanocats status` 显示都会自动工作。
 
 **常用 `ProviderSpec` 选项：**
 
@@ -962,7 +970,7 @@ class ProvidersConfig(BaseModel):
 > [!TIP]
 > 配置格式与 Claude Desktop / Cursor 兼容。你可以直接从任何 MCP 服务器的 README 复制 MCP 服务器配置。
 
-nanobot 支持 [MCP](https://modelcontextprotocol.io/) — 连接外部工具服务器并将其作为原生 agent 工具使用。
+nanocats 支持 [MCP](https://modelcontextprotocol.io/) — 连接外部工具服务器并将其作为原生 agent 工具使用。
 
 在 `config.json` 中添加 MCP 服务器：
 
@@ -1028,43 +1036,43 @@ MCP 工具在启动时自动发现和注册。LLM 可以将它们与内置工具
 
 ## 🧩 多实例
 
-使用独立的配置和运行时数据同时运行多个 nanobot 实例。使用 `--config` 作为主入口点，可选使用 `--workspace` 为特定运行覆盖工作区。
+使用独立的配置和运行时数据同时运行多个 nanocats 实例。使用 `--config` 作为主入口点，可选使用 `--workspace` 为特定运行覆盖工作区。
 
 ### 快速开始
 
 ```bash
 # 实例 A - Telegram 机器人
-nanobot gateway --config ~/.nanobot-telegram/config.json
+nanocats gateway --config ~/.nanocats-telegram/config.json
 
 # 实例 B - Discord 机器人  
-nanobot gateway --config ~/.nanobot-discord/config.json
+nanocats gateway --config ~/.nanocats-discord/config.json
 
 # 实例 C - 飞书机器人，自定义端口
-nanobot gateway --config ~/.nanobot-feishu/config.json --port 18792
+nanocats gateway --config ~/.nanocats-feishu/config.json --port 18792
 ```
 
 ### 路径解析
 
-使用 `--config` 时，nanobot 从配置文件位置派生其运行时数据目录。工作区仍来自 `agents.defaults.workspace`，除非你用 `--workspace` 覆盖它。
+使用 `--config` 时，nanocats 从配置文件位置派生其运行时数据目录。工作区仍来自 `agents.defaults.workspace`，除非你用 `--workspace` 覆盖它。
 
 要针对这些实例之一打开 CLI 会话：
 
 ```bash
-nanobot agent -c ~/.nanobot-telegram/config.json -m "Hello from Telegram instance"
-nanobot agent -c ~/.nanobot-discord/config.json -m "Hello from Discord instance"
+nanocats agent -c ~/.nanocats-telegram/config.json -m "Hello from Telegram instance"
+nanocats agent -c ~/.nanocats-discord/config.json -m "Hello from Discord instance"
 
 # 可选的一次性工作区覆盖
-nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test
+nanocats agent -c ~/.nanocats-telegram/config.json -w /tmp/nanocats-telegram-test
 ```
 
-> `nanobot agent` 使用选定的工作区/配置启动本地 CLI agent。它不会附加到或代理已经运行的 `nanobot gateway` 进程。
+> `nanocats agent` 使用选定的工作区/配置启动本地 CLI agent。它不会附加到或代理已经运行的 `nanocats gateway` 进程。
 
 | 组件 | 解析来源 | 示例 |
 |-----------|---------------|---------|
-| **配置** | `--config` 路径 | `~/.nanobot-A/config.json` |
-| **工作区** | `--workspace` 或配置 | `~/.nanobot-A/workspace/` |
-| **Cron 任务** | 配置目录 | `~/.nanobot-A/cron/` |
-| **媒体 / 运行时状态** | 配置目录 | `~/.nanobot-A/media/` |
+| **配置** | `--config` 路径 | `~/.nanocats-A/config.json` |
+| **工作区** | `--workspace` 或配置 | `~/.nanocats-A/workspace/` |
+| **Cron 任务** | 配置目录 | `~/.nanocats-A/cron/` |
+| **媒体 / 运行时状态** | 配置目录 | `~/.nanocats-A/media/` |
 
 ### 工作原理
 
@@ -1084,7 +1092,7 @@ nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test
 {
   "agents": {
     "defaults": {
-      "workspace": "~/.nanobot-telegram/workspace",
+      "workspace": "~/.nanocats-telegram/workspace",
       "model": "anthropic/claude-sonnet-4-6"
     }
   },
@@ -1103,14 +1111,14 @@ nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test
 启动独立实例：
 
 ```bash
-nanobot gateway --config ~/.nanobot-telegram/config.json
-nanobot gateway --config ~/.nanobot-discord/config.json
+nanocats gateway --config ~/.nanocats-telegram/config.json
+nanocats gateway --config ~/.nanocats-discord/config.json
 ```
 
 需要时为一次性运行覆盖工作区：
 
 ```bash
-nanobot gateway --config ~/.nanobot-telegram/config.json --workspace /tmp/nanobot-telegram-test
+nanocats gateway --config ~/.nanocats-telegram/config.json --workspace /tmp/nanocats-telegram-test
 ```
 
 ### 常见用例
@@ -1131,27 +1139,27 @@ nanobot gateway --config ~/.nanobot-telegram/config.json --workspace /tmp/nanobo
 
 | 命令 | 描述 |
 |---------|-------------|
-| `nanobot onboard` | 初始化配置和工作区 |
-| `nanobot agent -m "..."` | 与 agent 聊天 |
-| `nanobot agent -w <workspace>` | 针对特定工作区聊天 |
-| `nanobot agent -w <workspace> -c <config>` | 针对特定工作区/配置聊天 |
-| `nanobot agent` | 交互式聊天模式 |
-| `nanobot agent --no-markdown` | 显示纯文本回复 |
-| `nanobot agent --logs` | 聊天时显示运行时日志 |
-| `nanobot gateway` | 启动网关 |
-| `nanobot status` | 显示状态 |
-| `nanobot provider login openai-codex` | 提供商 OAuth 登录 |
-| `nanobot channels login` | 关联 WhatsApp（扫描二维码） |
-| `nanobot channels status` | 显示渠道状态 |
+| `nanocats onboard` | 初始化配置和工作区 |
+| `nanocats agent -m "..."` | 与 agent 聊天 |
+| `nanocats agent -w <workspace>` | 针对特定工作区聊天 |
+| `nanocats agent -w <workspace> -c <config>` | 针对特定工作区/配置聊天 |
+| `nanocats agent` | 交互式聊天模式 |
+| `nanocats agent --no-markdown` | 显示纯文本回复 |
+| `nanocats agent --logs` | 聊天时显示运行时日志 |
+| `nanocats gateway` | 启动网关 |
+| `nanocats status` | 显示状态 |
+| `nanocats provider login openai-codex` | 提供商 OAuth 登录 |
+| `nanocats channels login` | 关联 WhatsApp（扫描二维码） |
+| `nanocats channels status` | 显示渠道状态 |
 
 交互模式退出方式：`exit`、`quit`、`/exit`、`/quit`、`:q` 或 `Ctrl+D`。
 
 <details>
 <summary><b>心跳（定时任务）</b></summary>
 
-网关每 30 分钟唤醒一次并检查工作区中的 `HEARTBEAT.md`（`~/.nanobot/workspace/HEARTBEAT.md`）。如果文件有任务，agent 会执行它们并将结果发送到你最近活跃的聊天渠道。
+网关每 30 分钟唤醒一次并检查工作区中的 `HEARTBEAT.md`（`~/.nanocats/workspace/HEARTBEAT.md`）。如果文件有任务，agent 会执行它们并将结果发送到你最近活跃的聊天渠道。
 
-**设置：** 编辑 `~/.nanobot/workspace/HEARTBEAT.md`（由 `nanobot onboard` 自动创建）：
+**设置：** 编辑 `~/.nanocats/workspace/HEARTBEAT.md`（由 `nanocats onboard` 自动创建）：
 
 ```markdown
 ## 定时任务
@@ -1162,26 +1170,26 @@ nanobot gateway --config ~/.nanobot-telegram/config.json --workspace /tmp/nanobo
 
 agent 也可以自己管理这个文件 — 让它"添加一个定时任务"，它会为你更新 `HEARTBEAT.md`。
 
-> **注意：** 网关必须正在运行（`nanobot gateway`），并且你必须至少与机器人聊过一次，以便它知道将结果发送到哪个渠道。
+> **注意：** 网关必须正在运行（`nanocats gateway`），并且你必须至少与机器人聊过一次，以便它知道将结果发送到哪个渠道。
 
 </details>
 
 ## 🐳 Docker
 
 > [!TIP]
-> `-v ~/.nanobot:/root/.nanobot` 标志将你的本地配置目录挂载到容器中，这样你的配置和工作区在容器重启之间会持久保存。
+> `-v ~/.nanocats:/root/.nanocats` 标志将你的本地配置目录挂载到容器中，这样你的配置和工作区在容器重启之间会持久保存。
 
 ### Docker Compose
 
 ```bash
-docker compose run --rm nanobot-cli onboard   # 首次设置
-vim ~/.nanobot/config.json                     # 添加 API 密钥
-docker compose up -d nanobot-gateway           # 启动网关
+docker compose run --rm nanocats-cli onboard   # 首次设置
+vim ~/.nanocats/config.json                     # 添加 API 密钥
+docker compose up -d nanocats-gateway           # 启动网关
 ```
 
 ```bash
-docker compose run --rm nanobot-cli agent -m "Hello!"   # 运行 CLI
-docker compose logs -f nanobot-gateway                   # 查看日志
+docker compose run --rm nanocats-cli agent -m "Hello!"   # 运行 CLI
+docker compose logs -f nanocats-gateway                   # 查看日志
 docker compose down                                      # 停止
 ```
 
@@ -1189,33 +1197,33 @@ docker compose down                                      # 停止
 
 ```bash
 # 构建镜像
-docker build -t nanobot .
+docker build -t nanocats .
 
 # 初始化配置（仅首次）
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot onboard
+docker run -v ~/.nanocats:/root/.nanocats --rm nanocats onboard
 
 # 在主机上编辑配置以添加 API 密钥
-vim ~/.nanobot/config.json
+vim ~/.nanocats/config.json
 
 # 运行网关（连接到已启用的渠道，例如 Telegram/Discord/Mochat）
-docker run -v ~/.nanobot:/root/.nanobot -p 18790:18790 nanobot gateway
+docker run -v ~/.nanocats:/root/.nanocats -p 18790:18790 nanocats gateway
 
 # 或运行单个命令
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot agent -m "Hello!"
-docker run -v ~/.nanobot:/root/.nanobot --rm nanobot status
+docker run -v ~/.nanocats:/root/.nanocats --rm nanocats agent -m "Hello!"
+docker run -v ~/.nanocats:/root/.nanocats --rm nanocats status
 ```
 
 ## 🐧 Linux 服务
 
 将网关作为 systemd 用户服务运行，这样它会自动启动并在失败时重启。
 
-**1. 查找 nanobot 二进制文件路径：**
+**1. 查找 nanocats 二进制文件路径：**
 
 ```bash
-which nanobot   # 例如 /home/user/.local/bin/nanobot
+which nanocats   # 例如 /home/user/.local/bin/nanocats
 ```
 
-**2. 创建服务文件** 位于 `~/.config/systemd/user/nanobot-gateway.service`（如需要替换 `ExecStart` 路径）：
+**2. 创建服务文件** 位于 `~/.config/systemd/user/nanocats-gateway.service`（如需要替换 `ExecStart` 路径）：
 
 ```ini
 [Unit]
@@ -1224,7 +1232,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/nanobot gateway
+ExecStart=%h/.local/bin/nanocats gateway
 Restart=always
 RestartSec=10
 NoNewPrivileges=yes
@@ -1239,15 +1247,15 @@ WantedBy=default.target
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now nanobot-gateway
+systemctl --user enable --now nanocats-gateway
 ```
 
 **常用操作：**
 
 ```bash
-systemctl --user status nanobot-gateway        # 检查状态
-systemctl --user restart nanobot-gateway       # 配置更改后重启
-journalctl --user -u nanobot-gateway -f        # 跟踪日志
+systemctl --user status nanocats-gateway        # 检查状态
+systemctl --user restart nanocats-gateway       # 配置更改后重启
+journalctl --user -u nanocats-gateway -f        # 跟踪日志
 ```
 
 如果你编辑了 `.service` 文件本身，在重启前运行 `systemctl --user daemon-reload`。
@@ -1261,7 +1269,7 @@ journalctl --user -u nanobot-gateway -f        # 跟踪日志
 ## 📁 项目结构
 
 ```
-nanobot/
+nanocats/
 ├── agent/          # 🧠 核心 agent 逻辑
 │   ├── loop.py     #    Agent 循环（LLM ↔ 工具执行）
 │   ├── context.py  #    提示构建器
@@ -1284,7 +1292,7 @@ nanobot/
 
 欢迎提交 PR！代码库特意保持小巧和可读。🤗
 
-**路线图** — 选择一项并[提交 PR](https://github.com/HKUDS/nanobot/pulls)！
+**路线图** — 选择一项并[提交 PR](https://github.com/HKUDS/nanocats/pulls)！
 
 - [ ] **多模态** — 看和听（图像、语音、视频）
 - [ ] **长期记忆** — 永不遗忘重要上下文
@@ -1294,29 +1302,29 @@ nanobot/
 
 ### 贡献者
 
-<a href="https://github.com/HKUDS/nanobot/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=HKUDS/nanobot&max=100&columns=12&updated=20260210" alt="Contributors" />
+<a href="https://github.com/HKUDS/nanocats/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=HKUDS/nanocats&max=100&columns=12&updated=20260210" alt="Contributors" />
 </a>
 
 
 ## ⭐ Star 历史
 
 <div align="center">
-  <a href="https://star-history.com/#HKUDS/nanobot&Date">
+  <a href="https://star-history.com/#HKUDS/nanocats&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/nanobot&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanocats&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/nanocats&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/nanocats&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
     </picture>
   </a>
 </div>
 
 <p align="center">
-  <em> 感谢访问 ✨ nanobot！</em><br><br>
-  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.nanobot&style=for-the-badge&color=00d4ff" alt="Views">
+  <em> 感谢访问 ✨ nanocats！</em><br><br>
+  <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.nanocats&style=for-the-badge&color=00d4ff" alt="Views">
 </p>
 
 
 <p align="center">
-  <sub>nanobot 仅供教育、研究和技术交流目的使用</sub>
+  <sub>nanocats 仅供教育、研究和技术交流目的使用</sub>
 </p>
