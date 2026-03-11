@@ -192,8 +192,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     print("\n" + "="*60)
     print("🐱 nanocats Web Interface")
     print("="*60)
-    print(f"📱 Web UI:   http://localhost:8080")
-    print(f"📚 API Docs: http://localhost:8080/docs")
+    print(f"📱 Web UI:   http://localhost:15751")
+    print(f"📚 API Docs: http://localhost:15751/docs")
     print("="*60)
     print("\nLogin with your agent token to start chatting!")
     print("="*60 + "\n")
@@ -641,4 +641,4 @@ async def catch_all(path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=15751)
