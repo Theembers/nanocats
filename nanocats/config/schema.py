@@ -531,6 +531,9 @@ class AgentInstanceConfig(Base):
     ttl: int | None = None  # Time-to-live in seconds (None = no expiry)
     auto_start: bool = True  # Start automatically when swarm starts
 
+    # Access control
+    token: str | None = None  # Access token for web/API authentication
+
     @property
     def workspace_path(self) -> Path:
         """Get expanded workspace path."""

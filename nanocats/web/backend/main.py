@@ -219,22 +219,33 @@ app.add_middleware(
 @app.post("/api/auth/login", response_model=Token)
 async def login(request: LoginRequest):
     """Login with agent ID and token."""
+    # Load main config
+    config = load_config()
+    
     # Load agent config to verify
-    try:
-        agent_config = load_agent_config(request.agent_id)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid agent ID or token")
+    agent_config = load_agent_config(request.agent_id, config)
     
-    # Verify token (in production, use proper token verification)
-    # For now, we use a simple token stored in agent config
-    expected_token = agent_config.token if hasattr(agent_config, 'token') else request.agent_id
+    # Determine agent type
+    agent_type = "user"
     
-    if request.token != expected_token and request.token != "admin":
-        raise HTTPException(status_code=401, detail="Invalid token")
+    if agent_config is None:
+        # Agent not found - only allow login with admin token for new agents
+        if request.token != "admin":
+            raise HTTPException(status_code=401, detail="Invalid agent ID or token")
+        # Create a default agent type for admin login
+        agent_type = "user"
+    else:
+        # Agent exists - verify token
+        agent_type = agent_config.type if hasattr(agent_config, 'type') else "user"
+        expected_token = agent_config.token if hasattr(agent_config, 'token') else None
+        
+        # Allow admin token or configured token
+        if request.token != "admin" and request.token != expected_token:
+            raise HTTPException(status_code=401, detail="Invalid token")
     
     # Create JWT token
     access_token = create_access_token(
-        data={"sub": request.agent_id, "type": agent_config.type}
+        data={"sub": request.agent_id, "type": agent_type}
     )
     
     # Log login
@@ -251,13 +262,22 @@ async def login(request: LoginRequest):
         access_token=access_token,
         token_type="bearer",
         agent_id=request.agent_id,
-        agent_type=agent_config.type
+        agent_type=agent_type
     )
 
 @app.get("/api/agent/me")
 async def get_current_agent_info(current_agent: TokenData = Depends(get_current_agent)):
     """Get current agent information."""
-    agent_config = load_agent_config(current_agent.agent_id)
+    config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, config)
+    if agent_config is None:
+        return {
+            "id": current_agent.agent_id,
+            "name": current_agent.agent_id,
+            "type": current_agent.agent_type or "user",
+            "model": None,
+            "provider": None,
+        }
     return {
         "id": current_agent.agent_id,
         "name": agent_config.name,
@@ -269,7 +289,21 @@ async def get_current_agent_info(current_agent: TokenData = Depends(get_current_
 @app.get("/api/agent/config")
 async def get_agent_config(current_agent: TokenData = Depends(get_current_agent)):
     """Get agent configuration."""
-    agent_config = load_agent_config(current_agent.agent_id)
+    config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, config)
+    if agent_config is None:
+        return {
+            "id": current_agent.agent_id,
+            "name": current_agent.agent_id,
+            "type": "user",
+            "workspace": None,
+            "model": None,
+            "provider": None,
+            "personality": None,
+            "mcp": None,
+            "skills": None,
+            "channels": None,
+        }
     return {
         "id": agent_config.id,
         "name": agent_config.name,
@@ -277,37 +311,41 @@ async def get_agent_config(current_agent: TokenData = Depends(get_current_agent)
         "workspace": agent_config.workspace,
         "model": agent_config.model if hasattr(agent_config, 'model') else None,
         "provider": agent_config.provider if hasattr(agent_config, 'provider') else None,
-        "personality": agent_config.personality.dict() if hasattr(agent_config, 'personality') else None,
-        "mcp": agent_config.mcp.dict() if hasattr(agent_config, 'mcp') else None,
-        "skills": agent_config.skills.dict() if hasattr(agent_config, 'skills') else None,
-        "channels": agent_config.channels.dict() if hasattr(agent_config, 'channels') else None,
+        "personality": agent_config.personality.model_dump() if hasattr(agent_config, 'personality') else None,
+        "mcp": agent_config.mcp.model_dump() if hasattr(agent_config, 'mcp') else None,
+        "skills": agent_config.skills.model_dump() if hasattr(agent_config, 'skills') else None,
+        "channels": agent_config.channels.model_dump() if hasattr(agent_config, 'channels') else None,
     }
 
 @app.put("/api/agent/config")
 async def update_agent_config(
-    config: AgentConfigUpdate,
+    config_update: AgentConfigUpdate,
     current_agent: TokenData = Depends(get_current_agent)
 ):
     """Update agent configuration."""
-    agent_config = load_agent_config(current_agent.agent_id)
+    main_config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, main_config)
     
-    if config.name:
-        agent_config.name = config.name
-    if config.model:
-        agent_config.model = config.model
-    if config.provider:
-        agent_config.provider = config.provider
-    if config.personality:
-        agent_config.personality = AgentPersonalityConfig(**config.personality)
+    if agent_config is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
     
-    save_agent_config(agent_config)
+    if config_update.name:
+        agent_config.name = config_update.name
+    if config_update.model:
+        agent_config.model = config_update.model
+    if config_update.provider:
+        agent_config.provider = config_update.provider
+    if config_update.personality:
+        agent_config.personality = AgentPersonalityConfig(**config_update.personality)
+    
+    save_agent_config(agent_config, main_config)
     
     # Log config update
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO logs (agent_id, category, message, details) VALUES (?, ?, ?, ?)",
-        (current_agent.agent_id, "config", "Configuration updated", json.dumps(config.dict()))
+        (current_agent.agent_id, "config", "Configuration updated", json.dumps(config_update.model_dump()))
     )
     conn.commit()
     conn.close()
@@ -435,12 +473,12 @@ async def get_mcp_servers(current_agent: TokenData = Depends(get_current_agent))
     mcp_servers = global_config.tools.mcpServers if hasattr(global_config.tools, 'mcpServers') else {}
     
     # Load agent-specific MCP config
-    agent_config = load_agent_config(current_agent.agent_id)
-    agent_mcp = agent_config.mcp if hasattr(agent_config, 'mcp') else None
+    agent_config = load_agent_config(current_agent.agent_id, global_config)
+    agent_mcp = agent_config.mcp if agent_config and hasattr(agent_config, 'mcp') else None
     
     return {
         "global": {name: {"command": cfg.command, "args": cfg.args} for name, cfg in mcp_servers.items()},
-        "agent": agent_mcp.dict() if agent_mcp else None,
+        "agent": agent_mcp.model_dump() if agent_mcp else None,
         "can_install_global": current_agent.agent_type == "supervisor"
     }
 
@@ -451,12 +489,12 @@ async def get_skills(current_agent: TokenData = Depends(get_current_agent)):
     global_config = load_config()
     
     # Load agent-specific skills
-    agent_config = load_agent_config(current_agent.agent_id)
-    agent_skills = agent_config.skills if hasattr(agent_config, 'skills') else None
+    agent_config = load_agent_config(current_agent.agent_id, global_config)
+    agent_skills = agent_config.skills if agent_config and hasattr(agent_config, 'skills') else None
     
     return {
         "global": [],  # TODO: Load from skills directory
-        "agent": agent_skills.dict() if agent_skills else None,
+        "agent": agent_skills.model_dump() if agent_skills else None,
         "can_install_global": current_agent.agent_type == "supervisor"
     }
 

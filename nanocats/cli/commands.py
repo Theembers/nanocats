@@ -206,8 +206,420 @@ def onboard():
     console.print("\nNext steps:")
     console.print("  1. Add your API key to [cyan]~/.nanocats/config.json[/cyan]")
     console.print("     Get one at: https://openrouter.ai/keys")
-    console.print("  2. Chat: [cyan]nanocats agent -m \"Hello!\"[/cyan]")
+    console.print('  2. Chat: [cyan]nanocats agent -m "Hello!"[/cyan]')
     console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanocats#-chat-apps[/dim]")
+
+
+@app.command()
+def setup():
+    """Interactive setup wizard for nanocats installation."""
+    import json
+    import secrets
+    import shutil
+    import subprocess
+    from pathlib import Path
+    
+    from nanocats.config.loader import get_config_path, load_config, save_config
+    from nanocats.config.schema import (
+        AgentInstanceConfig,
+        AgentPersonalityConfig,
+        AgentChannelBindingConfig,
+        Config,
+    )
+    
+    console.print(f"\n{__logo__} [bold cyan]nanocats Setup Wizard[/bold cyan]\n")
+    console.print("This wizard will help you set up nanocats with:\n")
+    console.print("  1. Dependency verification")
+    console.print("  2. Model provider configuration")
+    console.print("  3. Admin agent creation")
+    console.print("  4. Channel configuration\n")
+    
+    # =========================================================================
+    # Step 1: Dependency Verification
+    # =========================================================================
+    console.print("[bold]━━━ Step 1/4: Dependency Verification ━━━[/bold]\n")
+    
+    # Check Python version
+    py_version = sys.version_info
+    py_ok = py_version >= (3, 11)
+    console.print(f"  Python {py_version.major}.{py_version.minor}.{py_version.micro} " +
+                  ("[green]✓[/green]" if py_ok else "[red]✗ (requires 3.11+)[/red]"))
+    
+    # Check Node.js (optional, for WhatsApp bridge)
+    node_version = None
+    node_ok = False
+    if shutil.which("node"):
+        try:
+            result = subprocess.run(["node", "--version"], capture_output=True, text=True)
+            node_version = result.stdout.strip().lstrip("v")
+            major = int(node_version.split(".")[0])
+            node_ok = major >= 18
+        except Exception:
+            pass
+    console.print(f"  Node.js {node_version or 'not installed'} " +
+                  ("[green]✓[/green]" if node_ok else "[yellow]○ (optional, for WhatsApp)[/yellow]"))
+    
+    # Check npm
+    npm_ok = shutil.which("npm") is not None
+    console.print(f"  npm {'installed' if npm_ok else 'not installed'} " +
+                  ("[green]✓[/green]" if npm_ok else "[yellow]○ (optional)[/yellow]"))
+    
+    # Check core dependencies
+    core_deps = [
+        ("typer", "typer"),
+        ("rich", "rich"),
+        ("prompt_toolkit", "prompt_toolkit"),
+        ("pydantic", "pydantic"),
+        ("litellm", "litellm"),
+        ("loguru", "loguru"),
+    ]
+    
+    missing_deps = []
+    for name, module in core_deps:
+        try:
+            __import__(module)
+            console.print(f"  {name} [green]✓[/green]")
+        except ImportError:
+            console.print(f"  {name} [red]✗[/red]")
+            missing_deps.append(name)
+    
+    # Check web dependencies (optional)
+    web_deps_ok = True
+    try:
+        import fastapi
+        import uvicorn
+        console.print(f"  fastapi [green]✓[/green]")
+        console.print(f"  uvicorn [green]✓[/green]")
+    except ImportError:
+        web_deps_ok = False
+        console.print(f"  web deps [yellow]○ (optional, run: pip install nanocats[web])[/yellow]")
+    
+    if missing_deps:
+        console.print(f"\n[red]Missing required dependencies: {', '.join(missing_deps)}[/red]")
+        console.print("Install with: [cyan]pip install nanocats[/cyan]\n")
+        raise typer.Exit(1)
+    
+    console.print("\n[green]✓ All core dependencies satisfied[/green]\n")
+    
+    # =========================================================================
+    # Step 2: Model Provider Configuration
+    # =========================================================================
+    console.print("[bold]━━━ Step 2/4: Model Provider Configuration ━━━[/bold]\n")
+    
+    # Load or create config
+    config_path = get_config_path()
+    if config_path.exists():
+        config = load_config()
+        console.print(f"[dim]Using existing config: {config_path}[/dim]\n")
+    else:
+        config = Config()
+        console.print(f"[dim]Creating new config: {config_path}[/dim]\n")
+    
+    # Show available providers
+    console.print("Available model providers:\n")
+    providers = [
+        ("openrouter", "OpenRouter (recommended, access to all models)", "https://openrouter.ai/keys"),
+        ("anthropic", "Anthropic Claude (direct)", "https://console.anthropic.com"),
+        ("openai", "OpenAI GPT (direct)", "https://platform.openai.com"),
+        ("deepseek", "DeepSeek (direct)", "https://platform.deepseek.com"),
+        ("ollama", "Ollama (local, free)", None),
+        ("custom", "Custom OpenAI-compatible endpoint", None),
+    ]
+    
+    for i, (key, desc, url) in enumerate(providers, 1):
+        url_str = f" [dim]→ {url}[/dim]" if url else ""
+        console.print(f"  {i}. {desc}{url_str}")
+    
+    console.print()
+    provider_choice = typer.prompt(
+        "Select provider (1-6)",
+        default="1",
+        show_default=True
+    )
+    
+    try:
+        provider_idx = int(provider_choice) - 1
+        provider_key = providers[provider_idx][0]
+    except (ValueError, IndexError):
+        provider_key = "openrouter"
+    
+    console.print()
+    
+    # Get API key if needed
+    if provider_key not in ("ollama", "custom"):
+        url = providers[[p[0] for p in providers].index(provider_key)][2]
+        console.print(f"[dim]Get your API key at: {url}[/dim]\n")
+        
+        existing_key = getattr(config.providers, provider_key, None)
+        existing_key = existing_key.api_key if existing_key else None
+        
+        if existing_key:
+            masked = existing_key[:8] + "..." + existing_key[-4:] if len(existing_key) > 12 else "***"
+            console.print(f"Existing API key found: {masked}")
+            if not typer.confirm("Update API key?", default=False):
+                api_key = existing_key
+            else:
+                api_key = typer.prompt("Enter API key", hide_input=True)
+        else:
+            api_key = typer.prompt("Enter API key", hide_input=True)
+        
+        # Update config
+        provider_config = getattr(config.providers, provider_key, None)
+        if provider_config:
+            provider_config.api_key = api_key
+        else:
+            from nanocats.config.schema import ProviderConfig
+            setattr(config.providers, provider_key, ProviderConfig(api_key=api_key))
+    
+    elif provider_key == "ollama":
+        console.print("[dim]Make sure Ollama is running: ollama serve[/dim]")
+    
+    elif provider_key == "custom":
+        api_base = typer.prompt("Enter API base URL", default="http://localhost:8000/v1")
+        api_key = typer.prompt("Enter API key (or press Enter to skip)", default="", hide_input=True)
+        
+        if hasattr(config.providers, "custom"):
+            config.providers.custom.api_base = api_base
+            if api_key:
+                config.providers.custom.api_key = api_key
+        else:
+            from nanocats.config.schema import ProviderConfig
+            config.providers.custom = ProviderConfig(api_base=api_base, api_key=api_key or None)
+    
+    # Select model
+    console.print()
+    model_suggestions = {
+        "openrouter": "anthropic/claude-sonnet-4",
+        "anthropic": "claude-sonnet-4-20250514",
+        "openai": "gpt-4o",
+        "deepseek": "deepseek-chat",
+        "ollama": "llama3.2",
+        "custom": "local-model",
+    }
+    
+    default_model = model_suggestions.get(provider_key, "gpt-4o")
+    model = typer.prompt("Enter model name", default=default_model)
+    
+    config.agents.defaults.model = model
+    config.agents.defaults.provider = provider_key
+    
+    console.print(f"\n[green]✓ Provider configured: {provider_key} / {model}[/green]\n")
+    
+    # =========================================================================
+    # Step 3: Admin Agent Configuration
+    # =========================================================================
+    console.print("[bold]━━━ Step 3/4: Admin Agent Configuration ━━━[/bold]\n")
+    
+    # Agent ID
+    default_agent_id = "admin"
+    agent_id = typer.prompt("Agent ID", default=default_agent_id)
+    
+    # Agent name
+    agent_name = typer.prompt("Agent display name", default="Admin Agent")
+    
+    # Access token
+    generated_token = secrets.token_urlsafe(16)
+    console.print(f"\n[dim]Generated access token: {generated_token}[/dim]")
+    use_generated = typer.confirm("Use generated token?", default=True)
+    
+    if use_generated:
+        access_token = generated_token
+    else:
+        access_token = typer.prompt("Enter custom access token", hide_input=True)
+    
+    # Agent type
+    console.print("\nAgent types:")
+    console.print("  1. supervisor - Can manage other agents and global MCP/skills")
+    console.print("  2. user - Regular user agent")
+    console.print("  3. specialized - Domain-specific agent")
+    console.print("  4. task - Single-purpose agent")
+    
+    type_choice = typer.prompt("Select agent type (1-4)", default="1")
+    type_map = {"1": "supervisor", "2": "user", "3": "specialized", "4": "task"}
+    agent_type = type_map.get(type_choice, "supervisor")
+    
+    # Personality
+    console.print("\n[dim]Configure agent personality (optional)[/dim]")
+    configure_personality = typer.confirm("Configure personality?", default=False)
+    
+    personality = None
+    if configure_personality:
+        system_prompt = typer.prompt(
+            "System prompt",
+            default="You are a helpful AI assistant."
+        )
+        personality = AgentPersonalityConfig(
+            name=agent_name,
+            system_prompt=system_prompt,
+        )
+    
+    # Create agent config
+    agents_dir = Path.home() / ".nanocats" / "agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    
+    agent_config = AgentInstanceConfig(
+        id=agent_id,
+        name=agent_name,
+        type=agent_type,
+        model=model,
+        provider=provider_key,
+        personality=personality,
+        auto_start=True,
+    )
+    agent_config.token = access_token  # Store token
+    
+    # Save agent config
+    agent_config_path = agents_dir / f"{agent_id}.json"
+    with open(agent_config_path, "w", encoding="utf-8") as f:
+        json.dump(agent_config.model_dump(by_alias=True), f, indent=2, ensure_ascii=False)
+    
+    console.print(f"\n[green]✓ Agent '{agent_id}' created at {agent_config_path}[/green]\n")
+    
+    # =========================================================================
+    # Step 4: Channel Configuration
+    # =========================================================================
+    console.print("[bold]━━━ Step 4/4: Channel Configuration ━━━[/bold]\n")
+    
+    console.print("Available channels:\n")
+    channels = [
+        ("telegram", "Telegram", "Bot token from @BotFather"),
+        ("discord", "Discord", "Bot token + Message Content intent"),
+        ("feishu", "Feishu (飞书)", "App ID + App Secret"),
+        ("dingtalk", "DingTalk (钉钉)", "App Key + App Secret"),
+        ("slack", "Slack", "Bot token + App-Level token"),
+        ("whatsapp", "WhatsApp", "QR code scan"),
+        ("email", "Email", "IMAP/SMTP credentials"),
+        ("none", "None (CLI only)", "Skip channel setup"),
+    ]
+    
+    for i, (key, name, req) in enumerate(channels, 1):
+        console.print(f"  {i}. {name} [dim]→ {req}[/dim]")
+    
+    console.print()
+    channel_choice = typer.prompt(
+        "Select channel (1-8)",
+        default="8",
+        show_default=True
+    )
+    
+    try:
+        channel_idx = int(channel_choice) - 1
+        selected_channel = channels[channel_idx][0]
+    except (ValueError, IndexError):
+        selected_channel = "none"
+    
+    # Configure selected channel
+    if selected_channel != "none":
+        console.print()
+        
+        if selected_channel == "telegram":
+            token = typer.prompt("Enter Telegram bot token")
+            allow_from = typer.prompt("Enter allowed user IDs (comma-separated, or * for all)", default="*")
+            config.channels.telegram.enabled = True
+            config.channels.telegram.token = token
+            if allow_from != "*":
+                config.channels.telegram.allow_from = allow_from.split(",")
+        
+        elif selected_channel == "discord":
+            token = typer.prompt("Enter Discord bot token")
+            config.channels.discord.enabled = True
+            config.channels.discord.token = token
+        
+        elif selected_channel == "feishu":
+            app_id = typer.prompt("Enter Feishu App ID")
+            app_secret = typer.prompt("Enter Feishu App Secret", hide_input=True)
+            config.channels.feishu.enabled = True
+            config.channels.feishu.app_id = app_id
+            config.channels.feishu.app_secret = app_secret
+        
+        elif selected_channel == "dingtalk":
+            client_id = typer.prompt("Enter DingTalk App Key")
+            client_secret = typer.prompt("Enter DingTalk App Secret", hide_input=True)
+            config.channels.dingtalk.enabled = True
+            config.channels.dingtalk.client_id = client_id
+            config.channels.dingtalk.client_secret = client_secret
+        
+        elif selected_channel == "slack":
+            bot_token = typer.prompt("Enter Slack bot token (xoxb-...)")
+            app_token = typer.prompt("Enter Slack app token (xapp-...)")
+            config.channels.slack.enabled = True
+            config.channels.slack.bot_token = bot_token
+            config.channels.slack.app_token = app_token
+        
+        elif selected_channel == "whatsapp":
+            console.print("[dim]Run 'nanocats channels login' to scan QR code[/dim]")
+            config.channels.whatsapp.enabled = True
+        
+        elif selected_channel == "email":
+            imap_host = typer.prompt("Enter IMAP host")
+            imap_user = typer.prompt("Enter IMAP username")
+            imap_pass = typer.prompt("Enter IMAP password", hide_input=True)
+            smtp_host = typer.prompt("Enter SMTP host")
+            config.channels.email.enabled = True
+            config.channels.email.imap_host = imap_host
+            config.channels.email.imap_user = imap_user
+            config.channels.email.imap_pass = imap_pass
+            config.channels.email.smtp_host = smtp_host
+        
+        # Enable channel for agent
+        agent_config.channels = AgentChannelBindingConfig(enabled=[selected_channel])
+        
+        console.print(f"\n[green]✓ Channel '{selected_channel}' configured[/green]\n")
+    
+    # =========================================================================
+    # Save and Summary
+    # =========================================================================
+    
+    # Enable swarm mode
+    config.agents.swarm.enabled = True
+    
+    # Save main config
+    save_config(config)
+    
+    # Create workspace
+    workspace = get_workspace_path()
+    if not workspace.exists():
+        workspace.mkdir(parents=True, exist_ok=True)
+    sync_workspace_templates(workspace)
+    
+    # Print summary
+    console.print("\n" + "=" * 60)
+    console.print(f"{__logo__} [bold green]Setup Complete![/bold green]")
+    console.print("=" * 60)
+    console.print()
+    console.print(f"[bold]Configuration:[/bold]")
+    console.print(f"  Config file: [cyan]{config_path}[/cyan]")
+    console.print(f"  Workspace: [cyan]{workspace}[/cyan]")
+    console.print()
+    console.print(f"[bold]Provider:[/bold]")
+    console.print(f"  Provider: [cyan]{provider_key}[/cyan]")
+    console.print(f"  Model: [cyan]{model}[/cyan]")
+    console.print()
+    console.print(f"[bold]Admin Agent:[/bold]")
+    console.print(f"  ID: [cyan]{agent_id}[/cyan]")
+    console.print(f"  Name: [cyan]{agent_name}[/cyan]")
+    console.print(f"  Type: [cyan]{agent_type}[/cyan]")
+    console.print(f"  Access Token: [yellow]{access_token}[/yellow]")
+    console.print()
+    
+    if selected_channel != "none":
+        console.print(f"[bold]Channel:[/bold]")
+        console.print(f"  Enabled: [cyan]{selected_channel}[/cyan]")
+        console.print()
+    
+    console.print("[bold]Next Steps:[/bold]")
+    console.print()
+    console.print("  1. Start the gateway:")
+    console.print("     [cyan]nanocats gateway[/cyan]")
+    console.print()
+    console.print("  2. Or start the web interface:")
+    console.print("     [cyan]nanocats web[/cyan]")
+    console.print(f"     Then login with Agent ID: [yellow]{agent_id}[/yellow] and your token")
+    console.print()
+    console.print("  3. Or chat directly:")
+    console.print("     [cyan]nanocats agent[/cyan]")
+    console.print()
+    console.print("[dim]Save your access token securely! You'll need it to login.[/dim]\n")
 
 
 
