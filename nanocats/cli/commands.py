@@ -341,6 +341,9 @@ def setup():
         ("anthropic", "Anthropic Claude (direct)", "https://console.anthropic.com"),
         ("openai", "OpenAI GPT (direct)", "https://platform.openai.com"),
         ("deepseek", "DeepSeek (direct)", "https://platform.deepseek.com"),
+        ("minimax", "MiniMax", "https://platform.minimaxi.com"),
+        ("qwen", "Qwen", "https://dashscope.console.aliyun.com"),
+        ("zhipu", "Zhipu AI", "https://open.bigmodel.cn"),
         ("ollama", "Ollama (local, free)", None),
         ("custom", "Custom OpenAI-compatible endpoint", None),
     ]
@@ -351,7 +354,7 @@ def setup():
     
     console.print()
     provider_choice = typer.prompt(
-        "Select provider (1-6)",
+        "Select provider (1-9)",
         default="1",
         show_default=True
     )
@@ -412,6 +415,9 @@ def setup():
         "anthropic": "claude-sonnet-4-20250514",
         "openai": "gpt-4o",
         "deepseek": "deepseek-chat",
+        "minimax": "abab6.5s-chat",
+        "qwen": "qwen-turbo",
+        "zhipu": "glm-4-flash",
         "ollama": "llama3.2",
         "custom": "local-model",
     }
