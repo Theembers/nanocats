@@ -1214,5 +1214,61 @@ def _login_github_copilot() -> None:
         raise typer.Exit(1)
 
 
+# ============================================================================
+# Web Interface Command
+# ============================================================================
+
+@app.command()
+def web(
+    port: int = typer.Option(8080, "--port", "-p", help="Web server port"),
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Web server host"),
+    dev: bool = typer.Option(False, "--dev", help="Run in development mode with auto-reload"),
+):
+    """Start the nanocats web interface."""
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    web_backend_path = Path(__file__).parent.parent / "web" / "backend" / "main.py"
+    
+    if not web_backend_path.exists():
+        console.print(f"[red]Web backend not found at {web_backend_path}[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"{__logo__} Starting nanocats Web Interface...\n")
+    
+    # Check dependencies
+    try:
+        import fastapi
+        import uvicorn
+    except ImportError:
+        console.print("[yellow]Installing web dependencies...[/yellow]")
+        req_file = web_backend_path.parent / "requirements.txt"
+        subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
+        console.print("[green]✓ Dependencies installed[/green]\n")
+    
+    console.print("=" * 60)
+    console.print("🐱 nanocats Web Interface")
+    console.print("=" * 60)
+    console.print(f"📱 Web UI:   http://localhost:{port}")
+    console.print(f"📚 API Docs: http://localhost:{port}/docs")
+    console.print("=" * 60)
+    console.print("\n[dim]Login with your agent token to start chatting![/dim]")
+    console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
+    
+    # Start the server
+    import uvicorn
+    try:
+        uvicorn.run(
+            "nanocats.web.backend.main:app",
+            host=host,
+            port=port,
+            reload=dev,
+            log_level="info"
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Web server stopped[/yellow]")
+
+
 if __name__ == "__main__":
     app()
