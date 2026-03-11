@@ -415,9 +415,9 @@ def setup():
         "anthropic": "claude-sonnet-4-20250514",
         "openai": "gpt-4o",
         "deepseek": "deepseek-chat",
-        "minimax": "abab6.5s-chat",
-        "qwen": "qwen-turbo",
-        "zhipu": "glm-4-flash",
+        "minimax": "MiniMax-M2.5",
+        "qwen": "qwen3-max",
+        "zhipu": "glm-5",
         "ollama": "llama3.2",
         "custom": "local-model",
     }
