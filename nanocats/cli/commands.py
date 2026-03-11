@@ -203,11 +203,30 @@ def onboard():
     sync_workspace_templates(workspace)
 
     console.print(f"\n{__logo__} nanocats is ready!")
-    console.print("\nNext steps:")
-    console.print("  1. Add your API key to [cyan]~/.nanocats/config.json[/cyan]")
-    console.print("     Get one at: https://openrouter.ai/keys")
-    console.print('  2. Chat: [cyan]nanocats agent -m "Hello!"[/cyan]')
-    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanocats#-chat-apps[/dim]")
+    console.print("\n[bold]Next Steps:[/bold]\n")
+    
+    console.print("[bold cyan]━━━ Web Interface ━━━[/bold cyan]")
+    console.print("  Start web server:")
+    console.print("  [cyan]nanocats web[/cyan]")
+    console.print("\n  Access: [yellow]http://localhost:15751[/yellow]")
+    console.print("  API Docs: [yellow]http://localhost:15751/docs[/yellow]")
+    console.print("\n  [dim]Login with Agent ID and Token (configured via 'nanocats setup')[/dim]")
+    
+    console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
+    console.print("  Show all commands:")
+    console.print("  [cyan]nanocats --help[/cyan]")
+    console.print("\n  Common commands:")
+    console.print("  [cyan]nanocats setup[/cyan]      # Interactive setup wizard")
+    console.print("  [cyan]nanocats agent[/cyan]      # Start interactive chat")
+    console.print("  [cyan]nanocats gateway[/cyan]    # Start channel gateway")
+    console.print("  [cyan]nanocats web[/cyan]        # Start web interface")
+    console.print("  [cyan]nanocats status[/cyan]     # Show system status")
+    console.print("  [cyan]nanocats swarm list[/cyan] # List configured agents")
+    
+    console.print("\n[bold cyan]━━━ Configuration ━━━[/bold cyan]")
+    console.print("  Config file: [cyan]~/.nanocats/config.json[/cyan]")
+    console.print("  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
+    console.print("\n[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
 
 
 @app.command()
@@ -607,19 +626,32 @@ def setup():
         console.print(f"  Enabled: [cyan]{selected_channel}[/cyan]")
         console.print()
     
-    console.print("[bold]Next Steps:[/bold]")
-    console.print()
-    console.print("  1. Start the gateway:")
-    console.print("     [cyan]nanocats gateway[/cyan]")
-    console.print()
-    console.print("  2. Or start the web interface:")
-    console.print("     [cyan]nanocats web[/cyan]")
-    console.print(f"     Then login with Agent ID: [yellow]{agent_id}[/yellow] and your token")
-    console.print()
-    console.print("  3. Or chat directly:")
-    console.print("     [cyan]nanocats agent[/cyan]")
-    console.print()
-    console.print("[dim]Save your access token securely! You'll need it to login.[/dim]\n")
+    console.print("[bold]Next Steps:[/bold]\n")
+    
+    console.print("[bold cyan]━━━ Web Interface ━━━[/bold cyan]")
+    console.print("  Start web server:")
+    console.print("  [cyan]nanocats web[/cyan]")
+    console.print(f"\n  Access: [yellow]http://localhost:15751[/yellow]")
+    console.print("  API Docs: [yellow]http://localhost:15751/docs[/yellow]")
+    console.print(f"\n  [dim]Login with:[/dim]")
+    console.print(f"  [dim]  Agent ID: [cyan]{agent_id}[/cyan][/dim]")
+    console.print(f"  [dim]  Token: [yellow]{access_token}[/yellow][/dim]")
+    
+    console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
+    console.print("  Show all commands:")
+    console.print("  [cyan]nanocats --help[/cyan]")
+    console.print("\n  Common commands:")
+    console.print("  [cyan]nanocats agent[/cyan]      # Start interactive chat")
+    console.print("  [cyan]nanocats gateway[/cyan]    # Start channel gateway")
+    console.print("  [cyan]nanocats web[/cyan]        # Start web interface")
+    console.print("  [cyan]nanocats status[/cyan]     # Show system status")
+    console.print("  [cyan]nanocats swarm list[/cyan] # List configured agents")
+    
+    console.print("\n[bold cyan]━━━ Configuration Files ━━━[/bold cyan]")
+    console.print(f"  Main config: [cyan]{config_path}[/cyan]")
+    console.print(f"  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
+    console.print("\n[dim]⚠ Save your access token securely! You'll need it to login.[/dim]")
+    console.print("[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
 
 
 
@@ -1632,7 +1664,7 @@ def _login_github_copilot() -> None:
 
 @app.command()
 def web(
-    port: int = typer.Option(8080, "--port", "-p", help="Web server port"),
+    port: int = typer.Option(15751, "--port", "-p", help="Web server port"),
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Web server host"),
     dev: bool = typer.Option(False, "--dev", help="Run in development mode with auto-reload"),
 ):
