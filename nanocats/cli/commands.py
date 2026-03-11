@@ -227,6 +227,42 @@ def onboard():
     console.print("  Config file: [cyan]~/.nanocats/config.json[/cyan]")
     console.print("  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
     console.print("\n[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
+    
+    # Ask if user wants to run setup or start web
+    console.print("[bold cyan]━━━ Quick Start ━━━[/bold cyan]\n")
+    console.print("What would you like to do next?")
+    console.print("  1. Run setup wizard (recommended for new users)")
+    console.print("  2. Start web interface")
+    console.print("  3. Skip for now\n")
+    
+    choice = typer.prompt("Select option (1-3)", default="1")
+    
+    if choice == "1":
+        console.print()
+        setup()
+    elif choice == "2":
+        console.print()
+        import uvicorn
+        try:
+            console.print("=" * 60)
+            console.print("🐱 nanocats Web Interface")
+            console.print("=" * 60)
+            console.print(f"📱 Web UI:   http://localhost:15751")
+            console.print(f"📚 API Docs: http://localhost:15751/docs")
+            console.print("=" * 60)
+            console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
+            
+            uvicorn.run(
+                "nanocats.web.backend.main:app",
+                host="0.0.0.0",
+                port=15751,
+                reload=False,
+                log_level="info"
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Web server stopped[/yellow]")
+    else:
+        console.print("\n[dim]You can start the web server later with: nanocats web[/dim]\n")
 
 
 @app.command()
@@ -634,9 +670,35 @@ def setup():
     console.print(f"  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
     console.print("\n[dim]⚠ Save your access token securely! You'll need it to login.[/dim]")
     console.print("[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
-
-
-
+    
+    # Ask if user wants to start web server
+    console.print("[bold cyan]━━━ Start Web Server? ━━━[/bold cyan]\n")
+    console.print("Would you like to start the web interface now?")
+    console.print(f"  Access: [yellow]http://localhost:15751[/yellow]")
+    console.print(f"  Login with Agent ID: [cyan]{agent_id}[/cyan] and your token\n")
+    
+    if typer.confirm("Start web server?", default=True):
+        console.print()
+        # Start web server
+        import uvicorn
+        try:
+            console.print("=" * 60)
+            console.print("🐱 nanocats Web Interface")
+            console.print("=" * 60)
+            console.print(f"📱 Web UI:   http://localhost:15751")
+            console.print(f"📚 API Docs: http://localhost:15751/docs")
+            console.print("=" * 60)
+            console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
+            
+            uvicorn.run(
+                "nanocats.web.backend.main:app",
+                host="0.0.0.0",
+                port=15751,
+                reload=False,
+                log_level="info"
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Web server stopped[/yellow]")
 
 
 def _make_provider(config: Config):
