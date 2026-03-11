@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Save, User, Bot, Server, Wrench } from 'lucide-react';
 import type { AgentConfig } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
 
 export default function ConfigPage() {
   const { token } = useAuth();

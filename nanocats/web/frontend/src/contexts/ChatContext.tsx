@@ -15,7 +15,7 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
