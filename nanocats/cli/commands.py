@@ -241,7 +241,6 @@ def setup():
     from nanocats.config.loader import get_config_path, load_config, save_config
     from nanocats.config.schema import (
         AgentInstanceConfig,
-        AgentPersonalityConfig,
         AgentChannelBindingConfig,
         Config,
     )
@@ -452,31 +451,9 @@ def setup():
     else:
         access_token = typer.prompt("Enter custom access token", hide_input=True)
     
-    # Agent type
-    console.print("\nAgent types:")
-    console.print("  1. supervisor - Can manage other agents and global MCP/skills")
-    console.print("  2. user - Regular user agent")
-    console.print("  3. specialized - Domain-specific agent")
-    console.print("  4. task - Single-purpose agent")
-    
-    type_choice = typer.prompt("Select agent type (1-4)", default="1")
-    type_map = {"1": "supervisor", "2": "user", "3": "specialized", "4": "task"}
-    agent_type = type_map.get(type_choice, "supervisor")
-    
-    # Personality
-    console.print("\n[dim]Configure agent personality (optional)[/dim]")
-    configure_personality = typer.confirm("Configure personality?", default=False)
-    
-    personality = None
-    if configure_personality:
-        system_prompt = typer.prompt(
-            "System prompt",
-            default="You are a helpful AI assistant."
-        )
-        personality = AgentPersonalityConfig(
-            name=agent_name,
-            system_prompt=system_prompt,
-        )
+    # Agent type - always supervisor for admin
+    agent_type = "supervisor"
+    console.print(f"\n[dim]Agent type: [cyan]{agent_type}[/cyan] (admin agent)[/dim]")
     
     # Create agent config
     agents_dir = Path.home() / ".nanocats" / "agents"
@@ -488,7 +465,6 @@ def setup():
         type=agent_type,
         model=model,
         provider=provider_key,
-        personality=personality,
         auto_start=True,
     )
     agent_config.token = access_token  # Store token
