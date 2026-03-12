@@ -50,7 +50,15 @@ class LoginRequest(BaseModel):
 
 class ChatMessage(BaseModel):
     message: str
-    conversation_id: Optional[str] = None
+    conversation_id: Optional[str] = None  # Deprecated, kept for compatibility
+
+class MessageHistoryItem(BaseModel):
+    id: str
+    channel: str  # web, feishu, dingtalk, telegram, etc.
+    role: str
+    content: str
+    timestamp: str
+    metadata: Optional[dict] = None
 
 class AgentConfigUpdate(BaseModel):
     name: Optional[str] = None
@@ -436,101 +444,234 @@ async def update_workspace_file(
 
 @app.get("/api/conversations")
 async def get_conversations(current_agent: TokenData = Depends(get_current_agent)):
-    """Get agent's conversations."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC",
-        (current_agent.agent_id,)
-    )
-    conversations = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return conversations
+    """
+    Get agent's conversations.
+    
+    DEPRECATED: This endpoint is kept for backward compatibility.
+    The new unified message flow uses /api/messages instead.
+    """
+    # Return empty list - conversations are no longer used
+    return []
 
 @app.post("/api/conversations")
 async def create_conversation(current_agent: TokenData = Depends(get_current_agent)):
-    """Create a new conversation."""
-    conversation_id = str(uuid.uuid4())
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO conversations (id, agent_id, title) VALUES (?, ?, ?)",
-        (conversation_id, current_agent.agent_id, "New Chat")
-    )
-    conn.commit()
-    conn.close()
-    return {"id": conversation_id, "title": "New Chat"}
+    """
+    Create a new conversation.
+    
+    DEPRECATED: This endpoint is kept for backward compatibility.
+    The new unified message flow doesn't use conversations.
+    """
+    # Return a dummy conversation for compatibility
+    return {"id": "unified", "title": "Chat"}
 
 @app.get("/api/conversations/{conversation_id}/messages")
 async def get_messages(
     conversation_id: str,
     current_agent: TokenData = Depends(get_current_agent)
 ):
-    """Get messages in a conversation."""
-    conn = get_db()
-    cursor = conn.cursor()
+    """
+    Get messages in a conversation.
     
-    # Verify conversation belongs to agent
-    cursor.execute(
-        "SELECT * FROM conversations WHERE id = ? AND agent_id = ?",
-        (conversation_id, current_agent.agent_id)
-    )
-    if not cursor.fetchone():
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    DEPRECATED: Use /api/messages instead for unified message history.
+    """
+    # Redirect to unified messages endpoint
+    return await get_message_history(current_agent)
+
+
+@app.get("/api/messages")
+async def get_message_history(
+    current_agent: TokenData = Depends(get_current_agent),
+    channel: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """
+    Get unified message history across all channels.
     
-    cursor.execute(
-        "SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp",
-        (conversation_id,)
-    )
-    messages = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return messages
+    This endpoint returns messages from all channels (web, feishu, dingtalk, etc.)
+    in a unified timeline, ordered by timestamp.
+    
+    Args:
+        channel: Filter by specific channel (web, feishu, dingtalk, telegram, etc.)
+        search: Search query to filter messages
+        limit: Maximum number of messages to return
+        offset: Offset for pagination
+    """
+    from nanocats.config.paths import get_workspace_path
+    from nanocats.session.manager import SessionManager
+    
+    # Load agent config to get workspace
+    config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, config)
+    
+    if agent_config is None:
+        # Fallback to default workspace
+        workspace = Path(get_workspace_path())
+    else:
+        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
+        workspace = Path(ws).expanduser()
+    
+    # Initialize session manager
+    session_manager = SessionManager(workspace)
+    
+    # Get all sessions for this agent
+    sessions = session_manager.list_sessions()
+    
+    messages = []
+    for session_info in sessions:
+        session_key = session_info.get("key", "")
+        
+        # Parse channel from session key (format: channel:chat_id)
+        if ":" in session_key:
+            session_channel, chat_id = session_key.split(":", 1)
+        else:
+            session_channel = "unknown"
+            chat_id = session_key
+        
+        # Filter by channel if specified
+        if channel and session_channel != channel:
+            continue
+        
+        # Load session messages
+        session = session_manager.get_or_create(session_key)
+        
+        for idx, msg in enumerate(session.messages):
+            content = msg.get("content", "")
+            
+            # Search filter
+            if search and search.lower() not in content.lower():
+                continue
+            
+            messages.append({
+                "id": f"{session_key}:{idx}",
+                "channel": session_channel,
+                "chat_id": chat_id,
+                "role": msg.get("role", "unknown"),
+                "content": content,
+                "timestamp": msg.get("timestamp", session_info.get("updated_at", "")),
+                "session_key": session_key,
+            })
+    
+    # Sort by timestamp descending
+    messages.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    
+    # Pagination
+    total = len(messages)
+    messages = messages[offset:offset + limit]
+    
+    return {
+        "messages": messages,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@app.get("/api/messages/channels")
+async def get_message_channels(
+    current_agent: TokenData = Depends(get_current_agent)
+):
+    """
+    Get list of channels with message counts for the current agent.
+    """
+    from nanocats.config.paths import get_workspace_path
+    from nanocats.session.manager import SessionManager
+    
+    # Load agent config to get workspace
+    config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, config)
+    
+    if agent_config is None:
+        workspace = Path(get_workspace_path())
+    else:
+        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
+        workspace = Path(ws).expanduser()
+    
+    session_manager = SessionManager(workspace)
+    sessions = session_manager.list_sessions()
+    
+    # Count messages per channel
+    channel_stats = {}
+    for session_info in sessions:
+        session_key = session_info.get("key", "")
+        if ":" in session_key:
+            channel, _ = session_key.split(":", 1)
+        else:
+            channel = "unknown"
+        
+        session = session_manager.get_or_create(session_key)
+        msg_count = len(session.messages)
+        
+        if channel not in channel_stats:
+            channel_stats[channel] = {"count": 0, "sessions": 0}
+        
+        channel_stats[channel]["count"] += msg_count
+        channel_stats[channel]["sessions"] += 1
+    
+    return [
+        {"channel": ch, "message_count": stats["count"], "session_count": stats["sessions"]}
+        for ch, stats in sorted(channel_stats.items())
+    ]
 
 @app.post("/api/chat")
 async def chat(
     message: ChatMessage,
     current_agent: TokenData = Depends(get_current_agent)
 ):
-    """Send a chat message and get response."""
-    conversation_id = message.conversation_id or str(uuid.uuid4())
+    """
+    Send a chat message and get response.
     
-    # Store user message
-    conn = get_db()
-    cursor = conn.cursor()
+    This endpoint now uses the unified session model. All web messages
+    are stored in a single web session for the agent, maintaining
+    continuity across the entire conversation history.
+    """
+    from nanocats.config.paths import get_workspace_path
+    from nanocats.session.manager import SessionManager
+    from datetime import datetime
     
-    # Create conversation if not exists
-    cursor.execute(
-        "INSERT OR IGNORE INTO conversations (id, agent_id, title) VALUES (?, ?, ?)",
-        (conversation_id, current_agent.agent_id, "Chat")
-    )
+    # Use unified web session for this agent
+    session_key = f"web:{current_agent.agent_id}"
     
-    cursor.execute(
-        "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
-        (conversation_id, "user", message.message)
-    )
+    # Load agent config to get workspace
+    config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, config)
     
-    # Update conversation timestamp
-    cursor.execute(
-        "UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (conversation_id,)
-    )
+    if agent_config is None:
+        workspace = Path(get_workspace_path())
+    else:
+        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
+        workspace = Path(ws).expanduser()
     
-    conn.commit()
-    conn.close()
+    # Initialize session manager and get/create session
+    session_manager = SessionManager(workspace)
+    session = session_manager.get_or_create(session_key)
+    
+    # Add user message to session
+    user_msg = {
+        "role": "user",
+        "content": message.message,
+        "timestamp": datetime.now().isoformat(),
+        "channel": "web",
+    }
+    session.messages.append(user_msg)
+    session.updated_at = datetime.now()
+    session_manager.save(session)
     
     # TODO: Integrate with actual agent loop for response
     # For now, return a placeholder response
     response_content = f"Echo: {message.message}"
     
-    # Store assistant response
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
-        (conversation_id, "assistant", response_content)
-    )
-    conn.commit()
-    conn.close()
+    # Add assistant response to session
+    assistant_msg = {
+        "role": "assistant",
+        "content": response_content,
+        "timestamp": datetime.now().isoformat(),
+        "channel": "web",
+    }
+    session.messages.append(assistant_msg)
+    session.updated_at = datetime.now()
+    session_manager.save(session)
     
     # Log chat
     conn = get_db()
@@ -544,7 +685,8 @@ async def chat(
     
     return {
         "response": response_content,
-        "conversation_id": conversation_id
+        "conversation_id": "unified",  # Deprecated, kept for compatibility
+        "session_key": session_key,
     }
 
 @app.get("/api/mcp/servers")

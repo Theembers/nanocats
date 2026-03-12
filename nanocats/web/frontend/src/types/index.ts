@@ -37,11 +37,19 @@ export interface Conversation {
 }
 
 export interface Message {
-  id: number;
-  conversation_id: string;
+  id: string;
+  channel: string;
+  chat_id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  session_key?: string;
+}
+
+export interface Channel {
+  channel: string;
+  message_count: number;
+  session_count: number;
 }
 
 export interface TokenStats {
