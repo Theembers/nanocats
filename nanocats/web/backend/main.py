@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from nanocats.config.paths import get_workspace_path
 from nanocats.config.loader import load_config, load_agent_config, save_agent_config
-from nanocats.config.schema import AgentInstanceConfig, AgentPersonalityConfig
+from nanocats.config.schema import AgentInstanceConfig
 
 # Configuration
 SECRET_KEY = "nanocats-secret-key-change-in-production"
@@ -54,7 +54,6 @@ class ChatMessage(BaseModel):
 
 class AgentConfigUpdate(BaseModel):
     name: Optional[str] = None
-    personality: Optional[dict] = None
     model: Optional[str] = None
     provider: Optional[str] = None
 
@@ -302,7 +301,6 @@ async def get_agent_config(current_agent: TokenData = Depends(get_current_agent)
             "workspace": None,
             "model": None,
             "provider": None,
-            "personality": None,
             "mcp": None,
             "skills": None,
             "channels": None,
@@ -314,7 +312,6 @@ async def get_agent_config(current_agent: TokenData = Depends(get_current_agent)
         "workspace": agent_config.workspace,
         "model": agent_config.model if hasattr(agent_config, 'model') else None,
         "provider": agent_config.provider if hasattr(agent_config, 'provider') else None,
-        "personality": agent_config.personality.model_dump() if hasattr(agent_config, 'personality') else None,
         "mcp": agent_config.mcp.model_dump() if hasattr(agent_config, 'mcp') else None,
         "skills": agent_config.skills.model_dump() if hasattr(agent_config, 'skills') else None,
         "channels": agent_config.channels.model_dump() if hasattr(agent_config, 'channels') else None,
@@ -338,8 +335,6 @@ async def update_agent_config(
         agent_config.model = config_update.model
     if config_update.provider:
         agent_config.provider = config_update.provider
-    if config_update.personality:
-        agent_config.personality = AgentPersonalityConfig(**config_update.personality)
     
     save_agent_config(agent_config, main_config)
     
