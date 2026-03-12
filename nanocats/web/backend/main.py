@@ -69,6 +69,9 @@ class SkillConfig(BaseModel):
     name: str
     enabled: bool = True
 
+class WorkspaceFileUpdate(BaseModel):
+    content: str
+
 class TokenUsage(BaseModel):
     timestamp: str
     agent_id: str
@@ -351,6 +354,74 @@ async def update_agent_config(
     conn.close()
     
     return {"status": "success"}
+
+# Allowed workspace markdown files (whitelist for security)
+WORKSPACE_MD_FILES = {"AGENTS.md", "HEARTBEAT.md", "SOUL.md", "TOOLS.md", "USER.md"}
+
+@app.get("/api/workspace/files/{filename}")
+async def get_workspace_file(
+    filename: str,
+    current_agent: TokenData = Depends(get_current_agent)
+):
+    """Read a workspace markdown file for the current agent."""
+    if filename not in WORKSPACE_MD_FILES:
+        raise HTTPException(status_code=400, detail=f"File not allowed. Must be one of: {', '.join(sorted(WORKSPACE_MD_FILES))}")
+
+    main_config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, main_config)
+    if agent_config is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
+    workspace_path = Path(ws).expanduser()
+    file_path = workspace_path / filename
+
+    if not file_path.exists():
+        # Return template default content
+        template_path = Path(__file__).parent.parent.parent / "templates" / filename
+        if template_path.exists():
+            content = template_path.read_text(encoding="utf-8")
+        else:
+            content = ""
+        return {"filename": filename, "content": content, "exists": False}
+
+    content = file_path.read_text(encoding="utf-8")
+    return {"filename": filename, "content": content, "exists": True}
+
+
+@app.put("/api/workspace/files/{filename}")
+async def update_workspace_file(
+    filename: str,
+    body: WorkspaceFileUpdate,
+    current_agent: TokenData = Depends(get_current_agent)
+):
+    """Write a workspace markdown file for the current agent."""
+    if filename not in WORKSPACE_MD_FILES:
+        raise HTTPException(status_code=400, detail=f"File not allowed. Must be one of: {', '.join(sorted(WORKSPACE_MD_FILES))}")
+
+    main_config = load_config()
+    agent_config = load_agent_config(current_agent.agent_id, main_config)
+    if agent_config is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
+    workspace_path = Path(ws).expanduser()
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    file_path = workspace_path / filename
+
+    file_path.write_text(body.content, encoding="utf-8")
+
+    # Log the update
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO logs (agent_id, category, message) VALUES (?, ?, ?)",
+        (current_agent.agent_id, "workspace", f"Updated {filename}")
+    )
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "filename": filename}
 
 @app.get("/api/conversations")
 async def get_conversations(current_agent: TokenData = Depends(get_current_agent)):
