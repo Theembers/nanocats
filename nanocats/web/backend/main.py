@@ -358,6 +358,29 @@ async def update_agent_config(
 # Allowed workspace markdown files (whitelist for security)
 WORKSPACE_MD_FILES = {"AGENTS.md", "HEARTBEAT.md", "SOUL.md", "TOOLS.md", "USER.md"}
 
+
+def _get_agent_workspace(agent_id: str, agent_config) -> Path:
+    """Resolve agent workspace path and ensure template files exist."""
+    from nanocats.utils.helpers import sync_workspace_templates
+
+    ws = agent_config.workspace or f"~/.nanocats/workspaces/{agent_id}"
+    workspace_path = Path(ws).expanduser()
+    # Ensure workspace + templates exist (idempotent, only creates missing files)
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    sync_workspace_templates(workspace_path, silent=True)
+    return workspace_path
+
+
+def _read_template_fallback(filename: str) -> str:
+    """Read a template file via importlib.resources (works in installed packages)."""
+    try:
+        from importlib.resources import files as pkg_files
+        tpl = pkg_files("nanocats") / "templates" / filename
+        return tpl.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
 @app.get("/api/workspace/files/{filename}")
 async def get_workspace_file(
     filename: str,
@@ -372,17 +395,12 @@ async def get_workspace_file(
     if agent_config is None:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
-    workspace_path = Path(ws).expanduser()
+    workspace_path = _get_agent_workspace(current_agent.agent_id, agent_config)
     file_path = workspace_path / filename
 
     if not file_path.exists():
-        # Return template default content
-        template_path = Path(__file__).parent.parent.parent / "templates" / filename
-        if template_path.exists():
-            content = template_path.read_text(encoding="utf-8")
-        else:
-            content = ""
+        # File still missing after sync — return template default
+        content = _read_template_fallback(filename)
         return {"filename": filename, "content": content, "exists": False}
 
     content = file_path.read_text(encoding="utf-8")
@@ -404,9 +422,7 @@ async def update_workspace_file(
     if agent_config is None:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
-    workspace_path = Path(ws).expanduser()
-    workspace_path.mkdir(parents=True, exist_ok=True)
+    workspace_path = _get_agent_workspace(current_agent.agent_id, agent_config)
     file_path = workspace_path / filename
 
     file_path.write_text(body.content, encoding="utf-8")

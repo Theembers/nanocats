@@ -78,7 +78,9 @@ class AgentConfigLoader:
         """
         Setup the workspace directory for an agent.
 
-        Creates the workspace directory and necessary subdirectories.
+        Creates the workspace directory, necessary subdirectories, and syncs
+        template files (AGENTS.md, SOUL.md, USER.md, TOOLS.md, HEARTBEAT.md)
+        if they don't already exist.
 
         Args:
             agent_config: The agent configuration.
@@ -86,6 +88,8 @@ class AgentConfigLoader:
         Returns:
             The workspace path.
         """
+        from nanocats.utils.helpers import sync_workspace_templates
+
         workspace = self.get_workspace_path(agent_config)
         workspace.mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +97,9 @@ class AgentConfigLoader:
         (workspace / "memory").mkdir(exist_ok=True)
         (workspace / "skills").mkdir(exist_ok=True)
         (workspace / "sessions").mkdir(exist_ok=True)
+
+        # Sync template files (only creates missing files, never overwrites)
+        sync_workspace_templates(workspace, silent=True)
 
         logger.debug("Setup workspace for agent '{}': {}", agent_config.id, workspace)
         return workspace

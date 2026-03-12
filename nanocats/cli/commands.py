@@ -510,7 +510,12 @@ def setup():
     with open(agent_config_path, "w", encoding="utf-8") as f:
         json.dump(agent_config.model_dump(by_alias=True), f, indent=2, ensure_ascii=False)
     
-    console.print(f"\n[green]✓ Agent '{agent_id}' created at {agent_config_path}[/green]\n")
+    # Initialize agent workspace with template files
+    agent_workspace = Path.home() / ".nanocats" / "workspaces" / agent_id
+    sync_workspace_templates(agent_workspace, silent=True)
+    
+    console.print(f"\n[green]✓ Agent '{agent_id}' created at {agent_config_path}[/green]")
+    console.print(f"[green]✓ Workspace initialized at {agent_workspace}[/green]\n")
     
     # =========================================================================
     # Step 4: Channel Configuration
