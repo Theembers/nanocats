@@ -63,13 +63,17 @@
 ```bash
 git clone https://github.com/Theembers/nanocats.git
 cd nanocats
-pip install -e .
+pip install -e ".[web]" --break-system-packages
 ```
 
-**Install with web interface**
+> [!NOTE]
+> Use `--break-system-packages` for Homebrew Python on macOS. For other systems or virtual environments, you can omit this flag.
+
+**Build Web Interface** (required for first time or after frontend changes)
 
 ```bash
-pip install -e ".[web]"
+cd nanocats/web/frontend
+npm install && npm run build
 ```
 
 ## 🚀 Quick Start

@@ -60,13 +60,17 @@
 ```bash
 git clone https://github.com/Theembers/nanocats.git
 cd nanocats
-pip install -e .
+pip install -e ".[web]" --break-system-packages
 ```
 
-**安装 Web 界面依赖**
+> [!NOTE]
+> macOS 上使用 Homebrew Python 需要添加 `--break-system-packages` 参数。其他系统或使用虚拟环境时可省略此参数。
+
+**构建 Web 界面**（首次安装或前端代码修改后需要执行）
 
 ```bash
-pip install -e ".[web]"
+cd nanocats/web/frontend
+npm install && npm run build
 ```
 
 ## 🚀 快速开始
