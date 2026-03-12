@@ -11,7 +11,8 @@ from typing import Any, AsyncGenerator
 
 from openai import AsyncOpenAI
 
-from nanocats.providers.base import LLMProvider, LLMResponse, GenerationSettings
+from loguru import logger
+from nanocats.providers.base import LLMProvider, LLMResponse, GenerationSettings, ToolCallRequest
 
 
 @dataclass
@@ -80,25 +81,30 @@ class OpenAIProvider(LLMProvider):
         content = message.content or ""
         
         # Extract tool calls if present
-        tool_calls = []
+        tool_calls: list[ToolCallRequest] = []
         if message.tool_calls:
             for tc in message.tool_calls:
                 # Handle both dict and object access
                 func = tc.function if hasattr(tc, 'function') else tc.get('function', {})
                 if isinstance(func, dict):
                     func_name = func.get('name', '')
-                    func_args = func.get('arguments', '')
+                    func_args_raw = func.get('arguments', '')
                 else:
                     func_name = func.name
-                    func_args = func.arguments
-                tool_calls.append({
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": func_args
-                    }
-                })
+                    func_args_raw = func.arguments
+                # Parse arguments (may be string or dict)
+                if isinstance(func_args_raw, str):
+                    import json_repair
+                    func_args = json_repair.loads(func_args_raw)
+                else:
+                    func_args = func_args_raw or {}
+                tool_calls.append(
+                    ToolCallRequest(
+                        id=tc.id,
+                        name=func_name,
+                        arguments=func_args
+                    )
+                )
         
         # Extract usage information
         usage = {}
