@@ -12,10 +12,18 @@
 
 > 🙏 **Based on [nanobot](https://github.com/HKUDS/nanobot)** — nanocats is built upon the excellent foundation of nanobot, extending it with Agent Swarm capabilities and multi-agent orchestration.
 
+## ⚠️ Development Status
+
+> **This project is currently in active development. Features may change, bugs may occur, and functionality is NOT guaranteed to be stable or complete. Use at your own risk.**
+
 ## 📢 News
 
+- **2026-03-12** 🔥 Major Refactor: Unified OpenAIProvider replacing LiteLLMProvider
+  - Better provider compatibility (MiniMax, etc.)
+  - Support for prompt_tokens_details.cached_tokens cache statistics
+  - Reduced dependency complexity
+- **2026-03-12** 🎨 Added frontend Markdown rendering (react-markdown, remark-gfm)
 - **2026-03-12** 🌐 Added Web interface with agent management, chat UI, token statistics, and logs viewer
-- **2026-03-11** 🎉 Project initialized — Forked from nanobot, renamed to nanocats with Agent Swarm support
 
 ## Key Features
 
@@ -37,17 +45,10 @@
 
 💎 **Easy-to-Use**: One-click to deploy and you're ready to go
 
-## 🏗️ Architecture
-
-<p align="center">
-  <img src="nanocats_arch.png" alt="Architecture" width="800">
-</p>
-
 ## Table of Contents
 
 - [News](#-news)
 - [Key Features](#key-features)
-- [Architecture](#️-architecture)
 - [Install](#-install)
 - [Quick Start](#-quick-start)
 - [Web Interface](#-web-interface)
