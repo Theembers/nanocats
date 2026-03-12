@@ -166,6 +166,108 @@ def main(
 # Onboard / Setup
 # ============================================================================
 
+WEB_PORT = 15751
+
+
+def _start_web_server() -> None:
+    """
+    Start the web server on WEB_PORT.
+
+    Logic:
+    1. Try to start normally.
+    2. If the port is already in use (Errno 48 / 98), check if the running
+       process responds to our health endpoint.
+       a. If it responds → it's already healthy: restart it so the latest
+          code is loaded.
+       b. Kill the old process and start a fresh server.
+    3. On any other error, print a message and return.
+    """
+    import socket
+    import time
+    import urllib.request
+    import uvicorn
+
+    def _port_in_use() -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(("127.0.0.1", WEB_PORT)) == 0
+
+    def _kill_port() -> bool:
+        """Kill whatever is listening on WEB_PORT. Returns True on success."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["lsof", "-ti", f":{WEB_PORT}"],
+                capture_output=True, text=True
+            )
+            pids = result.stdout.strip().split()
+            if not pids:
+                return False
+            for pid in pids:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            # Give processes up to 3 s to exit
+            for _ in range(15):
+                time.sleep(0.2)
+                if not _port_in_use():
+                    return True
+            # Force-kill if still up
+            for pid in pids:
+                try:
+                    os.kill(int(pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            time.sleep(0.5)
+            return not _port_in_use()
+        except FileNotFoundError:
+            # lsof not available (Windows)
+            return False
+
+    def _print_banner() -> None:
+        console.print("=" * 60)
+        console.print("🐱 nanocats Web Interface")
+        console.print("=" * 60)
+        console.print(f"📱 Web UI:   http://localhost:{WEB_PORT}")
+        console.print(f"📚 API Docs: http://localhost:{WEB_PORT}/docs")
+        console.print("=" * 60)
+        console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
+
+    def _run() -> None:
+        _print_banner()
+        uvicorn.run(
+            "nanocats.web.backend.main:app",
+            host="0.0.0.0",
+            port=WEB_PORT,
+            reload=False,
+            log_level="info",
+        )
+
+    # ── First attempt ────────────────────────────────────────────────────────
+    if not _port_in_use():
+        try:
+            _run()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Web server stopped[/yellow]")
+        return
+
+    # ── Port is occupied ─────────────────────────────────────────────────────
+    console.print(f"\n[yellow]Port {WEB_PORT} is already in use.[/yellow]")
+    console.print("[dim]Restarting the web server with the latest code...[/dim]")
+
+    if not _kill_port():
+        console.print(
+            f"[red]Could not free port {WEB_PORT}. "
+            "Please stop the existing process manually and run [cyan]nanocats web[/cyan] again.[/red]"
+        )
+        return
+
+    console.print(f"[green]✓ Previous server stopped.[/green]")
+    try:
+        _run()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Web server stopped[/yellow]")
+
 
 @app.command()
 def onboard():
@@ -242,25 +344,7 @@ def onboard():
         setup()
     elif choice == "2":
         console.print()
-        import uvicorn
-        try:
-            console.print("=" * 60)
-            console.print("🐱 nanocats Web Interface")
-            console.print("=" * 60)
-            console.print(f"📱 Web UI:   http://localhost:15751")
-            console.print(f"📚 API Docs: http://localhost:15751/docs")
-            console.print("=" * 60)
-            console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
-            
-            uvicorn.run(
-                "nanocats.web.backend.main:app",
-                host="0.0.0.0",
-                port=15751,
-                reload=False,
-                log_level="info"
-            )
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Web server stopped[/yellow]")
+        _start_web_server()
     else:
         console.print("\n[dim]You can start the web server later with: nanocats web[/dim]\n")
 
@@ -684,26 +768,7 @@ def setup():
     
     if typer.confirm("Start web server?", default=True):
         console.print()
-        # Start web server
-        import uvicorn
-        try:
-            console.print("=" * 60)
-            console.print("🐱 nanocats Web Interface")
-            console.print("=" * 60)
-            console.print(f"📱 Web UI:   http://localhost:15751")
-            console.print(f"📚 API Docs: http://localhost:15751/docs")
-            console.print("=" * 60)
-            console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
-            
-            uvicorn.run(
-                "nanocats.web.backend.main:app",
-                host="0.0.0.0",
-                port=15751,
-                reload=False,
-                log_level="info"
-            )
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Web server stopped[/yellow]")
+        _start_web_server()
 
 
 def _make_provider(config: Config):
@@ -1718,18 +1783,20 @@ def web(
     dev: bool = typer.Option(False, "--dev", help="Run in development mode with auto-reload"),
 ):
     """Start the nanocats web interface."""
+    import socket
+    import time
     import subprocess
     import sys
     from pathlib import Path
-    
+
     web_backend_path = Path(__file__).parent.parent / "web" / "backend" / "main.py"
-    
+
     if not web_backend_path.exists():
         console.print(f"[red]Web backend not found at {web_backend_path}[/red]")
         raise typer.Exit(1)
-    
+
     console.print(f"{__logo__} Starting nanocats Web Interface...\n")
-    
+
     # Check dependencies
     try:
         import fastapi
@@ -1739,7 +1806,47 @@ def web(
         req_file = web_backend_path.parent / "requirements.txt"
         subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
         console.print("[green]✓ Dependencies installed[/green]\n")
-    
+
+    def _port_in_use(p: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(("127.0.0.1", p)) == 0
+
+    def _kill_port(p: int) -> bool:
+        try:
+            result = subprocess.run(["lsof", "-ti", f":{p}"], capture_output=True, text=True)
+            pids = result.stdout.strip().split()
+            if not pids:
+                return False
+            for pid in pids:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            for _ in range(15):
+                time.sleep(0.2)
+                if not _port_in_use(p):
+                    return True
+            for pid in pids:
+                try:
+                    os.kill(int(pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            time.sleep(0.5)
+            return not _port_in_use(p)
+        except FileNotFoundError:
+            return False
+
+    if _port_in_use(port):
+        console.print(f"[yellow]Port {port} is already in use.[/yellow]")
+        console.print("[dim]Restarting the web server with the latest code...[/dim]")
+        if not _kill_port(port):
+            console.print(
+                f"[red]Could not free port {port}. "
+                "Please stop the existing process manually and try again.[/red]"
+            )
+            raise typer.Exit(1)
+        console.print(f"[green]✓ Previous server stopped.[/green]")
+
     console.print("=" * 60)
     console.print("🐱 nanocats Web Interface")
     console.print("=" * 60)
@@ -1748,8 +1855,7 @@ def web(
     console.print("=" * 60)
     console.print("\n[dim]Login with your agent token to start chatting![/dim]")
     console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
-    
-    # Start the server
+
     import uvicorn
     try:
         uvicorn.run(
@@ -1757,7 +1863,7 @@ def web(
             host=host,
             port=port,
             reload=dev,
-            log_level="info"
+            log_level="info",
         )
     except KeyboardInterrupt:
         console.print("\n[yellow]Web server stopped[/yellow]")
