@@ -23,5 +23,4 @@ botpy.log
 nano.*.save
 .qoder/
 workspaces/
-web.db
 .vibe/

@@ -1195,6 +1195,7 @@ def swarm_create(
     agent_id: str = typer.Argument(..., help="Agent ID"),
     name: str = typer.Option("", "--name", "-n", help="Agent display name"),
     agent_type: str = typer.Option("user", "--type", "-t", help="Agent type (supervisor, user, specialized, task)"),
+    bound_user_key: str = typer.Option("", "--bound-user", "-b", help="User binding key (for user agent only)"),
     model: str = typer.Option("", "--model", "-m", help="Model to use"),
 ):
     """Create a new agent configuration."""
@@ -1203,16 +1204,35 @@ def swarm_create(
 
     config = load_config()
 
+    # Map agent type to session policy
+    session_policy_map = {
+        "user": "per_user",
+        "supervisor": "global",
+        "specialized": "per_channel",
+        "task": "per_task",
+    }
+    session_policy = session_policy_map.get(agent_type, "per_channel")
+
+    # Validate user binding for user agent
+    if agent_type == "user" and not bound_user_key:
+        console.print("[yellow]Warning:[/yellow] user agent should have --bound-user key for 1:1 binding")
+
     # Create agent config
     agent_config = AgentInstanceConfig(
         id=agent_id,
         name=name or agent_id,
         type=agent_type,
         model=model or None,
+        bound_user_key=bound_user_key or None,
+        session_policy=session_policy,
     )
 
     save_agent_config(agent_config, config)
     console.print(f"[green]✓[/green] Created agent config: ~/.nanocats/agents/{agent_id}.json")
+    console.print(f"  Type: {agent_type}")
+    console.print(f"  Session policy: {session_policy}")
+    if bound_user_key:
+        console.print(f"  Bound user: {bound_user_key}")
     console.print("Edit the file to configure channels, MCP, skills, etc.")
 
 

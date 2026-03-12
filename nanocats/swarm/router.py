@@ -46,29 +46,64 @@ class MessageRouter:
         # 1. Try exact route match
         agent = self._route_exact(msg)
         if agent:
+            # Apply agent-type specific validation
+            if not self._validate_agent_access(agent, msg):
+                return None
             logger.debug("Routed message via exact match to agent '{}'", agent.id)
             return agent
 
         # 2. Try channel-level routing
         agent = self._route_by_channel(msg)
         if agent:
+            if not self._validate_agent_access(agent, msg):
+                return None
             logger.debug("Routed message via channel match to agent '{}'", agent.id)
             return agent
 
         # 3. Try metadata-based routing
         agent = self._route_by_metadata(msg)
         if agent:
+            if not self._validate_agent_access(agent, msg):
+                return None
             logger.debug("Routed message via metadata to agent '{}'", agent.id)
             return agent
 
         # 4. Fallback to supervisor
         agent = self._get_fallback_agent()
         if agent:
+            if not self._validate_agent_access(agent, msg):
+                return None
             logger.debug("Routed message via fallback to agent '{}'", agent.id)
             return agent
 
         logger.warning("No agent found for message from {}:{}", msg.channel, msg.chat_id)
         return None
+
+    def _validate_agent_access(self, agent: AgentInstance, msg: InboundMessage) -> bool:
+        """Validate if the agent can serve the message based on its type and configuration."""
+        config = agent.config
+        
+        # User agent: check user binding
+        if config.type == "user":
+            bound_key = config.bound_user_key if hasattr(config, 'bound_user_key') else None
+            if bound_key and bound_key != msg.sender_id:
+                logger.warning(
+                    "User agent '{}' is bound to '{}', but message from '{}' - access denied",
+                    agent.id, bound_key, msg.sender_id
+                )
+                return False
+        
+        # Specialized agent: only allow A2A communication (not direct user messages)
+        if config.type == "specialized":
+            is_a2a = msg.metadata.get("is_a2a", False) if msg.metadata else False
+            if not is_a2a:
+                logger.warning(
+                    "Specialized agent '{}' cannot respond to direct user messages (is_a2a=False)",
+                    agent.id
+                )
+                return False
+        
+        return True
 
     def _route_exact(self, msg: InboundMessage) -> AgentInstance | None:
         """Try exact route match."""

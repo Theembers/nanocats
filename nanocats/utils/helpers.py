@@ -170,8 +170,20 @@ def estimate_prompt_tokens_chain(
     return 0, "none"
 
 
-def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
-    """Sync bundled templates to workspace. Only creates missing files."""
+def sync_workspace_templates(workspace: Path, agent_type: str = "user", silent: bool = False) -> list[str]:
+    """Sync bundled templates to workspace based on agent type. Only creates missing files.
+    
+    Args:
+        workspace: Target workspace directory
+        agent_type: One of "supervisor", "user", "specialized", "task"
+        silent: If True, suppress output
+        
+    Template distribution:
+        - user: AGENTS.md, TOOLS.md, HEARTBEAT.md, SOUL.md, USER.md, memory/
+        - supervisor: AGENTS.md, TOOLS.md, HEARTBEAT.md, memory/
+        - specialized: AGENTS.md, TOOLS.md, HEARTBEAT.md
+        - task: no templates (ephemeral)
+    """
     from importlib.resources import files as pkg_files
     try:
         tpl = pkg_files("nanocats") / "templates"
@@ -189,12 +201,30 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
         dest.write_text(src.read_text(encoding="utf-8") if src else "", encoding="utf-8")
         added.append(str(dest.relative_to(workspace)))
 
-    for item in tpl.iterdir():
-        if item.name.endswith(".md") and not item.name.startswith("."):
-            _write(item, workspace / item.name)
-    _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
-    _write(None, workspace / "memory" / "HISTORY.md")
-    (workspace / "skills").mkdir(exist_ok=True)
+    # Common templates for all types
+    common_templates = ["AGENTS.md", "TOOLS.md", "HEARTBEAT.md"]
+    
+    # Templates by agent type
+    templates_by_type = {
+        "user": common_templates + ["SOUL.md", "USER.md"],
+        "supervisor": common_templates,  # No SOUL/USER for supervisor
+        "specialized": common_templates,
+        "task": [],  # No templates for ephemeral task agents
+    }
+    
+    templates = templates_by_type.get(agent_type, common_templates)
+    
+    # Write template files
+    for name in templates:
+        src = tpl / name
+        if src.exists():
+            _write(src, workspace / name)
+    
+    # Memory files - not for task agents
+    if agent_type != "task":
+        _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
+        _write(None, workspace / "memory" / "HISTORY.md")
+        (workspace / "skills").mkdir(exist_ok=True)
 
     if added and not silent:
         from rich.console import Console

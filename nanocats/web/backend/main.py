@@ -20,7 +20,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-from nanocats.config.paths import get_workspace_path
+from nanocats.config.paths import get_data_dir, get_workspace_path
 from nanocats.config.loader import load_config, load_agent_config, save_agent_config
 from nanocats.config.schema import AgentInstanceConfig
 
@@ -31,8 +31,8 @@ from nanocats.web.backend.agent_manager import agent_manager
 SECRET_KEY = "nanocats-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
-# Use project-local database to avoid sandbox restrictions
-DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "web.db"
+# Use config directory for database to enable unified backup and migration
+DATABASE_PATH = get_data_dir() / "web.db"
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 # Password hashing
@@ -75,6 +75,9 @@ class AgentConfigUpdate(BaseModel):
     name: Optional[str] = None
     model: Optional[str] = None
     provider: Optional[str] = None
+    type: Optional[str] = None  # supervisor, user, specialized, task
+    bound_user_key: Optional[str] = None  # 1:1 user binding for user agent
+    session_policy: Optional[str] = None  # per_channel, per_user, global, per_task
 
 class MCPServerConfig(BaseModel):
     name: str
@@ -329,6 +332,8 @@ async def get_agent_config(current_agent: TokenData = Depends(get_current_agent)
         "name": agent_config.name,
         "type": agent_config.type,
         "workspace": agent_config.workspace,
+        "bound_user_key": agent_config.bound_user_key if hasattr(agent_config, 'bound_user_key') else None,
+        "session_policy": agent_config.session_policy if hasattr(agent_config, 'session_policy') else "per_channel",
         "model": agent_config.model if hasattr(agent_config, 'model') else None,
         "provider": agent_config.provider if hasattr(agent_config, 'provider') else None,
         "mcp": agent_config.mcp.model_dump() if hasattr(agent_config, 'mcp') else None,
@@ -354,6 +359,12 @@ async def update_agent_config(
         agent_config.model = config_update.model
     if config_update.provider:
         agent_config.provider = config_update.provider
+    if config_update.type:
+        agent_config.type = config_update.type
+    if config_update.bound_user_key is not None:
+        agent_config.bound_user_key = config_update.bound_user_key
+    if config_update.session_policy:
+        agent_config.session_policy = config_update.session_policy
     
     save_agent_config(agent_config, main_config)
     

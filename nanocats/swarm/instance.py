@@ -107,6 +107,7 @@ class AgentInstance:
         Start the agent instance.
 
         This initializes the workspace, connects MCP servers, and starts the agent loop.
+        For task agents, workspace is optional (they are ephemeral).
         """
         if self._started:
             logger.warning("Agent '{}' already started", self.id)
@@ -114,12 +115,18 @@ class AgentInstance:
 
         logger.info("Starting agent: {} ({})", self.name, self.id)
 
-        # Setup workspace
-        self.config_loader.setup_workspace(self.config)
-
-        # Initialize components
-        self.context = ContextBuilder(self.workspace)
-        self.sessions = SessionManager(self.workspace)
+        # Setup workspace (returns None for task agents)
+        workspace = self.config_loader.setup_workspace(self.config)
+        
+        # For task agents, workspace is None - use a temporary in-memory session
+        if workspace is None:
+            # Task agents use in-memory session without persistent workspace
+            self.context = None
+            self.sessions = None
+        else:
+            self.workspace = workspace
+            self.context = ContextBuilder(self.workspace)
+            self.sessions = SessionManager(self.workspace, self.config.session_policy)
         self.tools = ToolRegistry()
 
         # Prepare MCP configuration
@@ -128,11 +135,19 @@ class AgentInstance:
             custom_servers=self.config.mcp.custom_servers,
         )
 
+        # Determine workspace for agent loop (use temp dir for task agents)
+        loop_workspace = self.workspace
+        if loop_workspace is None and self.config.type == "task":
+            # Task agents use a temporary workspace for execution
+            import tempfile
+            loop_workspace = Path(tempfile.mkdtemp(prefix=f"nanocats_task_{self.id}_"))
+            logger.debug("Task agent '{}' using temp workspace: {}", self.id, loop_workspace)
+
         # Create agent loop
         self.loop = AgentLoop(
             bus=self.agent_bus,
             provider=self.provider,
-            workspace=self.workspace,
+            workspace=loop_workspace,
             model=self.config.model,
             max_iterations=self.config.max_tool_iterations or 40,
             context_window_tokens=self.config.context_window_tokens or 65_536,

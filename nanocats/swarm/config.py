@@ -79,15 +79,19 @@ class AgentConfigLoader:
         Setup the workspace directory for an agent.
 
         Creates the workspace directory, necessary subdirectories, and syncs
-        template files (AGENTS.md, SOUL.md, USER.md, TOOLS.md, HEARTBEAT.md)
-        if they don't already exist.
+        template files based on agent type if they don't already exist.
 
         Args:
             agent_config: The agent configuration.
 
         Returns:
-            The workspace path.
+            The workspace path. Returns None for task agents (ephemeral).
         """
+        # Task agents are ephemeral - no workspace needed
+        if agent_config.type == "task":
+            logger.debug("Task agent '{}' - no workspace required", agent_config.id)
+            return None
+            
         from nanocats.utils.helpers import sync_workspace_templates
 
         workspace = self.get_workspace_path(agent_config)
@@ -98,8 +102,8 @@ class AgentConfigLoader:
         (workspace / "skills").mkdir(exist_ok=True)
         (workspace / "sessions").mkdir(exist_ok=True)
 
-        # Sync template files (only creates missing files, never overwrites)
-        sync_workspace_templates(workspace, silent=True)
+        # Sync template files based on agent type (only creates missing files, never overwrites)
+        sync_workspace_templates(workspace, agent_config.type, silent=True)
 
         logger.debug("Setup workspace for agent '{}': {}", agent_config.id, workspace)
         return workspace

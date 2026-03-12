@@ -452,7 +452,8 @@ class Config(BaseSettings):
         # to avoid polluting the global litellm.api_base.
         if name:
             spec = find_by_name(name)
-            if spec and (spec.is_gateway or spec.is_local) and spec.default_api_base:
+            # Return default_api_base if explicitly configured (including standard providers like MiniMax)
+            if spec and spec.default_api_base:
                 return spec.default_api_base
         return None
 
@@ -530,6 +531,12 @@ class AgentInstanceConfig(Base):
     # Lifecycle
     ttl: int | None = None  # Time-to-live in seconds (None = no expiry)
     auto_start: bool = True  # Start automatically when swarm starts
+
+    # User binding (only for user agent)
+    bound_user_key: str | None = None  # 1:1 binding with user identifier
+
+    # Session policy
+    session_policy: Literal["per_channel", "per_user", "global", "per_task"] = "per_channel"
 
     # Access control
     token: str | None = None  # Access token for web/API authentication

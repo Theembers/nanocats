@@ -17,8 +17,10 @@ from pathlib import Path
 from typing import Optional, Any
 from contextvars import ContextVar
 
+from nanocats.config.paths import get_data_dir
+
 # Database path (same as main.py)
-DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "web.db"
+DATABASE_PATH = get_data_dir() / "web.db"
 
 # Context variable to track current agent ID
 _current_agent_id: ContextVar[Optional[str]] = ContextVar('current_agent_id', default=None)
