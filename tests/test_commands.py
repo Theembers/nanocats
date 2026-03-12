@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from nanocats.cli.commands import app
 from nanocats.config.schema import Config
-from nanocats.providers.litellm_provider import LiteLLMProvider
+from nanocats.providers.openai_provider import OpenAIProvider
 from nanocats.providers.openai_codex_provider import _strip_model_prefix
 from nanocats.providers.registry import find_by_model
 
@@ -150,12 +150,14 @@ def test_find_by_model_prefers_explicit_prefix_over_generic_codex_keyword():
     assert spec.name == "github_copilot"
 
 
-def test_litellm_provider_canonicalizes_github_copilot_hyphen_prefix():
-    provider = LiteLLMProvider(default_model="github-copilot/gpt-5.3-codex")
-
-    resolved = provider._resolve_model("github-copilot/gpt-5.3-codex")
-
-    assert resolved == "github_copilot/gpt-5.3-codex"
+def test_openai_provider_init():
+    """Test OpenAIProvider can be initialized."""
+    provider = OpenAIProvider(
+        default_model="MiniMax-M2.5",
+        api_key="test-key",
+        api_base="https://api.minimaxi.com/v1"
+    )
+    assert provider.default_model == "MiniMax-M2.5"
 
 
 def test_openai_codex_strip_prefix_supports_hyphen_and_underscore():

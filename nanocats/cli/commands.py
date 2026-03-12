@@ -805,19 +805,18 @@ def _make_provider(config: Config):
             default_model=model,
         )
     else:
-        from nanocats.providers.litellm_provider import LiteLLMProvider
+        from nanocats.providers.openai_provider import OpenAIProvider
         from nanocats.providers.registry import find_by_name
         spec = find_by_name(provider_name)
         if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and (spec.is_oauth or spec.is_local)):
             console.print("[red]Error: No API key configured.[/red]")
             console.print("Set one in ~/.nanocats/config.json under providers section")
             raise typer.Exit(1)
-        provider = LiteLLMProvider(
+        provider = OpenAIProvider(
             api_key=p.api_key if p else None,
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,
-            provider_name=provider_name,
         )
 
     defaults = config.agents.defaults

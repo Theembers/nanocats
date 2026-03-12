@@ -102,7 +102,7 @@ def test_minimax_api_call(api_key=None):
     """Test actual API call to MiniMax to verify API Key works."""
     import os
     import asyncio
-    from nanocats.providers.litellm_provider import LiteLLMProvider
+    from nanocats.providers.openai_provider import OpenAIProvider
     from nanocats.config.loader import load_config
     
     config = load_config()
@@ -130,11 +130,10 @@ def test_minimax_api_call(api_key=None):
     os.environ["OPENAI_API_KEY"] = api_key
     
     # Create provider
-    provider = LiteLLMProvider(
+    provider = OpenAIProvider(
         api_key=api_key,
         api_base=api_base,
-        default_model=f"minimax/{model}",
-        provider_name="minimax"
+        default_model=model
     )
     
     # Test API call
@@ -160,7 +159,7 @@ def test_minimax_as_anthropic(api_key=None):
     """Test MiniMax using Anthropic SDK format (as per official docs)."""
     import os
     import asyncio
-    from nanocats.providers.litellm_provider import LiteLLMProvider
+    from nanocats.providers.openai_provider import OpenAIProvider
     from nanocats.config.loader import load_config
     
     config = load_config()
@@ -187,12 +186,11 @@ def test_minimax_as_anthropic(api_key=None):
     os.environ["ANTHROPIC_API_KEY"] = api_key
     os.environ["MINIMAX_API_KEY"] = api_key
     
-    # Create provider as anthropic
-    provider = LiteLLMProvider(
+    # Create provider
+    provider = OpenAIProvider(
         api_key=api_key,
         api_base=api_base,
-        default_model=f"anthropic/{model}",  # Try as anthropic
-        provider_name="anthropic"
+        default_model=model
     )
     
     # Test API call
