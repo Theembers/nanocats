@@ -11,6 +11,9 @@ interface ChatContextType {
   loadMoreMessages: () => Promise<void>;
   loadChannels: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  // For streaming
+  streamingContent: string;
+  streamingType: 'thinking' | 'tool' | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   selectedChannel: string | null;
@@ -30,6 +33,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingType, setStreamingType] = useState<'thinking' | 'tool' | null>(null);
   const LIMIT = 50;
 
   const loadMessages = useCallback(async (params?: { channel?: string; search?: string; offset?: number }) => {
@@ -105,6 +110,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (!token) return;
     
     setIsLoading(true);
+    setStreamingContent('');
+    setStreamingType(null);
     
     // Optimistically add user message
     const userMessage: Message = {
@@ -116,8 +123,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     };
     setMessages(prev => [...prev, userMessage]);
     
+    // Create a placeholder for assistant message
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      channel: 'web',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, assistantMessage]);
+    
     try {
-      const response = await fetch(`${API_URL}/api/chat`, {
+      // Use SSE streaming endpoint
+      const response = await fetch(`${API_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -126,21 +145,76 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ message: content })
       });
       
-      if (response.ok) {
-        const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('No response body');
+      }
+      
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
         
-        // Add assistant response
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          channel: 'web',
-          role: 'assistant',
-          content: data.response,
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, assistantMessage]);
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process SSE events
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            const eventType = line.slice(7);
+            
+            // Find the data line
+            const dataLineIndex = lines.findIndex(l => l.startsWith('data: '));
+            if (dataLineIndex !== -1) {
+              const dataLine = lines[dataLineIndex];
+              const jsonStr = dataLine.slice(6);
+              try {
+                const data = JSON.parse(jsonStr);
+                
+                if (eventType === 'thinking' || eventType === 'tool') {
+                  // Show progress update
+                  setStreamingType(eventType);
+                  setStreamingContent(data.content);
+                } else if (eventType === 'done') {
+                  // Final response - update message
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMessageId 
+                      ? { ...msg, content: data.content }
+                      : msg
+                  ));
+                  setStreamingContent('');
+                  setStreamingType(null);
+                } else if (eventType === 'error') {
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMessageId 
+                      ? { ...msg, content: `Error: ${data.content}` }
+                      : msg
+                  ));
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId 
+          ? { ...msg, content: `Error: ${error}` }
+          : msg
+      ));
     } finally {
       setIsLoading(false);
     }
@@ -156,6 +230,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       loadMoreMessages,
       loadChannels,
       sendMessage,
+      streamingContent,
+      streamingType,
       searchQuery,
       setSearchQuery,
       selectedChannel,

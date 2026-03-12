@@ -44,3 +44,68 @@
 * { box-sizing: border-box; }
 body { background-color: var(--bg-base); color: var(--text-primary); }
 
+/* Markdown Content Styles */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content pre {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.markdown-content code {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0;
+}
+
+.markdown-content li > p {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content blockquote {
+  margin: 0;
+}
+
+.markdown-content table {
+  border: 1px solid var(--border-soft);
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-soft);
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  margin: 1rem 0;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}
+
+/* User message specific styles */
+.markdown-user a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.markdown-user code {
+  color: inherit;
+}
+
+/* Assistant message specific styles */
+.markdown-assistant a {
+  color: var(--color-accent-dark);
+}
+
+.markdown-assistant code {
+  color: var(--text-primary);
+}
+

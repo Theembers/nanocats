@@ -12,6 +12,16 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from loguru import logger
 
 from nanocats.agent.context import ContextBuilder
+
+# Try to import web logger for activity tracking
+try:
+    from nanocats.web.backend.agent_logger import (
+        log_model_call, log_tool_call, log_mcp_call, log_skill_call,
+        set_current_agent_id
+    )
+    WEB_LOGGING_AVAILABLE = True
+except ImportError:
+    WEB_LOGGING_AVAILABLE = False
 from nanocats.agent.memory import MemoryConsolidator
 from nanocats.agent.subagent import SubagentManager
 from nanocats.agent.tools.cron import CronTool
@@ -61,10 +71,12 @@ class AgentLoop:
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
+        agent_id: str | None = None,
     ):
         from nanocats.config.schema import ExecToolConfig
         self.bus = bus
         self.channels_config = channels_config
+        self.agent_id = agent_id
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
@@ -183,17 +195,51 @@ class AgentLoop:
         iteration = 0
         final_content = None
         tools_used: list[str] = []
+        
+        # Set agent ID for web logging context
+        if WEB_LOGGING_AVAILABLE:
+            set_current_agent_id(self.agent_id)
 
         while iteration < self.max_iterations:
             iteration += 1
 
             tool_defs = self.tools.get_definitions()
 
+            # Log model call
             response = await self.provider.chat_with_retry(
                 messages=messages,
                 tools=tool_defs,
                 model=self.model,
             )
+            
+            # Log the model call to web interface
+            if WEB_LOGGING_AVAILABLE:
+                try:
+                    # Check for cache info from LLM response
+                    cached = False
+                    if response.usage:
+                        # Check various cache indicators from different providers
+                        usage = response.usage
+                        # OpenAI: prompt_token_details.cached_tokens
+                        # Anthropic: cache_creation_input_tokens, cache_read_input_tokens
+                        # LiteLLM: prompt_token_details
+                        cached = (
+                            usage.get('cached_tokens', 0) > 0 or
+                            usage.get('cache_read_input_tokens', 0) > 0 or
+                            usage.get('cache_creation_input_tokens', 0) > 0 or
+                            (isinstance(usage.get('prompt_token_details'), dict) and 
+                             usage.get('prompt_token_details', {}).get('cached_tokens', 0) > 0)
+                        )
+                    
+                    log_model_call(
+                        model=self.model,
+                        input_tokens=response.usage.get('prompt_tokens', 0) if response.usage else 0,
+                        output_tokens=response.usage.get('completion_tokens', 0) if response.usage else 0,
+                        cached=cached,
+                        agent_id=self.agent_id
+                    )
+                except Exception as e:
+                    logger.debug("Failed to log model call: {}", e)
 
             if response.has_tool_calls:
                 if on_progress:
@@ -223,7 +269,32 @@ class AgentLoop:
                     tools_used.append(tool_call.name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
+                    
+                    # Execute tool and log the call
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
+                    
+                    # Log tool call to web interface
+                    if WEB_LOGGING_AVAILABLE:
+                        try:
+                            # Determine if this is an MCP or regular tool
+                            if hasattr(self.tools, '_mcp_tools') and tool_call.name in self.tools._mcp_tools:
+                                log_mcp_call(
+                                    server_name="mcp",
+                                    tool_name=tool_call.name,
+                                    arguments=tool_call.arguments,
+                                    result=result,
+                                    agent_id=self.agent_id
+                                )
+                            else:
+                                log_tool_call(
+                                    tool_name=tool_call.name,
+                                    arguments=tool_call.arguments,
+                                    result=result,
+                                    agent_id=self.agent_id
+                                )
+                        except Exception as e:
+                            logger.debug("Failed to log tool call: {}", e)
+                    
                     messages = self.context.add_tool_result(
                         messages, tool_call.id, tool_call.name, result
                     )

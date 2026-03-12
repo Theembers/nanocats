@@ -5,11 +5,13 @@ import json
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
+from loguru import logger
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -22,16 +24,25 @@ from nanocats.config.paths import get_workspace_path
 from nanocats.config.loader import load_config, load_agent_config, save_agent_config
 from nanocats.config.schema import AgentInstanceConfig
 
+# Import agent manager
+from nanocats.web.backend.agent_manager import agent_manager
+
 # Configuration
 SECRET_KEY = "nanocats-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
-DATABASE_PATH = Path(get_workspace_path()) / "web.db"
+# Use project-local database to avoid sandbox restrictions
+DATABASE_PATH = Path(__file__).parent.parent.parent.parent / "web.db"
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
+
+
+def get_local_timestamp() -> str:
+    """Get current timestamp in local timezone."""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Pydantic models
 class Token(BaseModel):
@@ -111,7 +122,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS token_usage (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
             agent_id TEXT NOT NULL,
             model TEXT NOT NULL,
             prompt_tokens INTEGER DEFAULT 0,
@@ -126,7 +137,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
             agent_id TEXT,
             level TEXT DEFAULT 'INFO',
             category TEXT,
@@ -262,8 +273,8 @@ async def login(request: LoginRequest):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO logs (agent_id, category, message) VALUES (?, ?, ?)",
-        (request.agent_id, "auth", "User logged in")
+        "INSERT INTO logs (timestamp, agent_id, category, message) VALUES (?, ?, ?, ?)",
+        (get_local_timestamp(), request.agent_id, "auth", "User logged in")
     )
     conn.commit()
     conn.close()
@@ -350,8 +361,8 @@ async def update_agent_config(
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO logs (agent_id, category, message, details) VALUES (?, ?, ?, ?)",
-        (current_agent.agent_id, "config", "Configuration updated", json.dumps(config_update.model_dump()))
+        "INSERT INTO logs (timestamp, agent_id, category, message, details) VALUES (?, ?, ?, ?, ?)",
+        (get_local_timestamp(), current_agent.agent_id, "config", "Configuration updated", json.dumps(config_update.model_dump()))
     )
     conn.commit()
     conn.close()
@@ -434,8 +445,8 @@ async def update_workspace_file(
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO logs (agent_id, category, message) VALUES (?, ?, ?)",
-        (current_agent.agent_id, "workspace", f"Updated {filename}")
+        "INSERT INTO logs (timestamp, agent_id, category, message) VALUES (?, ?, ?, ?)",
+        (get_local_timestamp(), current_agent.agent_id, "workspace", f"Updated {filename}")
     )
     conn.commit()
     conn.close()
@@ -498,22 +509,8 @@ async def get_message_history(
         limit: Maximum number of messages to return
         offset: Offset for pagination
     """
-    from nanocats.config.paths import get_workspace_path
-    from nanocats.session.manager import SessionManager
-    
-    # Load agent config to get workspace
-    config = load_config()
-    agent_config = load_agent_config(current_agent.agent_id, config)
-    
-    if agent_config is None:
-        # Fallback to default workspace
-        workspace = Path(get_workspace_path())
-    else:
-        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
-        workspace = Path(ws).expanduser()
-    
-    # Initialize session manager
-    session_manager = SessionManager(workspace)
+    # Use agent manager's session manager
+    session_manager = agent_manager.get_session_manager(current_agent.agent_id)
     
     # Get all sessions for this agent
     sessions = session_manager.list_sessions()
@@ -538,6 +535,20 @@ async def get_message_history(
         
         for idx, msg in enumerate(session.messages):
             content = msg.get("content", "")
+            
+            # Filter out empty or whitespace-only content
+            # This includes tool hints, thinking blocks, etc.
+            if not content or not content.strip():
+                continue
+            
+            # Filter out tool call hints (e.g., "web_search(\"...\")")
+            stripped = content.strip()
+            if stripped.startswith('\n') and len(stripped.replace('\n', '').replace('\r', '')) == 0:
+                continue
+            # Function call pattern like "web_search(...)"
+            import re
+            if re.match(r'^\w+\(.*\)$', stripped):
+                continue
             
             # Search filter
             if search and search.lower() not in content.lower():
@@ -575,20 +586,8 @@ async def get_message_channels(
     """
     Get list of channels with message counts for the current agent.
     """
-    from nanocats.config.paths import get_workspace_path
-    from nanocats.session.manager import SessionManager
-    
-    # Load agent config to get workspace
-    config = load_config()
-    agent_config = load_agent_config(current_agent.agent_id, config)
-    
-    if agent_config is None:
-        workspace = Path(get_workspace_path())
-    else:
-        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
-        workspace = Path(ws).expanduser()
-    
-    session_manager = SessionManager(workspace)
+    # Use agent manager's session manager
+    session_manager = agent_manager.get_session_manager(current_agent.agent_id)
     sessions = session_manager.list_sessions()
     
     # Count messages per channel
@@ -620,74 +619,133 @@ async def chat(
     current_agent: TokenData = Depends(get_current_agent)
 ):
     """
-    Send a chat message and get response.
+    Send a chat message and get response through the real Agent.
     
-    This endpoint now uses the unified session model. All web messages
-    are stored in a single web session for the agent, maintaining
-    continuity across the entire conversation history.
+    This endpoint now uses the actual AgentLoop to process messages,
+    providing real AI responses with tool execution capabilities.
     """
-    from nanocats.config.paths import get_workspace_path
-    from nanocats.session.manager import SessionManager
-    from datetime import datetime
+    try:
+        # Process message through AgentLoop
+        response_content = await agent_manager.process_message(
+            agent_id=current_agent.agent_id,
+            content=message.message
+        )
+        
+        # Log chat
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO logs (timestamp, agent_id, category, message) VALUES (?, ?, ?, ?)",
+            (get_local_timestamp(), current_agent.agent_id, "chat", f"User message: {message.message[:50]}...")
+        )
+        conn.commit()
+        conn.close()
+        
+        return {
+            "response": response_content,
+            "conversation_id": "unified",  # Deprecated, kept for compatibility
+            "session_key": f"web:{current_agent.agent_id}",
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing chat message: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process message: {str(e)}")
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(
+    message: ChatMessage,
+    current_agent: TokenData = Depends(get_current_agent)
+):
+    """
+    SSE streaming endpoint for real-time chat responses.
     
-    # Use unified web session for this agent
-    session_key = f"web:{current_agent.agent_id}"
+    This endpoint streams:
+    - progress: Tool calls and thinking updates
+    - content: Final response chunks
+    - done: Signal when complete
+    """
+    import asyncio
+    import json
+    from typing import AsyncGenerator
     
-    # Load agent config to get workspace
-    config = load_config()
-    agent_config = load_agent_config(current_agent.agent_id, config)
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            # Create a queue to collect progress updates
+            progress_queue: asyncio.Queue = asyncio.Queue()
+            
+            async def on_progress(content: str, tool_hint: bool = False):
+                """Callback for agent progress updates."""
+                event_type = "tool" if tool_hint else "thinking"
+                await progress_queue.put({
+                    "type": event_type,
+                    "content": content
+                })
+            
+            # Start processing in background
+            async def process_message():
+                try:
+                    response_content = await agent_manager.process_message(
+                        agent_id=current_agent.agent_id,
+                        content=message.message,
+                        on_progress=on_progress
+                    )
+                    await progress_queue.put({
+                        "type": "done",
+                        "content": response_content
+                    })
+                except Exception as e:
+                    await progress_queue.put({
+                        "type": "error",
+                        "content": str(e)
+                    })
+            
+            # Start processing task
+            process_task = asyncio.create_task(process_message())
+            
+            # Stream events from queue
+            while True:
+                try:
+                    # Wait for progress with timeout
+                    try:
+                        progress = await asyncio.wait_for(progress_queue.get(), timeout=30.0)
+                    except asyncio.TimeoutError:
+                        # Send heartbeat to keep connection alive
+                        yield "\n"
+                        continue
+                    
+                    progress_type = progress.get("type")
+                    progress_content = progress.get("content", "")
+                    
+                    if progress_type == "done":
+                        # Send final content
+                        yield f"event: done\ndata: {json.dumps({'content': progress_content})}\n\n"
+                        break
+                    elif progress_type == "error":
+                        yield f"event: error\ndata: {json.dumps({'content': progress_content})}\n\n"
+                        break
+                    else:
+                        # Send progress update
+                        yield f"event: {progress_type}\ndata: {json.dumps({'content': progress_content})}\n\n"
+                        
+                except asyncio.CancelledError:
+                    process_task.cancel()
+                    break
+            
+        except Exception as e:
+            logger.error(f"SSE stream error: {e}")
+            yield f"event: error\ndata: {json.dumps({'content': str(e)})}\n\n"
     
-    if agent_config is None:
-        workspace = Path(get_workspace_path())
-    else:
-        ws = agent_config.workspace or f"~/.nanocats/workspaces/{current_agent.agent_id}"
-        workspace = Path(ws).expanduser()
-    
-    # Initialize session manager and get/create session
-    session_manager = SessionManager(workspace)
-    session = session_manager.get_or_create(session_key)
-    
-    # Add user message to session
-    user_msg = {
-        "role": "user",
-        "content": message.message,
-        "timestamp": datetime.now().isoformat(),
-        "channel": "web",
-    }
-    session.messages.append(user_msg)
-    session.updated_at = datetime.now()
-    session_manager.save(session)
-    
-    # TODO: Integrate with actual agent loop for response
-    # For now, return a placeholder response
-    response_content = f"Echo: {message.message}"
-    
-    # Add assistant response to session
-    assistant_msg = {
-        "role": "assistant",
-        "content": response_content,
-        "timestamp": datetime.now().isoformat(),
-        "channel": "web",
-    }
-    session.messages.append(assistant_msg)
-    session.updated_at = datetime.now()
-    session_manager.save(session)
-    
-    # Log chat
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO logs (agent_id, category, message) VALUES (?, ?, ?)",
-        (current_agent.agent_id, "chat", f"User message: {message.message[:50]}...")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
     )
-    conn.commit()
-    conn.close()
-    
-    return {
-        "response": response_content,
-        "conversation_id": "unified",  # Deprecated, kept for compatibility
-        "session_key": session_key,
-    }
+
 
 @app.get("/api/mcp/servers")
 async def get_mcp_servers(current_agent: TokenData = Depends(get_current_agent)):
@@ -798,6 +856,19 @@ async def get_logs(
     logs = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return logs
+
+
+@app.get("/api/logs/stats")
+async def get_logs_stats(current_agent: TokenData = Depends(get_current_agent)):
+    """Get log statistics for dashboard."""
+    from nanocats.web.backend.agent_logger import get_log_stats
+    
+    # Filter by agent if not supervisor
+    agent_id = None if current_agent.agent_type == "supervisor" else current_agent.agent_id
+    
+    stats = get_log_stats(agent_id)
+    return stats
+
 
 @app.get("/api/admin/agents")
 async def get_all_agents(current_agent: TokenData = Depends(get_current_agent)):

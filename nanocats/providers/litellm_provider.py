@@ -322,6 +322,26 @@ class LiteLLMProvider(LLMProvider):
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens,
             }
+            # Extract cache info - MiniMax uses prompt_tokens_details.cached_tokens (OpenAI format)
+            # Anthropic uses cache_read_input_tokens and cache_creation_input_tokens
+            
+            # Try prompt_token_details first (OpenAI format)
+            if hasattr(response.usage, "prompt_token_details") and response.usage.prompt_token_details:
+                ptd = response.usage.prompt_token_details
+                if hasattr(ptd, "cached_tokens") and ptd.cached_tokens:
+                    usage["cached_tokens"] = ptd.cached_tokens
+            
+            # Try prompt_tokens_details (alternative OpenAI format for MiniMax)
+            if hasattr(response.usage, "prompt_tokens_details") and response.usage.prompt_tokens_details:
+                ptd = response.usage.prompt_tokens_details
+                if hasattr(ptd, "cached_tokens") and ptd.cached_tokens:
+                    usage["cached_tokens"] = ptd.cached_tokens
+            
+            # Try Anthropic format
+            if hasattr(response.usage, "cache_read_input_tokens"):
+                usage["cache_read_input_tokens"] = response.usage.cache_read_input_tokens
+            if hasattr(response.usage, "cache_creation_input_tokens"):
+                usage["cache_creation_input_tokens"] = response.usage.cache_creation_input_tokens
 
         reasoning_content = getattr(message, "reasoning_content", None) or None
         thinking_blocks = getattr(message, "thinking_blocks", None) or None

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, FileText, AlertCircle, Info, AlertTriangle, Terminal } from 'lucide-react';
+import { Loader2, FileText, AlertCircle, Info, AlertTriangle, Terminal, Cpu, Wrench, BookOpen } from 'lucide-react';
 import type { LogEntry } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
@@ -9,10 +9,10 @@ const categoryIcons: Record<string, React.ReactNode> = {
   chat: <Terminal className="w-4 h-4" />,
   auth: <Info className="w-4 h-4" />,
   config: <FileText className="w-4 h-4" />,
-  mcp: <Terminal className="w-4 h-4" />,
-  skill: <FileText className="w-4 h-4" />,
+  mcp: <Wrench className="w-4 h-4" />,
+  skill: <BookOpen className="w-4 h-4" />,
   tool: <Terminal className="w-4 h-4" />,
-  model: <Terminal className="w-4 h-4" />,
+  model: <Cpu className="w-4 h-4" />,
   error: <AlertCircle className="w-4 h-4" />,
   warning: <AlertTriangle className="w-4 h-4" />,
 };
@@ -24,15 +24,26 @@ const levelColors: Record<string, { bg: string; color: string }> = {
   DEBUG: { bg: 'rgba(176,164,156,0.15)', color: 'var(--text-secondary)' },
 };
 
+interface LogStats {
+  model: number;
+  tool: number;
+  mcp: number;
+  skill: number;
+  chat: number;
+  config: number;
+}
+
 export default function LogsPage() {
   const { token } = useAuth();
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [stats, setStats] = useState<LogStats>({ model: 0, tool: 0, mcp: 0, skill: 0, chat: 0, config: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [category, setCategory] = useState('');
   const [level, setLevel] = useState('');
 
   useEffect(() => {
     loadLogs();
+    loadStats();
   }, [category, level]);
 
   const loadLogs = async () => {
@@ -58,13 +69,29 @@ export default function LogsPage() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/logs/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('en-US', {
+    return new Date(timestamp).toLocaleString('en-GB', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      hour12: false
     });
   };
 
@@ -190,33 +217,45 @@ export default function LogsPage() {
         )}
       </div>
 
-      {/* Log Categories Legend */}
+      {/* Log Categories Stats */}
       <div className="mt-5 grid grid-cols-4 gap-4">
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Terminal className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
-            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Model Calls</h4>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+              <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Model Calls</h4>
+            </div>
+            <span className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>{stats.model}</span>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>LLM API calls and responses</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Terminal className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
-            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>MCP Tools</h4>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+              <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>MCP Tools</h4>
+            </div>
+            <span className="text-lg font-bold" style={{ color: 'var(--color-success)' }}>{stats.mcp}</span>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>MCP server tool executions</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <FileText className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Skills</h4>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+              <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Skills</h4>
+            </div>
+            <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{stats.skill}</span>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Skill executions and results</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Terminal className="w-4 h-4" style={{ color: 'var(--color-primary-dark)' }} />
-            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Tools</h4>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4" style={{ color: 'var(--color-primary-dark)' }} />
+              <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Tools</h4>
+            </div>
+            <span className="text-lg font-bold" style={{ color: 'var(--color-primary-dark)' }}>{stats.tool}</span>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Built-in tool executions</p>
         </div>

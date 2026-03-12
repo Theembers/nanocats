@@ -1,6 +1,102 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '../contexts/ChatContext';
-import { Send, MessageSquare, Loader2, Search, Globe, MessageCircle } from 'lucide-react';
+import { Send, MessageSquare, Loader2, Search, Globe, MessageCircle, ChevronDown, ChevronRight, Wrench, Cpu } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// Component to display tool call results in a collapsible format
+function ToolCallContent({ content, role }: { content: string; role: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Check if content looks like a tool result (JSON with url/status or similar)
+  const isToolResult = content.includes('"url":') || 
+                       content.includes('"status":') ||
+                       content.includes('"result":') ||
+                       (content.includes('"') && content.length > 500);
+  
+  // Check if it's a tool call hint
+  const isToolHint = content.match(/^\w+\(/) || content.includes('tool call');
+  
+  if (!isToolResult && !isToolHint) {
+    // Regular message, render as markdown
+    return (
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code: ({ node, inline, className, children, ...props }: any) => {
+            return !inline ? (
+              <pre className="rounded-lg p-3 my-2 overflow-x-auto" style={{ backgroundColor: role === 'user' ? 'rgba(0,0,0,0.2)' : 'var(--bg-elevated)' }}>
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              </pre>
+            ) : (
+              <code className="px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: role === 'user' ? 'rgba(0,0,0,0.2)' : 'var(--bg-elevated)' }} {...props}>
+                {children}
+              </code>
+            );
+          },
+          p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
+          h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 mt-3">{children}</h1>,
+          h2: ({ children }: any) => <h2 className="text-base font-bold mb-2 mt-3">{children}</h2>,
+          h3: ({ children }: any) => <h3 className="text-sm font-bold mb-1 mt-2">{children}</h3>,
+          ul: ({ children }: any) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+          ol: ({ children }: any) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+          li: ({ children }: any) => <li className="mb-0.5">{children}</li>,
+          a: ({ children, href }: any) => <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">{children}</a>,
+          blockquote: ({ children }: any) => (
+            <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: role === 'user' ? 'rgba(255,255,255,0.4)' : 'var(--color-accent)' }}>
+              {children}
+            </blockquote>
+          ),
+          table: ({ children }: any) => (
+            <div className="overflow-x-auto my-2">
+              <table className="w-full text-xs border-collapse">{children}</table>
+            </div>
+          ),
+          thead: ({ children }: any) => <thead style={{ backgroundColor: role === 'user' ? 'rgba(0,0,0,0.1)' : 'var(--bg-elevated)' }}>{children}</thead>,
+          th: ({ children }: any) => <th className="px-2 py-1 border text-left font-semibold">{children}</th>,
+          td: ({ children }: any) => <td className="px-2 py-1 border">{children}</td>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    );
+  }
+  
+  // Tool result - show collapsed by default
+  let toolName = 'Tool Result';
+  let icon = <Wrench className="w-3 h-3" />;
+  
+  if (isToolHint) {
+    const match = content.match(/^(\w+)\(/);
+    toolName = match ? match[1] : 'Tool';
+  } else if (content.includes('"url":')) {
+    toolName = 'Web Fetch';
+    icon = <Cpu className="w-3 h-3" />;
+  }
+  
+  return (
+    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: role === 'user' ? 'rgba(0,0,0,0.15)' : 'var(--bg-elevated)' }}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:opacity-80 transition-opacity"
+      >
+        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {icon}
+        <span className="text-xs font-medium">{toolName}</span>
+        <span className="text-xs opacity-50 ml-auto">{isExpanded ? 'Hide details' : 'Show details'}</span>
+      </button>
+      {isExpanded && (
+        <div className="px-3 pb-3">
+          <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-all" style={{ color: 'var(--text-secondary)' }}>
+            {content}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CHANNEL_ICONS: Record<string, string> = {
   web: '🌐',
@@ -32,6 +128,8 @@ export default function ChatPage() {
     loadMoreMessages,
     loadChannels,
     sendMessage,
+    streamingContent,
+    streamingType,
     searchQuery,
     setSearchQuery,
     selectedChannel,
@@ -83,6 +181,7 @@ export default function ChatPage() {
   };
 
   // Group messages by date
+  // (empty messages are now filtered at the backend for all channels)
   const groupedMessages = messages.reduce((groups, msg) => {
     const date = new Date(msg.timestamp).toLocaleDateString();
     if (!groups[date]) groups[date] = [];
@@ -246,12 +345,15 @@ export default function ChatPage() {
                         <span className="text-xs">{CHANNEL_NAMES[message.channel] || message.channel}</span>
                       </div>
                       
-                      <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                      {/* Message content with tool call handling */}
+                      <div className={`markdown-content text-sm ${message.role === 'user' ? 'markdown-user' : 'markdown-assistant'}`}>
+                        <ToolCallContent content={message.content} role={message.role} />
+                      </div>
                       <p
                         className="text-xs mt-1"
                         style={{ color: message.role === 'user' ? 'rgba(255,255,255,0.65)' : 'var(--text-muted)' }}
                       >
-                        {new Date(message.timestamp).toLocaleTimeString()}
+                        {new Date(message.timestamp).toLocaleTimeString('en-GB', { hour12: false })}
                       </p>
                     </div>
                   </div>
@@ -260,7 +362,37 @@ export default function ChatPage() {
             ))
           )}
           
-          {isLoading && (
+          {/* Loading / Streaming indicator */}
+          {isLoading && streamingContent && (
+            <div className="flex justify-start">
+              <div
+                className="px-4 py-3 rounded-2xl max-w-[70%]"
+                style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-soft)' }}
+              >
+                {/* Tool call indicator */}
+                {streamingType === 'tool' && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wrench className="w-3 h-3" style={{ color: 'var(--color-success)' }} />
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>Tool Call</span>
+                  </div>
+                )}
+                {/* Thinking indicator */}
+                {streamingType === 'thinking' && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--color-accent)' }} />
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-accent)' }}>Thinking</span>
+                  </div>
+                )}
+                {/* Streaming content */}
+                <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+                  {streamingContent}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Simple loading when no streaming content */}
+          {isLoading && !streamingContent && (
             <div className="flex justify-start">
               <div
                 className="px-4 py-3 rounded-2xl flex items-center gap-2"
