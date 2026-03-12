@@ -17,11 +17,11 @@ const categoryIcons: Record<string, React.ReactNode> = {
   warning: <AlertTriangle className="w-4 h-4" />,
 };
 
-const levelColors: Record<string, string> = {
-  INFO: 'bg-blue-100 text-blue-700',
-  WARN: 'bg-amber-100 text-amber-700',
-  ERROR: 'bg-red-100 text-red-700',
-  DEBUG: 'bg-gray-100 text-gray-700',
+const levelColors: Record<string, { bg: string; color: string }> = {
+  INFO:  { bg: 'rgba(123,143,161,0.12)', color: 'var(--color-primary-dark)' },
+  WARN:  { bg: 'rgba(196,149,106,0.15)', color: 'var(--color-accent-dark)' },
+  ERROR: { bg: 'rgba(192,97,74,0.12)',   color: 'var(--color-error)' },
+  DEBUG: { bg: 'rgba(176,164,156,0.15)', color: 'var(--text-secondary)' },
 };
 
 export default function LogsPage() {
@@ -71,16 +71,17 @@ export default function LogsPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">System Logs</h1>
-        <p className="text-gray-600 mt-1">View model calls, MCP, skill, and tool usage logs</p>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>System Logs</h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>View model calls, MCP, skill, and tool usage logs</p>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex gap-4">
+      <div className="mb-5 flex gap-3">
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          className="px-4 py-2 rounded-xl outline-none text-sm"
+          style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-main)', color: 'var(--text-primary)' }}
         >
           <option value="">All Categories</option>
           <option value="chat">Chat</option>
@@ -95,7 +96,8 @@ export default function LogsPage() {
         <select
           value={level}
           onChange={(e) => setLevel(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          className="px-4 py-2 rounded-xl outline-none text-sm"
+          style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-main)', color: 'var(--text-primary)' }}
         >
           <option value="">All Levels</option>
           <option value="INFO">Info</option>
@@ -106,64 +108,74 @@ export default function LogsPage() {
 
         <button
           onClick={loadLogs}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
+          style={{ backgroundColor: 'var(--color-accent)', color: 'var(--text-inverse)' }}
         >
           Refresh
         </button>
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-accent)' }} />
           </div>
         ) : logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-            <FileText className="w-12 h-12 mb-4 opacity-30" />
+          <div className="flex flex-col items-center justify-center h-64" style={{ color: 'var(--text-muted)' }}>
+            <FileText className="w-12 h-12 mb-4 opacity-25" />
             <p>No logs found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--bg-base)' }}>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Time</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Level</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Agent</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Message</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                  <tr key={log.id} style={{ borderTop: '1px solid var(--border-soft)' }}>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                       {formatTimestamp(log.timestamp)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${levelColors[log.level] || 'bg-gray-100 text-gray-700'}`}>
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: (levelColors[log.level] || levelColors.DEBUG).bg,
+                          color: (levelColors[log.level] || levelColors.DEBUG).color,
+                        }}
+                      >
                         {log.level}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">
+                        <span style={{ color: 'var(--text-muted)' }}>
                           {categoryIcons[log.category] || <Info className="w-4 h-4" />}
                         </span>
-                        <span className="text-sm text-gray-700 capitalize">{log.category}</span>
+                        <span className="text-sm capitalize" style={{ color: 'var(--text-secondary)' }}>{log.category}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-primary)' }}>
                       {log.agent_id || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
+                    <td className="px-4 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                       <div className="max-w-xl">
                         <p className="truncate">{log.message}</p>
                         {log.details && (
                           <details className="mt-1">
-                            <summary className="text-xs text-gray-500 cursor-pointer">Details</summary>
-                            <pre className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-700 overflow-x-auto">
+                            <summary className="text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>Details</summary>
+                            <pre
+                              className="mt-2 p-2 rounded text-xs overflow-x-auto"
+                              style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-secondary)' }}
+                            >
                               {log.details}
                             </pre>
                           </details>
@@ -179,34 +191,34 @@ export default function LogsPage() {
       </div>
 
       {/* Log Categories Legend */}
-      <div className="mt-6 grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Terminal className="w-5 h-5 text-blue-600" />
-            <h4 className="font-medium text-gray-900">Model Calls</h4>
+      <div className="mt-5 grid grid-cols-4 gap-4">
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Terminal className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Model Calls</h4>
           </div>
-          <p className="text-sm text-gray-500">LLM API calls and responses</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>LLM API calls and responses</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Terminal className="w-5 h-5 text-green-600" />
-            <h4 className="font-medium text-gray-900">MCP Tools</h4>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Terminal className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>MCP Tools</h4>
           </div>
-          <p className="text-sm text-gray-500">MCP server tool executions</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>MCP server tool executions</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText className="w-5 h-5 text-amber-600" />
-            <h4 className="font-medium text-gray-900">Skills</h4>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <FileText className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Skills</h4>
           </div>
-          <p className="text-sm text-gray-500">Skill executions and results</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Skill executions and results</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Terminal className="w-5 h-5 text-purple-600" />
-            <h4 className="font-medium text-gray-900">Tools</h4>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Terminal className="w-4 h-4" style={{ color: 'var(--color-primary-dark)' }} />
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Tools</h4>
           </div>
-          <p className="text-sm text-gray-500">Built-in tool executions</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Built-in tool executions</p>
         </div>
       </div>
     </div>

@@ -120,63 +120,76 @@ function WorkspaceEditor({ token }: WorkspaceEditorProps) {
   const isDirty = dirty[activeFile];
 
   return (
-    <div className="flex gap-6 h-full">
+    <div className="flex gap-5 h-full">
       {/* Sidebar file list */}
-      <div className="w-52 shrink-0 space-y-1">
+      <div className="w-52 shrink-0 space-y-0.5">
         {WORKSPACE_FILES.map(file => (
           <button
             key={file.filename}
             onClick={() => handleTabChange(file.filename)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors group ${
-              activeFile === file.filename
-                ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                : 'hover:bg-gray-50 text-gray-700 border border-transparent'
-            }`}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+            style={{
+              backgroundColor: activeFile === file.filename ? 'var(--color-accent-light)' : 'transparent',
+              border: activeFile === file.filename ? '1px solid rgba(196,149,106,0.3)' : '1px solid transparent',
+              color: activeFile === file.filename ? 'var(--color-accent-dark)' : 'var(--text-secondary)',
+            }}
           >
-            <span className="text-lg">{file.icon}</span>
+            <span className="text-base">{file.icon}</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{file.label}</p>
             </div>
             {dirty[file.filename] && (
-              <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" title="Unsaved changes" />
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: 'var(--color-accent)' }} title="Unsaved changes" />
             )}
             {activeFile === file.filename && (
-              <ChevronRight className="w-4 h-4 shrink-0 text-blue-500" />
+              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--color-accent)' }} />
             )}
           </button>
         ))}
       </div>
 
       {/* Editor panel */}
-      <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div
+        className="flex-1 flex flex-col rounded-2xl overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+        <div
+          className="flex items-center justify-between px-6 py-4"
+          style={{ borderBottom: '1px solid var(--border-soft)', backgroundColor: 'var(--bg-base)' }}
+        >
           <div>
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
               {currentFile.icon} {currentFile.label}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">{currentFile.description}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{currentFile.description}</p>
           </div>
           <div className="flex items-center gap-3">
             {status === 'saved' && (
-              <span className="flex items-center gap-1.5 text-sm text-green-600">
-                <CheckCircle2 className="w-4 h-4" /> Saved
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-success)' }}>
+                <CheckCircle2 className="w-3.5 h-3.5" /> Saved
               </span>
             )}
             {status === 'error' && (
-              <span className="flex items-center gap-1.5 text-sm text-red-600">
-                <AlertCircle className="w-4 h-4" /> Failed to save
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-error)' }}>
+                <AlertCircle className="w-3.5 h-3.5" /> Failed to save
               </span>
             )}
             <button
               onClick={() => handleSave(activeFile)}
               disabled={isSaving || !isDirty}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg transition-all"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: 'var(--text-inverse)',
+                opacity: (isSaving || !isDirty) ? 0.4 : 1,
+                cursor: (isSaving || !isDirty) ? 'not-allowed' : 'pointer',
+              }}
             >
               {isSaving ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</>
               ) : (
-                <><Save className="w-4 h-4" /> Save</>
+                <><Save className="w-3.5 h-3.5" /> Save</>
               )}
             </button>
           </div>
@@ -185,13 +198,14 @@ function WorkspaceEditor({ token }: WorkspaceEditorProps) {
         {/* Textarea */}
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-accent)' }} />
           </div>
         ) : (
           <textarea
             value={contents[activeFile] ?? ''}
             onChange={e => handleChange(activeFile, e.target.value)}
-            className="flex-1 resize-none p-6 font-mono text-sm text-gray-800 leading-relaxed outline-none focus:ring-0 border-none"
+            className="flex-1 resize-none p-6 font-mono text-sm leading-relaxed outline-none"
+            style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
             placeholder={`# ${activeFile}\n\nAdd your content here...`}
             spellCheck={false}
           />
@@ -265,7 +279,7 @@ export default function ConfigPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-accent)' }} />
       </div>
     );
   }
@@ -278,21 +292,22 @@ export default function ConfigPage() {
   return (
     <div className="max-w-5xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Configuration</h1>
-        <p className="text-gray-600 mt-1">Manage your agent settings and workspace files</p>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Configuration</h1>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Manage your agent settings and workspace files</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-0 mb-6" style={{ borderBottom: '1px solid var(--border-soft)' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className="flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all"
+            style={{
+              borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
+              color: activeTab === tab.id ? 'var(--color-accent-dark)' : 'var(--text-muted)',
+              marginBottom: '-1px',
+            }}
           >
             {tab.icon}
             {tab.label}
@@ -302,46 +317,58 @@ export default function ConfigPage() {
 
       {/* ── Tab: Agent Config ── */}
       {activeTab === 'basic' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {message && (
-            <div className={`p-4 rounded-lg flex items-center gap-2 ${message.includes('success') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            <div
+              className="p-4 rounded-xl flex items-center gap-2 text-sm"
+              style={{
+                backgroundColor: message.includes('success') ? 'rgba(94,158,110,0.1)' : 'rgba(192,97,74,0.1)',
+                color: message.includes('success') ? 'var(--color-success)' : 'var(--color-error)',
+                border: `1px solid ${message.includes('success') ? 'rgba(94,158,110,0.3)' : 'rgba(192,97,74,0.3)'}`,
+              }}
+            >
               {message.includes('success') ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
               {message}
             </div>
           )}
 
           {/* Basic Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <User className="w-5 h-5 text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <User className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Basic Information</h2>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Agent ID</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Agent ID</label>
                 <input
                   type="text"
                   value={config?.id || ''}
                   disabled
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm"
+                  style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Agent Type</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Agent Type</label>
                 <input
                   type="text"
                   value={config?.type || ''}
                   disabled
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 capitalize"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm capitalize"
+                  style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Agent Name</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Agent Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
+                  style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-main)', color: 'var(--text-primary)' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-main)')}
                   placeholder="Enter agent name"
                 />
               </div>
@@ -349,18 +376,19 @@ export default function ConfigPage() {
           </div>
 
           {/* Model Settings */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Bot className="w-5 h-5 text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Model Settings</h2>
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <Bot className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Model Settings</h2>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Model</label>
                 <select
                   value={model}
                   onChange={e => setModel(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-main)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Select model</option>
                   <option value="anthropic/claude-opus-4">Claude Opus 4</option>
@@ -373,11 +401,12 @@ export default function ConfigPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Provider</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Provider</label>
                 <select
                   value={provider}
                   onChange={e => setProvider(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border-main)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Auto-detect</option>
                   <option value="anthropic">Anthropic</option>
@@ -393,25 +422,37 @@ export default function ConfigPage() {
           </div>
 
           {/* MCP & Skills */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Wrench className="w-5 h-5 text-blue-600" />
-              <h2 className="text-lg font-semibold text-gray-900">MCP & Skills</h2>
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <Wrench className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>MCP &amp; Skills</h2>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-3">
+              <div
+                className="flex items-center justify-between p-4 rounded-xl"
+                style={{ backgroundColor: 'var(--bg-base)' }}
+              >
                 <div>
-                  <p className="font-medium text-gray-900">MCP Servers</p>
-                  <p className="text-sm text-gray-500">Manage Model Context Protocol servers</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>MCP Servers</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Manage Model Context Protocol servers</p>
                 </div>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">Configure</button>
+                <button
+                  className="px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                  style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}
+                >Configure</button>
               </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div
+                className="flex items-center justify-between p-4 rounded-xl"
+                style={{ backgroundColor: 'var(--bg-base)' }}
+              >
                 <div>
-                  <p className="font-medium text-gray-900">Skills</p>
-                  <p className="text-sm text-gray-500">Manage agent skills and capabilities</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Skills</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Manage agent skills and capabilities</p>
                 </div>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">Manage</button>
+                <button
+                  className="px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                  style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}
+                >Manage</button>
               </div>
             </div>
           </div>
@@ -421,12 +462,18 @@ export default function ConfigPage() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-lg transition-colors"
+              className="flex items-center gap-2 font-medium px-6 py-3 rounded-xl transition-all text-sm"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: 'var(--text-inverse)',
+                opacity: isSaving ? 0.6 : 1,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+              }}
             >
               {isSaving ? (
-                <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
               ) : (
-                <><Save className="w-5 h-5" /> Save Changes</>
+                <><Save className="w-4 h-4" /> Save Changes</>
               )}
             </button>
           </div>

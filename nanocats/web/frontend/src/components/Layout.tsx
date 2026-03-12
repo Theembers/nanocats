@@ -19,37 +19,72 @@ export default function Layout() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen flex" style={{ backgroundColor: 'var(--bg-base)' }}>
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside
+        className="w-60 flex flex-col shrink-0"
+        style={{ backgroundColor: 'var(--bg-sidebar)' }}
+      >
         {/* Logo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <Cat className="w-8 h-8 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">nanocats</h1>
-              <p className="text-xs text-gray-500">Agent Swarm</p>
-            </div>
+        <div
+          className="px-6 py-5 flex items-center gap-3"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            <Cat className="w-5 h-5" style={{ color: 'var(--text-inverse)' }} />
+          </div>
+          <div>
+            <h1 className="text-base font-bold" style={{ color: 'var(--text-inverse)' }}>
+              nanocats
+            </h1>
+            <p className="text-xs" style={{ color: 'var(--color-primary)' }}>
+              Agent Swarm
+            </p>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <ul className="space-y-1">
+        <nav className="flex-1 px-3 py-4">
+          <ul className="space-y-0.5">
             {navItems.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    `flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium ${
+                      isActive ? 'nav-active' : 'nav-idle'
                     }`
                   }
+                  style={({ isActive }) =>
+                    isActive
+                      ? {
+                          backgroundColor: 'var(--color-accent)',
+                          color: 'var(--text-inverse)',
+                        }
+                      : {
+                          color: 'rgba(255,255,255,0.65)',
+                        }
+                  }
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget;
+                    if (!el.classList.contains('nav-active')) {
+                      el.style.backgroundColor = 'var(--bg-sidebar-hover)';
+                      el.style.color = '#fff';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget;
+                    if (!el.classList.contains('nav-active')) {
+                      el.style.backgroundColor = '';
+                      el.style.color = 'rgba(255,255,255,0.65)';
+                    }
+                  }}
                 >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
                 </NavLink>
               </li>
             ))}
@@ -57,23 +92,41 @@ export default function Layout() {
         </nav>
 
         {/* User Info */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <span className="text-blue-700 font-semibold">
-                {agent?.name?.charAt(0).toUpperCase() || 'A'}
-              </span>
+        <div
+          className="p-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+              style={{
+                backgroundColor: 'var(--color-primary-dark)',
+                color: 'var(--text-inverse)',
+              }}
+            >
+              {agent?.name?.charAt(0).toUpperCase() || 'A'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-inverse)' }}>
                 {agent?.name || agent?.id}
               </p>
-              <p className="text-xs text-gray-500 capitalize">{agent?.type} Agent</p>
+              <p className="text-xs capitalize" style={{ color: 'var(--color-primary)' }}>
+                {agent?.type} Agent
+              </p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(192,97,74,0.2)';
+              (e.currentTarget as HTMLElement).style.color = '#e88a76';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = '';
+              (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.5)';
+            }}
           >
             <LogOut className="w-4 h-4" />
             Logout

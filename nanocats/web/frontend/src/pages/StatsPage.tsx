@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const COLORS = ['#C4956A', '#7B8FA1', '#5E9E6E', '#4F6478', '#A3714A'];
 
 export default function StatsPage() {
   const { token } = useAuth();
@@ -67,7 +67,7 @@ export default function StatsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-accent)' }} />
       </div>
     );
   }
@@ -76,13 +76,18 @@ export default function StatsPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Token Usage Statistics</h1>
-          <p className="text-gray-600 mt-1">Monitor your agent's token consumption and costs</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Token Usage Statistics</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Monitor your agent's token consumption and costs</p>
         </div>
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          className="px-4 py-2 rounded-xl outline-none text-sm"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1.5px solid var(--border-main)',
+            color: 'var(--text-primary)',
+          }}
         >
           <option value={7}>Last 7 days</option>
           <option value={14}>Last 14 days</option>
@@ -91,70 +96,70 @@ export default function StatsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Coins className="w-5 h-5 text-blue-600" />
+      <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--color-accent-light)' }}>
+              <Coins className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
             </div>
-            <p className="text-sm text-gray-500">Total Tokens</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Tokens</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totals.total.toLocaleString()}</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{totals.total.toLocaleString()}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-600" />
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(94,158,110,0.12)' }}>
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-success)' }} />
             </div>
-            <p className="text-sm text-gray-500">Prompt Tokens</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Prompt Tokens</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totals.prompt.toLocaleString()}</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{totals.prompt.toLocaleString()}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-amber-600" />
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(123,143,161,0.12)' }}>
+              <BarChart3 className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
             </div>
-            <p className="text-sm text-gray-500">Completion Tokens</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Completion Tokens</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totals.completion.toLocaleString()}</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{totals.completion.toLocaleString()}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-purple-600" />
+        <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(79,100,120,0.12)' }}>
+              <Zap className="w-4 h-4" style={{ color: 'var(--color-primary-dark)' }} />
             </div>
-            <p className="text-sm text-gray-500">Cache Hits</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Cache Hits</p>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totals.cacheHits.toLocaleString()}</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{totals.cacheHits.toLocaleString()}</p>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-5">
         {/* Token Usage Over Time */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Token Usage Over Time</h3>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <h3 className="text-base font-semibold mb-5" style={{ color: 'var(--text-primary)' }}>Token Usage Over Time</h3>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" />
+              <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-main)', borderRadius: 12 }} />
               <Legend />
-              <Bar dataKey="prompt" name="Prompt" fill="#3B82F6" />
-              <Bar dataKey="completion" name="Completion" fill="#10B981" />
+              <Bar dataKey="prompt" name="Prompt" fill="#C4956A" radius={[4,4,0,0]} />
+              <Bar dataKey="completion" name="Completion" fill="#7B8FA1" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Model Distribution */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Model Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+          <h3 className="text-base font-semibold mb-5" style={{ color: 'var(--text-primary)' }}>Model Distribution</h3>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
                 data={pieData}
@@ -163,54 +168,54 @@ export default function StatsPage() {
                 labelLine={false}
                 label={({ percent }) => `${((percent || 0) * 100).toFixed(0)}%`}
                 outerRadius={100}
-                fill="#8884d8"
+                fill="#C4956A"
                 dataKey="value"
               >
                 {pieData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-main)', borderRadius: 12 }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Detailed Table */}
-      <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Detailed Usage</h3>
+      <div className="mt-8 rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}>
+        <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--border-soft)' }}>
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Detailed Usage</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Prompt</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Completion</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cache Hits</th>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--bg-base)' }}>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Agent</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Model</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Prompt</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Completion</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Total</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase" style={{ color: 'var(--text-muted)' }}>Cache Hits</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {stats.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center" style={{ color: 'var(--text-muted)' }}>
                     No data available for the selected period
                   </td>
                 </tr>
               ) : (
                 stats.map((stat, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{new Date(stat.date).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{stat.agent_id}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{stat.model}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 text-right">{stat.prompt_tokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 text-right">{stat.completion_tokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900 text-right">{stat.total_tokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 text-right">{stat.cache_hits}</td>
+                  <tr key={index} style={{ borderTop: '1px solid var(--border-soft)' }}>
+                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-primary)' }}>{new Date(stat.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-primary)' }}>{stat.agent_id}</td>
+                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-primary)' }}>{stat.model}</td>
+                    <td className="px-6 py-4 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{stat.prompt_tokens.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{stat.completion_tokens.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-right" style={{ color: 'var(--color-accent-dark)' }}>{stat.total_tokens.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm text-right" style={{ color: 'var(--text-primary)' }}>{stat.cache_hits}</td>
                   </tr>
                 ))
               )}

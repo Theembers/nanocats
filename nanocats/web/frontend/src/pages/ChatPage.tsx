@@ -37,11 +37,15 @@ export default function ChatPage() {
   return (
     <div className="h-[calc(100vh-4rem)] flex gap-6">
       {/* Conversations Sidebar */}
-      <div className="w-64 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+      <div
+        className="w-60 rounded-2xl flex flex-col"
+        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}
+      >
+        <div className="p-4" style={{ borderBottom: '1px solid var(--border-soft)' }}>
           <button
             onClick={createConversation}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 font-medium py-2.5 px-4 rounded-xl transition-all text-sm"
+            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--text-inverse)' }}
           >
             <Plus className="w-4 h-4" />
             New Chat
@@ -50,24 +54,24 @@ export default function ChatPage() {
         
         <div className="flex-1 overflow-y-auto p-2">
           {conversations.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
+              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p className="text-sm">No conversations yet</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {conversations.map((conv) => (
                 <button
                   key={conv.id}
                   onClick={() => selectConversation(conv)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                    currentConversation?.id === conv.id
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`}
+                  className="w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all"
+                  style={{
+                    backgroundColor: currentConversation?.id === conv.id ? 'var(--color-accent-light)' : 'transparent',
+                    color: currentConversation?.id === conv.id ? 'var(--color-accent-dark)' : 'var(--text-primary)',
+                  }}
                 >
                   <p className="font-medium truncate">{conv.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {new Date(conv.updated_at).toLocaleDateString()}
                   </p>
                 </button>
@@ -78,13 +82,16 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col">
+      <div
+        className="flex-1 rounded-2xl flex flex-col"
+        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-soft)' }}
+      >
         {currentConversation ? (
           <>
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
                   <div className="text-center">
                     <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
                     <p>Start a new conversation</p>
@@ -99,17 +106,17 @@ export default function ChatPage() {
                     }`}
                   >
                     <div
-                      className={`max-w-[70%] px-4 py-3 rounded-2xl ${
+                      className="max-w-[70%] px-4 py-3 rounded-2xl"
+                      style={
                         message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
+                          ? { backgroundColor: 'var(--color-accent)', color: 'var(--text-inverse)' }
+                          : { backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-soft)' }
+                      }
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-sm">{message.content}</p>
                       <p
-                        className={`text-xs mt-1 ${
-                          message.role === 'user' ? 'text-blue-200' : 'text-gray-500'
-                        }`}
+                        className="text-xs mt-1"
+                        style={{ color: message.role === 'user' ? 'rgba(255,255,255,0.65)' : 'var(--text-muted)' }}
                       >
                         {new Date(message.timestamp).toLocaleTimeString()}
                       </p>
@@ -119,9 +126,12 @@ export default function ChatPage() {
               )}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 px-4 py-3 rounded-2xl flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-                    <span className="text-sm text-gray-500">Thinking...</span>
+                  <div
+                    className="px-4 py-3 rounded-2xl flex items-center gap-2"
+                    style={{ backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-soft)' }}
+                  >
+                    <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--color-accent)' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Thinking...</span>
                   </div>
                 </div>
               )}
@@ -129,20 +139,32 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-200">
+            <div className="p-4" style={{ borderTop: '1px solid var(--border-soft)' }}>
               <form onSubmit={handleSubmit} className="flex gap-3">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type your message..."
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="flex-1 px-4 py-3 rounded-xl outline-none transition-all text-sm"
+                  style={{
+                    backgroundColor: 'var(--bg-base)',
+                    border: '1.5px solid var(--border-main)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-main)')}
                   disabled={isLoading}
                 />
                 <button
                   type="submit"
                   disabled={!input.trim() || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-lg transition-colors"
+                  className="px-4 py-3 rounded-xl transition-all"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: 'var(--text-inverse)',
+                    opacity: (!input.trim() || isLoading) ? 0.4 : 1,
+                  }}
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -150,9 +172,9 @@ export default function ChatPage() {
             </div>
           </>
         ) : (
-          <div className="h-full flex items-center justify-center text-gray-400">
+          <div className="h-full flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
             <div className="text-center">
-              <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
+              <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-20" />
               <p className="text-lg">Select a conversation or start a new chat</p>
             </div>
           </div>

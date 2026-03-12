@@ -15,7 +15,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
       await login(agentId, token);
       navigate('/chat');
@@ -27,30 +26,85 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-            <Cat className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">nanocats</h1>
-          <p className="text-gray-600 mt-2">Agent Swarm Web Interface</p>
+    <div
+      className="min-h-screen flex"
+      style={{ backgroundColor: 'var(--bg-base)' }}
+    >
+      {/* Left decorative panel */}
+      <div
+        className="hidden lg:flex w-2/5 flex-col items-center justify-center p-12"
+        style={{ backgroundColor: 'var(--bg-sidebar)' }}
+      >
+        <div
+          className="w-20 h-20 rounded-3xl flex items-center justify-center mb-6"
+          style={{ backgroundColor: 'var(--color-accent)' }}
+        >
+          <Cat className="w-12 h-12" style={{ color: 'var(--text-inverse)' }} />
         </div>
+        <h1 className="text-3xl font-bold mb-3" style={{ color: 'var(--text-inverse)' }}>
+          nanocats
+        </h1>
+        <p className="text-center text-sm leading-relaxed" style={{ color: 'var(--color-primary)' }}>
+          Personal AI Agent Swarm<br />
+          Always curious, always ready 🐱
+        </p>
+        {/* Decorative tabby stripes */}
+        <div className="mt-12 space-y-2 w-32 opacity-20">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="rounded-full"
+              style={{
+                height: '3px',
+                backgroundColor: 'var(--color-accent)',
+                width: `${100 - i * 14}%`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
 
-        {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Agent Login</h2>
-          
+      {/* Right login panel */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div
+              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
+              style={{ backgroundColor: 'var(--color-accent)' }}
+            >
+              <Cat className="w-8 h-8" style={{ color: 'var(--text-inverse)' }} />
+            </div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>nanocats</h1>
+          </div>
+
+          <h2 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+            Welcome back
+          </h2>
+          <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>
+            Sign in with your agent credentials
+          </p>
+
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div
+              className="mb-5 px-4 py-3 rounded-xl text-sm"
+              style={{
+                backgroundColor: 'rgba(192,97,74,0.1)',
+                border: '1px solid rgba(192,97,74,0.3)',
+                color: 'var(--color-error)',
+              }}
+            >
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="agentId" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="agentId"
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 Agent ID
               </label>
               <input
@@ -58,14 +112,25 @@ export default function LoginPage() {
                 id="agentId"
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                placeholder="Enter your agent ID"
+                className="w-full px-4 py-3 rounded-xl outline-none transition-all text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1.5px solid var(--border-main)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-main)')}
+                placeholder="e.g. admin"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="token" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="token"
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 Access Token
               </label>
               <input
@@ -73,49 +138,55 @@ export default function LoginPage() {
                 id="token"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                placeholder="Enter your access token"
+                className="w-full px-4 py-3 rounded-xl outline-none transition-all text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1.5px solid var(--border-main)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--border-main)')}
+                placeholder="Your access token"
                 required
               />
-              <p className="mt-2 text-xs text-gray-500">
-                Token is configured in your agent config file
+              <p className="mt-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Configured via <code>nanocats setup</code>
               </p>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2"
+              style={{
+                backgroundColor: isLoading ? 'var(--color-accent-dark)' : 'var(--color-accent)',
+                color: 'var(--text-inverse)',
+                opacity: isLoading ? 0.8 : 1,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+              }}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Logging in...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
                 </>
               ) : (
-                'Login'
+                'Sign in'
               )}
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              <strong>Default login:</strong>
-            </p>
-            <ul className="mt-2 text-xs text-gray-500 space-y-1">
-              <li>• Agent ID: Your agent configuration ID</li>
-              <li>• Token: Use &quot;admin&quot; for testing or your configured token</li>
-            </ul>
+          <div
+            className="mt-8 pt-6 text-xs space-y-1"
+            style={{
+              borderTop: '1px solid var(--border-soft)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <p>Agent ID · your agent configuration ID</p>
+            <p>Token · set during <code>nanocats setup</code></p>
           </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-8">
-          Based on{' '}
-          <a href="https://github.com/HKUDS/nanobot" className="text-blue-600 hover:underline">
-            nanobot
-          </a>
-        </p>
       </div>
     </div>
   );
