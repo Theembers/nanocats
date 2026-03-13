@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import select
 import signal
 import sys
 from pathlib import Path
@@ -19,14 +18,9 @@ if sys.platform == "win32":
             pass
 
 import typer
-from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.shortcuts import choice
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.table import Table
-from rich.text import Text
 
 from nanocats import __logo__, __version__
 from nanocats.config.paths import get_workspace_path
@@ -40,110 +34,6 @@ app = typer.Typer(
 )
 
 console = Console()
-EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
-
-# ---------------------------------------------------------------------------
-# CLI input: prompt_toolkit for editing, paste, history, and display
-# ---------------------------------------------------------------------------
-
-_PROMPT_SESSION: PromptSession | None = None
-_SAVED_TERM_ATTRS = None  # original termios settings, restored on exit
-
-
-def _flush_pending_tty_input() -> None:
-    """Drop unread keypresses typed while the model was generating output."""
-    try:
-        fd = sys.stdin.fileno()
-        if not os.isatty(fd):
-            return
-    except Exception:
-        return
-
-    try:
-        import termios
-        termios.tcflush(fd, termios.TCIFLUSH)
-        return
-    except Exception:
-        pass
-
-    try:
-        while True:
-            ready, _, _ = select.select([fd], [], [], 0)
-            if not ready:
-                break
-            if not os.read(fd, 4096):
-                break
-    except Exception:
-        return
-
-
-def _restore_terminal() -> None:
-    """Restore terminal to its original state (echo, line buffering, etc.)."""
-    if _SAVED_TERM_ATTRS is None:
-        return
-    try:
-        import termios
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _SAVED_TERM_ATTRS)
-    except Exception:
-        pass
-
-
-def _init_prompt_session() -> None:
-    """Create the prompt_toolkit session with persistent file history."""
-    global _PROMPT_SESSION, _SAVED_TERM_ATTRS
-
-    # Save terminal state so we can restore it on exit
-    try:
-        import termios
-        _SAVED_TERM_ATTRS = termios.tcgetattr(sys.stdin.fileno())
-    except Exception:
-        pass
-
-    from nanocats.config.paths import get_cli_history_path
-
-    history_file = get_cli_history_path()
-    history_file.parent.mkdir(parents=True, exist_ok=True)
-
-    _PROMPT_SESSION = PromptSession(
-        history=FileHistory(str(history_file)),
-        enable_open_in_editor=False,
-        multiline=False,   # Enter submits (single line mode)
-    )
-
-
-def _print_agent_response(response: str, render_markdown: bool) -> None:
-    """Render assistant response with consistent terminal styling."""
-    content = response or ""
-    body = Markdown(content) if render_markdown else Text(content)
-    console.print()
-    console.print(f"[cyan]{__logo__} nanocats[/cyan]")
-    console.print(body)
-    console.print()
-
-
-def _is_exit_command(command: str) -> bool:
-    """Return True when input should end interactive chat."""
-    return command.lower() in EXIT_COMMANDS
-
-
-async def _read_interactive_input_async() -> str:
-    """Read user input using prompt_toolkit (handles paste, history, display).
-
-    prompt_toolkit natively handles:
-    - Multiline paste (bracketed paste mode)
-    - History navigation (up/down arrows)
-    - Clean display (no ghost characters or artifacts)
-    """
-    if _PROMPT_SESSION is None:
-        raise RuntimeError("Call _init_prompt_session() first")
-    try:
-        with patch_stdout():
-            return await _PROMPT_SESSION.prompt_async(
-                HTML("<b fg='ansiblue'>You:</b> "),
-            )
-    except EOFError as exc:
-        raise KeyboardInterrupt from exc
-
 
 
 def version_callback(value: bool):
@@ -163,15 +53,140 @@ def main(
 
 
 # ============================================================================
+# Help Command
+# ============================================================================
+
+
+@app.command()
+def help(
+    command: str | None = typer.Argument(None, help="Command to get help for"),
+):
+    """Show help information for nanocats commands."""
+    if command:
+        _show_command_help(command)
+    else:
+        _show_all_commands()
+
+
+def _show_all_commands():
+    """Display all available commands."""
+    console.print(f"\n[bold cyan]{__logo__} nanocats CLI 帮助[/bold cyan]\n")
+    
+    # Main commands
+    console.print("[bold]主命令:[/bold]")
+    console.print("  [green]onboard[/green]          初始化配置和 workspace")
+    console.print("  [green]setup[/green]            交互式设置向导")
+    console.print("  [green]gateway[/green]          启动 Gateway 服务")
+    console.print("  [green]status[/green]           显示系统状态")
+    console.print("  [green]help[/green] [command]   显示帮助信息\n")
+
+    # Sub commands
+    console.print("[bold]子命令:[/bold]")
+    console.print("  [green]swarm status[/green]     显示 Swarm 状态")
+    console.print("  [green]swarm list[/green]       列出所有 Agent")
+    console.print("  [green]swarm create[/green]     创建新 Agent")
+    console.print("  [green]swarm mcp[/green]        管理 MCP 服务器")
+    console.print("  [green]channels status[/green]  显示通道状态")
+    console.print("  [green]channels login[/green]   WhatsApp 设备登录")
+    console.print("  [green]provider login[/green]   OAuth 登录\n")
+    
+    console.print("[dim]使用 \"nanocats help <command>\" 查看具体指令的详细参数说明[/dim]\n")
+
+
+def _show_command_help(command: str):
+    """Display detailed help for a specific command."""
+    help_map = {
+        "onboard": {
+            "desc": "初始化 nanocats 配置和 workspace",
+            "usage": "nanocats onboard",
+            "options": [],
+        },
+        "setup": {
+            "desc": "交互式设置向导，配置模型提供商、Agent、通道",
+            "usage": "nanocats setup",
+            "options": [],
+        },
+        "gateway": {
+            "desc": "启动 Gateway 服务（Swarm 模式）",
+            "usage": "nanocats gateway [OPTIONS]",
+            "options": [
+                ("-p, --port", "Gateway 端口"),
+                ("-w, --workspace", "Workspace 目录"),
+                ("-c, --config", "配置文件路径"),
+                ("-v, --verbose", "启用调试日志"),
+            ],
+        },
+
+        "status": {
+            "desc": "显示 nanocats 系统状态",
+            "usage": "nanocats status",
+            "options": [],
+        },
+        "swarm": {
+            "desc": "Swarm 管理命令",
+            "usage": "nanocats swarm <subcommand>",
+            "options": [
+                ("status", "显示 Swarm 状态"),
+                ("list", "列出所有 Agent"),
+                ("create <id>", "创建新 Agent"),
+                ("mcp <action>", "管理 MCP 服务器 (list/install/uninstall)"),
+            ],
+        },
+        "channels": {
+            "desc": "通道管理命令",
+            "usage": "nanocats channels <subcommand>",
+            "options": [
+                ("status", "显示通道状态"),
+                ("login", "WhatsApp 设备登录（扫码）"),
+            ],
+        },
+        "provider": {
+            "desc": "OAuth 提供商登录",
+            "usage": "nanocats provider login <provider>",
+            "options": [
+                ("openai-codex", "OpenAI Codex OAuth 登录"),
+                ("github-copilot", "GitHub Copilot OAuth 登录"),
+            ],
+        },
+    }
+    
+    if command not in help_map:
+        console.print(f"[red]未知命令: {command}[/red]")
+        console.print("\n使用 [cyan]nanocats help[/cyan] 查看所有可用命令")
+        raise typer.Exit(1)
+    
+    info = help_map[command]
+    console.print(f"\n[bold cyan]{__logo__} nanocats help {command}[/bold cyan]\n")
+    console.print(f"[bold]描述:[/bold] {info['desc']}\n")
+    console.print(f"[bold]用法:[/bold] [green]{info['usage']}[/green]\n")
+    
+    if info["options"]:
+        console.print("[bold]选项/子命令:[/bold]")
+        for opt, desc in info["options"]:
+            console.print(f"  [green]{opt:<18}[/green] {desc}")
+        console.print()
+
+
+# ============================================================================
 # Onboard / Setup
 # ============================================================================
 
-WEB_PORT = 15751
+DEFAULT_WEB_PORT = 15751
+
+
+def _get_web_port() -> int:
+    """Get web server port from config or return default."""
+    try:
+        from nanocats.config.loader import load_config
+        config = load_config()
+        return config.channels.web.port
+    except Exception:
+        return DEFAULT_WEB_PORT
 
 
 def _start_web_server() -> None:
     """
-    Start the web server on WEB_PORT.
+    Start the web server on configured port.
 
     Logic:
     1. Try to start normally.
@@ -187,16 +202,18 @@ def _start_web_server() -> None:
     import urllib.request
     import uvicorn
 
+    web_port = _get_web_port()
+
     def _port_in_use() -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(("127.0.0.1", WEB_PORT)) == 0
+            return s.connect_ex(("127.0.0.1", web_port)) == 0
 
     def _kill_port() -> bool:
-        """Kill whatever is listening on WEB_PORT. Returns True on success."""
+        """Kill whatever is listening on web_port. Returns True on success."""
         import subprocess
         try:
             result = subprocess.run(
-                ["lsof", "-ti", f":{WEB_PORT}"],
+                ["lsof", "-ti", f":{web_port}"],
                 capture_output=True, text=True
             )
             pids = result.stdout.strip().split()
@@ -228,8 +245,8 @@ def _start_web_server() -> None:
         console.print("=" * 60)
         console.print("🐱 nanocats Web Interface")
         console.print("=" * 60)
-        console.print(f"📱 Web UI:   http://localhost:{WEB_PORT}")
-        console.print(f"📚 API Docs: http://localhost:{WEB_PORT}/docs")
+        console.print(f"📱 Web UI:   http://localhost:{web_port}")
+        console.print(f"📚 API Docs: http://localhost:{web_port}/docs")
         console.print("=" * 60)
         console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
 
@@ -238,7 +255,7 @@ def _start_web_server() -> None:
         uvicorn.run(
             "nanocats.web.backend.main:app",
             host="0.0.0.0",
-            port=WEB_PORT,
+            port=web_port,
             reload=False,
             log_level="info",
         )
@@ -252,13 +269,13 @@ def _start_web_server() -> None:
         return
 
     # ── Port is occupied ─────────────────────────────────────────────────────
-    console.print(f"\n[yellow]Port {WEB_PORT} is already in use.[/yellow]")
+    console.print(f"\n[yellow]Port {web_port} is already in use.[/yellow]")
     console.print("[dim]Restarting the web server with the latest code...[/dim]")
 
     if not _kill_port():
         console.print(
-            f"[red]Could not free port {WEB_PORT}. "
-            "Please stop the existing process manually and run [cyan]nanocats web[/cyan] again.[/red]"
+            f"[red]Could not free port {web_port}. "
+            "Please stop the existing process manually and run [cyan]nanocats gateway[/cyan] again.[/red]"
         )
         return
 
@@ -267,6 +284,30 @@ def _start_web_server() -> None:
         _run()
     except KeyboardInterrupt:
         console.print("\n[yellow]Web server stopped[/yellow]")
+
+
+def _interactive_select(options: list[str], title: str = "Select an option:") -> int:
+    """Interactive selection using arrow keys and Enter.
+    
+    Args:
+        options: List of option strings to display
+        title: Title to show above the options
+    
+    Returns:
+        Index of the selected option (0-based)
+    """
+    try:
+        # Use prompt_toolkit's built-in choice function
+        # options should be list of (value, label) tuples
+        option_tuples = [(opt, opt) for opt in options]
+        result = choice(
+            message=title + " ",
+            options=option_tuples,
+            default=options[0],
+        )
+        return options.index(result)
+    except Exception:
+        return 0  # Fallback to first option on any error
 
 
 @app.command()
@@ -305,48 +346,49 @@ def onboard():
     sync_workspace_templates(workspace)
 
     console.print(f"\n{__logo__} nanocats is ready!")
+    web_port = _get_web_port()
+    
     console.print("\n[bold]Next Steps:[/bold]\n")
     
-    console.print("[bold cyan]━━━ Web Interface ━━━[/bold cyan]")
+    console.print("[bold cyan]━━━ Gateway ━━━[/bold cyan]")
     console.print("  Start web server:")
-    console.print("  [cyan]nanocats web[/cyan]")
-    console.print("\n  Access: [yellow]http://localhost:15751[/yellow]")
-    console.print("  API Docs: [yellow]http://localhost:15751/docs[/yellow]")
+    console.print("  [cyan]nanocats gateway[/cyan]")
+    console.print(f"\n  Access: [yellow]http://localhost:{web_port}[/yellow]")
+    console.print(f"  API Docs: [yellow]http://localhost:{web_port}/docs[/yellow]")
     console.print("\n  [dim]Login with Agent ID and Token (configured via 'nanocats setup')[/dim]")
-    
+
     console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
     console.print("  Show all commands:")
     console.print("  [cyan]nanocats --help[/cyan]")
     console.print("\n  Common commands:")
-    console.print("  [cyan]nanocats setup[/cyan]      # Interactive setup wizard")
-    console.print("  [cyan]nanocats agent[/cyan]      # Start interactive chat")
-    console.print("  [cyan]nanocats gateway[/cyan]    # Start channel gateway")
-    console.print("  [cyan]nanocats web[/cyan]        # Start web interface")
-    console.print("  [cyan]nanocats status[/cyan]     # Show system status")
-    console.print("  [cyan]nanocats swarm list[/cyan] # List configured agents")
-    
+    console.print("  [cyan]nanocats setup[/cyan]              # Interactive setup wizard")
+    console.print("  [cyan]nanocats gateway[/cyan]            # Start channel gateway")
+    console.print("  [cyan]nanocats status[/cyan]             # Show system status")
+    console.print("  [cyan]nanocats swarm list[/cyan]         # List configured agents")
+
     console.print("\n[bold cyan]━━━ Configuration ━━━[/bold cyan]")
     console.print("  Config file: [cyan]~/.nanocats/config.json[/cyan]")
     console.print("  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
     console.print("\n[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
-    
+
     # Ask if user wants to run setup or start web
     console.print("[bold cyan]━━━ Quick Start ━━━[/bold cyan]\n")
-    console.print("What would you like to do next?")
-    console.print("  1. Run setup wizard (recommended for new users)")
-    console.print("  2. Start web interface")
-    console.print("  3. Skip for now\n")
-    
-    choice = typer.prompt("Select option (1-3)", default="1")
-    
-    if choice == "1":
+
+    options = [
+        "Run setup wizard (recommended for new users)",
+        "Start web interface",
+        "Skip for now"
+    ]
+    choice = _interactive_select(options, "What would you like to do next?")
+
+    if choice == 0:
         console.print()
         setup()
-    elif choice == "2":
+    elif choice == 1:
         console.print()
         _start_web_server()
     else:
-        console.print("\n[dim]You can start the web server later with: nanocats web[/dim]\n")
+        console.print("\n[dim]You can start the web server later with: nanocats gateway[/dim]\n")
 
 
 @app.command()
@@ -467,23 +509,10 @@ def setup():
         ("custom", "Custom OpenAI-compatible endpoint", None),
     ]
     
-    for i, (key, desc, url) in enumerate(providers, 1):
-        url_str = f" [dim]→ {url}[/dim]" if url else ""
-        console.print(f"  {i}. {desc}{url_str}")
-    
-    console.print()
-    provider_choice = typer.prompt(
-        "Select provider (1-9)",
-        default="1",
-        show_default=True
-    )
-    
-    try:
-        provider_idx = int(provider_choice) - 1
-        provider_key = providers[provider_idx][0]
-    except (ValueError, IndexError):
-        provider_key = "openrouter"
-    
+    provider_options = [desc for _, desc, _ in providers]
+    provider_idx = _interactive_select(provider_options, "Select a model provider:")
+    provider_key = providers[provider_idx][0]
+
     console.print()
     
     # Get API key if needed
@@ -618,22 +647,10 @@ def setup():
         ("none", "None (CLI only)", "Skip channel setup"),
     ]
     
-    for i, (key, name, req) in enumerate(channels, 1):
-        console.print(f"  {i}. {name} [dim]→ {req}[/dim]")
-    
-    console.print()
-    channel_choice = typer.prompt(
-        "Select channel (1-8)",
-        default="8",
-        show_default=True
-    )
-    
-    try:
-        channel_idx = int(channel_choice) - 1
-        selected_channel = channels[channel_idx][0]
-    except (ValueError, IndexError):
-        selected_channel = "none"
-    
+    channel_options = [f"{name} ({req})" for key, name, req in channels]
+    channel_idx = _interactive_select(channel_options, "Select a channel:")
+    selected_channel = channels[channel_idx][0]
+
     # Configure selected channel
     if selected_channel != "none":
         console.print()
@@ -733,39 +750,39 @@ def setup():
         console.print(f"  Enabled: [cyan]{selected_channel}[/cyan]")
         console.print()
     
+    web_port = _get_web_port()
+    
     console.print("[bold]Next Steps:[/bold]\n")
     
-    console.print("[bold cyan]━━━ Web Interface ━━━[/bold cyan]")
+    console.print("[bold cyan]━━━ Gateway ━━━[/bold cyan]")
     console.print("  Start web server:")
-    console.print("  [cyan]nanocats web[/cyan]")
-    console.print(f"\n  Access: [yellow]http://localhost:15751[/yellow]")
-    console.print("  API Docs: [yellow]http://localhost:15751/docs[/yellow]")
+    console.print("  [cyan]nanocats gateway[/cyan]")
+    console.print(f"\n  Access: [yellow]http://localhost:{web_port}[/yellow]")
+    console.print(f"  API Docs: [yellow]http://localhost:{web_port}/docs[/yellow]")
     console.print(f"\n  [dim]Login with:[/dim]")
     console.print(f"  [dim]  Agent ID: [cyan]{agent_id}[/cyan][/dim]")
     console.print(f"  [dim]  Token: [yellow]{access_token}[/yellow][/dim]")
-    
+
     console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
     console.print("  Show all commands:")
     console.print("  [cyan]nanocats --help[/cyan]")
     console.print("\n  Common commands:")
-    console.print("  [cyan]nanocats agent[/cyan]      # Start interactive chat")
-    console.print("  [cyan]nanocats gateway[/cyan]    # Start channel gateway")
-    console.print("  [cyan]nanocats web[/cyan]        # Start web interface")
-    console.print("  [cyan]nanocats status[/cyan]     # Show system status")
-    console.print("  [cyan]nanocats swarm list[/cyan] # List configured agents")
-    
+    console.print("  [cyan]nanocats gateway[/cyan]            # Start channel gateway")
+    console.print("  [cyan]nanocats status[/cyan]             # Show system status")
+    console.print("  [cyan]nanocats swarm list[/cyan]         # List configured agents")
+
     console.print("\n[bold cyan]━━━ Configuration Files ━━━[/bold cyan]")
     console.print(f"  Main config: [cyan]{config_path}[/cyan]")
     console.print(f"  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
     console.print("\n[dim]⚠ Save your access token securely! You'll need it to login.[/dim]")
     console.print("[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
-    
+
     # Ask if user wants to start web server
     console.print("[bold cyan]━━━ Start Web Server? ━━━[/bold cyan]\n")
     console.print("Would you like to start the web interface now?")
-    console.print(f"  Access: [yellow]http://localhost:15751[/yellow]")
+    console.print(f"  Access: [yellow]http://localhost:{web_port}[/yellow]")
     console.print(f"  Login with Agent ID: [cyan]{agent_id}[/cyan] and your token\n")
-    
+
     if typer.confirm("Start web server?", default=True):
         console.print()
         _start_web_server()
@@ -890,162 +907,10 @@ def gateway(
     console.print(f"{__logo__} Starting nanocats gateway on port {port}...")
     sync_workspace_templates(config.workspace_path)
 
-    # Check if swarm mode is enabled
-    if config.agents.swarm.enabled:
-        asyncio.run(_run_swarm_gateway(config))
-        return
-
-    # Single agent mode (original behavior)
-    bus = MessageBus()
-    provider = _make_provider(config)
-    session_manager = SessionManager(config.workspace_path)
-
-    # Create cron service first (callback set after agent creation)
-    cron_store_path = get_cron_dir() / "jobs.json"
-    cron = CronService(cron_store_path)
-
-    # Create agent with cron service
-    agent = AgentLoop(
-        bus=bus,
-        provider=provider,
-        workspace=config.workspace_path,
-        model=config.agents.defaults.model,
-        max_iterations=config.agents.defaults.max_tool_iterations,
-        context_window_tokens=config.agents.defaults.context_window_tokens,
-        brave_api_key=config.tools.web.search.api_key or None,
-        web_proxy=config.tools.web.proxy or None,
-        exec_config=config.tools.exec,
-        cron_service=cron,
-        restrict_to_workspace=config.tools.restrict_to_workspace,
-        session_manager=session_manager,
-        mcp_servers=config.tools.mcp_servers,
-        channels_config=config.channels,
-    )
-
-    # Set cron callback (needs agent)
-    async def on_cron_job(job: CronJob) -> str | None:
-        """Execute a cron job through the agent."""
-        from nanocats.agent.tools.cron import CronTool
-        from nanocats.agent.tools.message import MessageTool
-        reminder_note = (
-            "[Scheduled Task] Timer finished.\n\n"
-            f"Task '{job.name}' has been triggered.\n"
-            f"Scheduled instruction: {job.payload.message}"
-        )
-
-        # Prevent the agent from scheduling new cron jobs during execution
-        cron_tool = agent.tools.get("cron")
-        cron_token = None
-        if isinstance(cron_tool, CronTool):
-            cron_token = cron_tool.set_cron_context(True)
-        try:
-            response = await agent.process_direct(
-                reminder_note,
-                session_key=f"cron:{job.id}",
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to or "direct",
-            )
-        finally:
-            if isinstance(cron_tool, CronTool) and cron_token is not None:
-                cron_tool.reset_cron_context(cron_token)
-
-        message_tool = agent.tools.get("message")
-        if isinstance(message_tool, MessageTool) and message_tool._sent_in_turn:
-            return response
-
-        if job.payload.deliver and job.payload.to and response:
-            from nanocats.bus.events import OutboundMessage
-            await bus.publish_outbound(OutboundMessage(
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to,
-                content=response
-            ))
-        return response
-    cron.on_job = on_cron_job
-
-    # Create channel manager
-    channels = ChannelManager(config, bus)
-
-    def _pick_heartbeat_target() -> tuple[str, str]:
-        """Pick a routable channel/chat target for heartbeat-triggered messages."""
-        enabled = set(channels.enabled_channels)
-        # Prefer the most recently updated non-internal session on an enabled channel.
-        for item in session_manager.list_sessions():
-            key = item.get("key") or ""
-            if ":" not in key:
-                continue
-            channel, chat_id = key.split(":", 1)
-            if channel in {"cli", "system"}:
-                continue
-            if channel in enabled and chat_id:
-                return channel, chat_id
-        # Fallback keeps prior behavior but remains explicit.
-        return "cli", "direct"
-
-    # Create heartbeat service
-    async def on_heartbeat_execute(tasks: str) -> str:
-        """Phase 2: execute heartbeat tasks through the full agent loop."""
-        channel, chat_id = _pick_heartbeat_target()
-
-        async def _silent(*_args, **_kwargs):
-            pass
-
-        return await agent.process_direct(
-            tasks,
-            session_key="heartbeat",
-            channel=channel,
-            chat_id=chat_id,
-            on_progress=_silent,
-        )
-
-    async def on_heartbeat_notify(response: str) -> None:
-        """Deliver a heartbeat response to the user's channel."""
-        from nanocats.bus.events import OutboundMessage
-        channel, chat_id = _pick_heartbeat_target()
-        if channel == "cli":
-            return  # No external channel available to deliver to
-        await bus.publish_outbound(OutboundMessage(channel=channel, chat_id=chat_id, content=response))
-
-    hb_cfg = config.gateway.heartbeat
-    heartbeat = HeartbeatService(
-        workspace=config.workspace_path,
-        provider=provider,
-        model=agent.model,
-        on_execute=on_heartbeat_execute,
-        on_notify=on_heartbeat_notify,
-        interval_s=hb_cfg.interval_s,
-        enabled=hb_cfg.enabled,
-    )
-
-    if channels.enabled_channels:
-        console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
-    else:
-        console.print("[yellow]Warning: No channels enabled[/yellow]")
-
-    cron_status = cron.status()
-    if cron_status["jobs"] > 0:
-        console.print(f"[green]✓[/green] Cron: {cron_status['jobs']} scheduled jobs")
-
-    console.print(f"[green]✓[/green] Heartbeat: every {hb_cfg.interval_s}s")
-
-    async def run():
-        try:
-            await cron.start()
-            await heartbeat.start()
-            await asyncio.gather(
-                agent.run(),
-                channels.start_all(),
-            )
-        except KeyboardInterrupt:
-            console.print("\nShutting down...")
-        finally:
-            await agent.close_mcp()
-            heartbeat.stop()
-            cron.stop()
-            agent.stop()
-            await channels.stop_all()
-
-    asyncio.run(run())
+    # Unified entry: always use swarm manager
+    # If no agents are configured, it will create a default agent
+    asyncio.run(_run_swarm_gateway(config))
+    return
 
 
 def _run_swarm_gateway(config: Config) -> None:
@@ -1056,6 +921,11 @@ def _run_swarm_gateway(config: Config) -> None:
     from nanocats.swarm.manager import SwarmManager
 
     console.print("[cyan]Swarm mode enabled[/cyan]")
+
+    # Check if web channel is enabled and start web backend
+    web_server_task = None
+    if config.channels.web.enabled:
+        web_server_task = _start_web_backend(config)
 
     bus = MessageBus()
     provider = _make_provider(config)
@@ -1086,6 +956,11 @@ def _run_swarm_gateway(config: Config) -> None:
                 console.print("[yellow]Warning: No agents configured[/yellow]")
                 console.print("Create agent configs in ~/.nanocats/agents/")
 
+            # Show web backend status
+            if config.channels.web.enabled:
+                web_port = config.channels.web.port
+                console.print(f"[green]✓[/green] Web UI: http://localhost:{web_port}")
+
             # Keep running
             while swarm._running:
                 await asyncio.sleep(1)
@@ -1096,6 +971,27 @@ def _run_swarm_gateway(config: Config) -> None:
             await swarm.stop()
 
     asyncio.run(run_swarm())
+
+
+def _start_web_backend(config: Config):
+    """Start the web backend in a background thread."""
+    import threading
+    import uvicorn
+    from nanocats.web.backend import main as web_main
+
+    web_port = config.channels.web.port
+
+    def run():
+        uvicorn.run(
+            web_main.app,
+            host="0.0.0.0",
+            port=web_port,
+            log_level="warning",
+        )
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
 
 
 
@@ -1295,186 +1191,6 @@ def swarm_mcp(
 # ============================================================================
 # Agent Commands
 # ============================================================================
-
-
-@app.command()
-def agent(
-    message: str = typer.Option(None, "--message", "-m", help="Message to send to the agent"),
-    session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
-    config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
-    markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
-    logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanocats runtime logs during chat"),
-):
-    """Interact with the agent directly."""
-    from loguru import logger
-
-    from nanocats.agent.loop import AgentLoop
-    from nanocats.bus.queue import MessageBus
-    from nanocats.config.paths import get_cron_dir
-    from nanocats.cron.service import CronService
-
-    config = _load_runtime_config(config, workspace)
-    _print_deprecated_memory_window_notice(config)
-    sync_workspace_templates(config.workspace_path)
-
-    bus = MessageBus()
-    provider = _make_provider(config)
-
-    # Create cron service for tool usage (no callback needed for CLI unless running)
-    cron_store_path = get_cron_dir() / "jobs.json"
-    cron = CronService(cron_store_path)
-
-    if logs:
-        logger.enable("nanocats")
-    else:
-        logger.disable("nanocats")
-
-    agent_loop = AgentLoop(
-        bus=bus,
-        provider=provider,
-        workspace=config.workspace_path,
-        model=config.agents.defaults.model,
-        max_iterations=config.agents.defaults.max_tool_iterations,
-        context_window_tokens=config.agents.defaults.context_window_tokens,
-        brave_api_key=config.tools.web.search.api_key or None,
-        web_proxy=config.tools.web.proxy or None,
-        exec_config=config.tools.exec,
-        cron_service=cron,
-        restrict_to_workspace=config.tools.restrict_to_workspace,
-        mcp_servers=config.tools.mcp_servers,
-        channels_config=config.channels,
-    )
-
-    # Show spinner when logs are off (no output to miss); skip when logs are on
-    def _thinking_ctx():
-        if logs:
-            from contextlib import nullcontext
-            return nullcontext()
-        # Animated spinner is safe to use with prompt_toolkit input handling
-        return console.status("[dim]nanocats is thinking...[/dim]", spinner="dots")
-
-    async def _cli_progress(content: str, *, tool_hint: bool = False) -> None:
-        ch = agent_loop.channels_config
-        if ch and tool_hint and not ch.send_tool_hints:
-            return
-        if ch and not tool_hint and not ch.send_progress:
-            return
-        console.print(f"  [dim]↳ {content}[/dim]")
-
-    if message:
-        # Single message mode — direct call, no bus needed
-        async def run_once():
-            with _thinking_ctx():
-                response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
-            _print_agent_response(response, render_markdown=markdown)
-            await agent_loop.close_mcp()
-
-        asyncio.run(run_once())
-    else:
-        # Interactive mode — route through bus like other channels
-        from nanocats.bus.events import InboundMessage
-        _init_prompt_session()
-        console.print(f"{__logo__} Interactive mode (type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit)\n")
-
-        if ":" in session_id:
-            cli_channel, cli_chat_id = session_id.split(":", 1)
-        else:
-            cli_channel, cli_chat_id = "cli", session_id
-
-        def _handle_signal(signum, frame):
-            sig_name = signal.Signals(signum).name
-            _restore_terminal()
-            console.print(f"\nReceived {sig_name}, goodbye!")
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, _handle_signal)
-        signal.signal(signal.SIGTERM, _handle_signal)
-        # SIGHUP is not available on Windows
-        if hasattr(signal, 'SIGHUP'):
-            signal.signal(signal.SIGHUP, _handle_signal)
-        # Ignore SIGPIPE to prevent silent process termination when writing to closed pipes
-        # SIGPIPE is not available on Windows
-        if hasattr(signal, 'SIGPIPE'):
-            signal.signal(signal.SIGPIPE, signal.SIG_IGN)
-
-        async def run_interactive():
-            bus_task = asyncio.create_task(agent_loop.run())
-            turn_done = asyncio.Event()
-            turn_done.set()
-            turn_response: list[str] = []
-
-            async def _consume_outbound():
-                while True:
-                    try:
-                        msg = await asyncio.wait_for(bus.consume_outbound(), timeout=1.0)
-                        if msg.metadata.get("_progress"):
-                            is_tool_hint = msg.metadata.get("_tool_hint", False)
-                            ch = agent_loop.channels_config
-                            if ch and is_tool_hint and not ch.send_tool_hints:
-                                pass
-                            elif ch and not is_tool_hint and not ch.send_progress:
-                                pass
-                            else:
-                                console.print(f"  [dim]↳ {msg.content}[/dim]")
-                        elif not turn_done.is_set():
-                            if msg.content:
-                                turn_response.append(msg.content)
-                            turn_done.set()
-                        elif msg.content:
-                            console.print()
-                            _print_agent_response(msg.content, render_markdown=markdown)
-                    except asyncio.TimeoutError:
-                        continue
-                    except asyncio.CancelledError:
-                        break
-
-            outbound_task = asyncio.create_task(_consume_outbound())
-
-            try:
-                while True:
-                    try:
-                        _flush_pending_tty_input()
-                        user_input = await _read_interactive_input_async()
-                        command = user_input.strip()
-                        if not command:
-                            continue
-
-                        if _is_exit_command(command):
-                            _restore_terminal()
-                            console.print("\nGoodbye!")
-                            break
-
-                        turn_done.clear()
-                        turn_response.clear()
-
-                        await bus.publish_inbound(InboundMessage(
-                            channel=cli_channel,
-                            sender_id="user",
-                            chat_id=cli_chat_id,
-                            content=user_input,
-                        ))
-
-                        with _thinking_ctx():
-                            await turn_done.wait()
-
-                        if turn_response:
-                            _print_agent_response(turn_response[0], render_markdown=markdown)
-                    except KeyboardInterrupt:
-                        _restore_terminal()
-                        console.print("\nGoodbye!")
-                        break
-                    except EOFError:
-                        _restore_terminal()
-                        console.print("\nGoodbye!")
-                        break
-            finally:
-                agent_loop.stop()
-                outbound_task.cancel()
-                await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
-                await agent_loop.close_mcp()
-
-        asyncio.run(run_interactive())
 
 
 # ============================================================================
@@ -1789,103 +1505,6 @@ def _login_github_copilot() -> None:
     except Exception as e:
         console.print(f"[red]Authentication error: {e}[/red]")
         raise typer.Exit(1)
-
-
-# ============================================================================
-# Web Interface Command
-# ============================================================================
-
-@app.command()
-def web(
-    port: int = typer.Option(15751, "--port", "-p", help="Web server port"),
-    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Web server host"),
-    dev: bool = typer.Option(False, "--dev", help="Run in development mode with auto-reload"),
-):
-    """Start the nanocats web interface."""
-    import socket
-    import time
-    import subprocess
-    import sys
-    from pathlib import Path
-
-    web_backend_path = Path(__file__).parent.parent / "web" / "backend" / "main.py"
-
-    if not web_backend_path.exists():
-        console.print(f"[red]Web backend not found at {web_backend_path}[/red]")
-        raise typer.Exit(1)
-
-    console.print(f"{__logo__} Starting nanocats Web Interface...\n")
-
-    # Check dependencies
-    try:
-        import fastapi
-        import uvicorn
-    except ImportError:
-        console.print("[yellow]Installing web dependencies...[/yellow]")
-        req_file = web_backend_path.parent / "requirements.txt"
-        subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
-        console.print("[green]✓ Dependencies installed[/green]\n")
-
-    def _port_in_use(p: int) -> bool:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(("127.0.0.1", p)) == 0
-
-    def _kill_port(p: int) -> bool:
-        try:
-            result = subprocess.run(["lsof", "-ti", f":{p}"], capture_output=True, text=True)
-            pids = result.stdout.strip().split()
-            if not pids:
-                return False
-            for pid in pids:
-                try:
-                    os.kill(int(pid), signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-            for _ in range(15):
-                time.sleep(0.2)
-                if not _port_in_use(p):
-                    return True
-            for pid in pids:
-                try:
-                    os.kill(int(pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            time.sleep(0.5)
-            return not _port_in_use(p)
-        except FileNotFoundError:
-            return False
-
-    if _port_in_use(port):
-        console.print(f"[yellow]Port {port} is already in use.[/yellow]")
-        console.print("[dim]Restarting the web server with the latest code...[/dim]")
-        if not _kill_port(port):
-            console.print(
-                f"[red]Could not free port {port}. "
-                "Please stop the existing process manually and try again.[/red]"
-            )
-            raise typer.Exit(1)
-        console.print(f"[green]✓ Previous server stopped.[/green]")
-
-    console.print("=" * 60)
-    console.print("🐱 nanocats Web Interface")
-    console.print("=" * 60)
-    console.print(f"📱 Web UI:   http://localhost:{port}")
-    console.print(f"📚 API Docs: http://localhost:{port}/docs")
-    console.print("=" * 60)
-    console.print("\n[dim]Login with your agent token to start chatting![/dim]")
-    console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
-
-    import uvicorn
-    try:
-        uvicorn.run(
-            "nanocats.web.backend.main:app",
-            host=host,
-            port=port,
-            reload=dev,
-            log_level="info",
-        )
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Web server stopped[/yellow]")
 
 
 if __name__ == "__main__":

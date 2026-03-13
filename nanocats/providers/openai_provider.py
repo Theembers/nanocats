@@ -1,4 +1,4 @@
-"""OpenAI SDK Provider for nanocat.
+"""OpenAI SDK Provider for nanocats.
 
 This provider directly uses the OpenAI SDK to make API calls,
 which provides better compatibility with providers that implement

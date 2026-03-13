@@ -4,7 +4,7 @@ import { Loader2, TrendingUp, Coins, Zap, BarChart3 } from 'lucide-react';
 import type { TokenStats } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const COLORS = ['#C4956A', '#7B8FA1', '#5E9E6E', '#4F6478', '#A3714A'];
 

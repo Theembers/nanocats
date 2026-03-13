@@ -161,6 +161,18 @@ class ChannelManager:
             except ImportError as e:
                 logger.warning("WeCom channel not available: {}", e)
 
+        # Web channel
+        if self.config.channels.web.enabled:
+            try:
+                from nanocats.channels.web import WebChannel
+                self.channels["web"] = WebChannel(
+                    self.config.channels.web,
+                    self.bus,
+                )
+                logger.info("Web channel enabled")
+            except ImportError as e:
+                logger.warning("Web channel not available: {}", e)
+
         self._validate_allow_from()
 
     def _validate_allow_from(self) -> None:

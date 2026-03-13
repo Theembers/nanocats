@@ -84,6 +84,7 @@ class SwarmManager:
         Start the swarm manager.
 
         This loads all predefined agents and starts them.
+        If no agents are configured, creates a default agent.
         """
         if self._running:
             logger.warning("Swarm manager already running")
@@ -95,6 +96,12 @@ class SwarmManager:
         agent_configs = load_agent_configs(self.config)
         logger.info("Found {} predefined agent configurations", len(agent_configs))
 
+        # If no agents configured, create default agent
+        if not agent_configs:
+            logger.info("No agent configs found, creating default agent")
+            default_config = self._create_default_agent_config()
+            agent_configs = [default_config]
+
         # Start agents marked for auto-start
         for agent_config in agent_configs:
             if agent_config.auto_start:
@@ -105,6 +112,35 @@ class SwarmManager:
 
         self._running = True
         logger.info("Swarm manager started with {} agents", self.agent_count)
+
+    def _create_default_agent_config(self) -> AgentInstanceConfig:
+        """
+        Create a default agent config when no agents are configured.
+
+        This mimics the original single-agent mode behavior.
+        """
+        # Get enabled channels from global config
+        enabled_channels = []
+        for channel_name in ["telegram", "discord", "feishu", "dingtalk", "slack",
+                              "whatsapp", "qq", "email", "matrix", "wecom", "web"]:
+            channel_config = getattr(self.config.channels, channel_name, None)
+            if channel_config and getattr(channel_config, "enabled", False):
+                enabled_channels.append(channel_name)
+
+        return AgentInstanceConfig(
+            id="default",
+            name="Default Agent",
+            type="supervisor",
+            model=self.config.agents.defaults.model,
+            auto_start=True,
+            channels=AgentChannelBindingConfig(
+                enabled=enabled_channels,
+            ),
+            max_tokens=self.config.agents.defaults.max_tokens,
+            context_window_tokens=self.config.agents.defaults.context_window_tokens,
+            temperature=self.config.agents.defaults.temperature,
+            max_tool_iterations=self.config.agents.defaults.max_tool_iterations,
+        )
 
     async def stop(self) -> None:
         """

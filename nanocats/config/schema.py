@@ -210,6 +210,16 @@ class WecomConfig(Base):
     welcome_message: str = ""  # Welcome message for enter_chat event
 
 
+class WebChannelConfig(Base):
+    """Web channel configuration for browser-based chat via WebSocket."""
+
+    enabled: bool = True  # Web channel is enabled by default
+    port: int = 15751  # Web server port
+    allow_from: list[str] = Field(default_factory=lambda: ["*"])  # Allowed user IDs
+    heartbeat_interval: int = 30  # WebSocket heartbeat interval in seconds
+    max_connections: int = 100  # Maximum concurrent connections
+
+
 class ChannelsConfig(Base):
     """Configuration for chat channels."""
 
@@ -226,6 +236,7 @@ class ChannelsConfig(Base):
     qq: QQConfig = Field(default_factory=QQConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)
     wecom: WecomConfig = Field(default_factory=WecomConfig)
+    web: WebChannelConfig = Field(default_factory=WebChannelConfig)
 
 
 class AgentDefaults(Base):

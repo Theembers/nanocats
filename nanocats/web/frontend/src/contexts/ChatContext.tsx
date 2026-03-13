@@ -22,7 +22,7 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();

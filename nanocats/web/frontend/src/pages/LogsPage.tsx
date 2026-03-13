@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, FileText, AlertCircle, Info, AlertTriangle, Terminal, Cpu, Wrench, BookOpen } from 'lucide-react';
 import type { LogEntry } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:15751';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const categoryIcons: Record<string, React.ReactNode> = {
   chat: <Terminal className="w-4 h-4" />,
