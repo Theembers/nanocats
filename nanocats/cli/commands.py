@@ -70,89 +70,89 @@ def help(
 
 def _show_all_commands():
     """Display all available commands."""
-    console.print(f"\n[bold cyan]{__logo__} nanocats CLI 帮助[/bold cyan]\n")
+    console.print(f"\n[bold cyan]{__logo__} nanocats CLI Help\[/bold cyan]\n")
     
     # Main commands
-    console.print("[bold]主命令:[/bold]")
-    console.print("  [green]onboard[/green]          初始化配置和 workspace")
-    console.print("  [green]setup[/green]            交互式设置向导")
-    console.print("  [green]gateway[/green]          启动 Gateway 服务")
-    console.print("  [green]status[/green]           显示系统状态")
-    console.print("  [green]help[/green] [command]   显示帮助信息\n")
+    console.print("[bold]Main Commands:[/bold]")
+    console.print("  [green]onboard[/green]          Initialize config and workspace")
+    console.print("  [green]setup[/green]            Interactive setup wizard")
+    console.print("  [green]gateway[/green]          Start Gateway service")
+    console.print("  [green]status[/green]           Show system status")
+    console.print("  [green]help[/green] [command]   Show help information\n")
 
     # Sub commands
-    console.print("[bold]子命令:[/bold]")
-    console.print("  [green]swarm status[/green]     显示 Swarm 状态")
-    console.print("  [green]swarm list[/green]       列出所有 Agent")
-    console.print("  [green]swarm create[/green]     创建新 Agent")
-    console.print("  [green]swarm mcp[/green]        管理 MCP 服务器")
-    console.print("  [green]channels status[/green]  显示通道状态")
-    console.print("  [green]channels login[/green]   WhatsApp 设备登录")
-    console.print("  [green]provider login[/green]   OAuth 登录\n")
+    console.print("[bold]Sub Commands:[/bold]")
+    console.print("  [green]swarm status[/green]     Show Swarm status")
+    console.print("  [green]swarm list[/green]       List all Agents")
+    console.print("  [green]swarm create[/green]     Create new Agent")
+    console.print("  [green]swarm mcp[/green]        Manage MCP servers")
+    console.print("  [green]channels status[/green]  Show channel status")
+    console.print("  [green]channels login[/green]   WhatsApp device login")
+    console.print("  [green]provider login[/green]   OAuth login\n")
     
-    console.print("[dim]使用 \"nanocats help <command>\" 查看具体指令的详细参数说明[/dim]\n")
+    console.print("[dim]Use \"nanocats help <command>\" for detailed command usage[/dim]\n")
 
 
 def _show_command_help(command: str):
     """Display detailed help for a specific command."""
     help_map = {
         "onboard": {
-            "desc": "初始化 nanocats 配置和 workspace",
+            "desc": "Initialize nanocats configuration and workspace",
             "usage": "nanocats onboard",
             "options": [],
         },
         "setup": {
-            "desc": "交互式设置向导，配置模型提供商、Agent、通道",
+            "desc": "Interactive setup wizard for provider, agent, and channel configuration",
             "usage": "nanocats setup",
             "options": [],
         },
         "gateway": {
-            "desc": "启动 Gateway 服务（Swarm 模式）",
+            "desc": "Start Gateway service (Swarm mode)",
             "usage": "nanocats gateway [OPTIONS]",
             "options": [
-                ("-p, --port", "Gateway 端口"),
-                ("-w, --workspace", "Workspace 目录"),
-                ("-c, --config", "配置文件路径"),
-                ("-v, --verbose", "启用调试日志"),
+                ("-p, --port", "Gateway port"),
+                ("-w, --workspace", "Workspace directory"),
+                ("-c, --config", "Config file path"),
+                ("-v, --verbose", "Enable debug logging"),
             ],
         },
 
         "status": {
-            "desc": "显示 nanocats 系统状态",
+            "desc": "Show nanocats system status",
             "usage": "nanocats status",
             "options": [],
         },
         "swarm": {
-            "desc": "Swarm 管理命令",
+            "desc": "Swarm management commands",
             "usage": "nanocats swarm <subcommand>",
             "options": [
-                ("status", "显示 Swarm 状态"),
-                ("list", "列出所有 Agent"),
-                ("create <id>", "创建新 Agent"),
-                ("mcp <action>", "管理 MCP 服务器 (list/install/uninstall)"),
+                ("status", "Show Swarm status"),
+                ("list", "List all Agents"),
+                ("create <id>", "Create new Agent"),
+                ("mcp <action>", "Manage MCP servers (list/install/uninstall)"),
             ],
         },
         "channels": {
-            "desc": "通道管理命令",
+            "desc": "Channel management commands",
             "usage": "nanocats channels <subcommand>",
             "options": [
-                ("status", "显示通道状态"),
-                ("login", "WhatsApp 设备登录（扫码）"),
+                ("status", "Show channel status"),
+                ("login", "WhatsApp device login (QR scan)"),
             ],
         },
         "provider": {
-            "desc": "OAuth 提供商登录",
+            "desc": "OAuth provider login",
             "usage": "nanocats provider login <provider>",
             "options": [
-                ("openai-codex", "OpenAI Codex OAuth 登录"),
-                ("github-copilot", "GitHub Copilot OAuth 登录"),
+                ("openai-codex", "OpenAI Codex OAuth login"),
+                ("github-copilot", "GitHub Copilot OAuth login"),
             ],
         },
     }
     
     if command not in help_map:
-        console.print(f"[red]未知命令: {command}[/red]")
-        console.print("\n使用 [cyan]nanocats help[/cyan] 查看所有可用命令")
+        console.print(f"[red]Unknown command: {command}[/red]")
+        console.print("\nUse [cyan]nanocats help[/cyan] to see all available commands")
         raise typer.Exit(1)
     
     info = help_map[command]
@@ -413,7 +413,7 @@ def setup():
     console.print("This wizard will help you set up nanocats with:\n")
     console.print("  1. Dependency verification")
     console.print("  2. Model provider configuration")
-    console.print("  3. Admin agent creation")
+    console.print("  3. Master agent creation")
     console.print("  4. Channel configuration\n")
     
     # =========================================================================
@@ -581,16 +581,14 @@ def setup():
     console.print(f"\n[green]✓ Provider configured: {provider_key} / {model}[/green]\n")
     
     # =========================================================================
-    # Step 3: Admin Agent Configuration
+    # Step 3: Master Agent Configuration
     # =========================================================================
-    console.print("[bold]━━━ Step 3/4: Admin Agent Configuration ━━━[/bold]\n")
+    console.print("[bold]━━━ Step 3/4: Master Agent Configuration ━━━[/bold]\n")
     
     # Agent ID
-    default_agent_id = "admin"
-    agent_id = typer.prompt("Agent ID", default=default_agent_id)
-    
+    agent_id = typer.prompt("Agent ID", default="master")
     # Agent name
-    agent_name = typer.prompt("Agent display name", default="Admin Agent")
+    agent_name = typer.prompt("Agent display name", default="Master Agent")
     
     # Access token
     generated_token = secrets.token_urlsafe(16)
@@ -602,9 +600,9 @@ def setup():
     else:
         access_token = typer.prompt("Enter custom access token", hide_input=True)
     
-    # Agent type - always supervisor for admin
+    # Agent type - always supervisor for Master
     agent_type = "supervisor"
-    console.print(f"\n[dim]Agent type: [cyan]{agent_type}[/cyan] (admin agent)[/dim]")
+    console.print(f"\n[dim]Agent type: [cyan]{agent_type}[/cyan] (Master agent)[/dim]")
     
     # Create agent config
     agents_dir = Path.home() / ".nanocats" / "agents"
@@ -740,7 +738,7 @@ def setup():
     console.print(f"  Provider: [cyan]{provider_key}[/cyan]")
     console.print(f"  Model: [cyan]{model}[/cyan]")
     console.print()
-    console.print(f"[bold]Admin Agent:[/bold]")
+    console.print(f"[bold]Master Agent:[/bold]")
     console.print(f"  ID: [cyan]{agent_id}[/cyan]")
     console.print(f"  Name: [cyan]{agent_name}[/cyan]")
     console.print(f"  Type: [cyan]{agent_type}[/cyan]")
