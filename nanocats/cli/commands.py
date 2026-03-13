@@ -184,106 +184,106 @@ def _get_web_port() -> int:
         return DEFAULT_WEB_PORT
 
 
-def _start_web_server() -> None:
-    """
-    Start the web server on configured port.
+# def _start_web_server() -> None:
+#     """
+#     Start the web server on configured port.
 
-    Logic:
-    1. Try to start normally.
-    2. If the port is already in use (Errno 48 / 98), check if the running
-       process responds to our health endpoint.
-       a. If it responds → it's already healthy: restart it so the latest
-          code is loaded.
-       b. Kill the old process and start a fresh server.
-    3. On any other error, print a message and return.
-    """
-    import socket
-    import time
-    import urllib.request
-    import uvicorn
+#     Logic:
+#     1. Try to start normally.
+#     2. If the port is already in use (Errno 48 / 98), check if the running
+#        process responds to our health endpoint.
+#        a. If it responds → it's already healthy: restart it so the latest
+#           code is loaded.
+#        b. Kill the old process and start a fresh server.
+#     3. On any other error, print a message and return.
+#     """
+#     import socket
+#     import time
+#     import urllib.request
+#     import uvicorn
 
-    web_port = _get_web_port()
+#     web_port = _get_web_port()
 
-    def _port_in_use() -> bool:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(("127.0.0.1", web_port)) == 0
+#     def _port_in_use() -> bool:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#             return s.connect_ex(("127.0.0.1", web_port)) == 0
 
-    def _kill_port() -> bool:
-        """Kill whatever is listening on web_port. Returns True on success."""
-        import subprocess
-        try:
-            result = subprocess.run(
-                ["lsof", "-ti", f":{web_port}"],
-                capture_output=True, text=True
-            )
-            pids = result.stdout.strip().split()
-            if not pids:
-                return False
-            for pid in pids:
-                try:
-                    os.kill(int(pid), signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-            # Give processes up to 3 s to exit
-            for _ in range(15):
-                time.sleep(0.2)
-                if not _port_in_use():
-                    return True
-            # Force-kill if still up
-            for pid in pids:
-                try:
-                    os.kill(int(pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            time.sleep(0.5)
-            return not _port_in_use()
-        except FileNotFoundError:
-            # lsof not available (Windows)
-            return False
+#     def _kill_port() -> bool:
+#         """Kill whatever is listening on web_port. Returns True on success."""
+#         import subprocess
+#         try:
+#             result = subprocess.run(
+#                 ["lsof", "-ti", f":{web_port}"],
+#                 capture_output=True, text=True
+#             )
+#             pids = result.stdout.strip().split()
+#             if not pids:
+#                 return False
+#             for pid in pids:
+#                 try:
+#                     os.kill(int(pid), signal.SIGTERM)
+#                 except ProcessLookupError:
+#                     pass
+#             # Give processes up to 3 s to exit
+#             for _ in range(15):
+#                 time.sleep(0.2)
+#                 if not _port_in_use():
+#                     return True
+#             # Force-kill if still up
+#             for pid in pids:
+#                 try:
+#                     os.kill(int(pid), signal.SIGKILL)
+#                 except ProcessLookupError:
+#                     pass
+#             time.sleep(0.5)
+#             return not _port_in_use()
+#         except FileNotFoundError:
+#             # lsof not available (Windows)
+#             return False
 
-    def _print_banner() -> None:
-        console.print("=" * 60)
-        console.print("🐱 nanocats Web Interface")
-        console.print("=" * 60)
-        console.print(f"📱 Web UI:   http://localhost:{web_port}")
-        console.print(f"📚 API Docs: http://localhost:{web_port}/docs")
-        console.print("=" * 60)
-        console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
+#     def _print_banner() -> None:
+#         console.print("=" * 60)
+#         console.print("🐱 nanocats Web Interface")
+#         console.print("=" * 60)
+#         console.print(f"📱 Web UI:   http://localhost:{web_port}")
+#         console.print(f"📚 API Docs: http://localhost:{web_port}/docs")
+#         console.print("=" * 60)
+#         console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
 
-    def _run() -> None:
-        _print_banner()
-        uvicorn.run(
-            "nanocats.web.backend.main:app",
-            host="0.0.0.0",
-            port=web_port,
-            reload=False,
-            log_level="info",
-        )
+#     def _run() -> None:
+#         _print_banner()
+#         uvicorn.run(
+#             "nanocats.web.backend.main:app",
+#             host="0.0.0.0",
+#             port=web_port,
+#             reload=False,
+#             log_level="info",
+#         )
 
-    # ── First attempt ────────────────────────────────────────────────────────
-    if not _port_in_use():
-        try:
-            _run()
-        except KeyboardInterrupt:
-            console.print("\n[yellow]Web server stopped[/yellow]")
-        return
+#     # ── First attempt ────────────────────────────────────────────────────────
+#     if not _port_in_use():
+#         try:
+#             _run()
+#         except KeyboardInterrupt:
+#             console.print("\n[yellow]Web server stopped[/yellow]")
+#         return
 
-    # ── Port is occupied ─────────────────────────────────────────────────────
-    console.print(f"\n[yellow]Port {web_port} is already in use.[/yellow]")
-    console.print("[dim]Restarting the web server with the latest code...[/dim]")
+#     # ── Port is occupied ─────────────────────────────────────────────────────
+#     console.print(f"\n[yellow]Port {web_port} is already in use.[/yellow]")
+#     console.print("[dim]Restarting the web server with the latest code...[/dim]")
 
-    if not _kill_port():
-        console.print(
-            f"[red]Could not free port {web_port}. "
-            "Please stop the existing process manually and run [cyan]nanocats gateway[/cyan] again.[/red]"
-        )
-        return
+#     if not _kill_port():
+#         console.print(
+#             f"[red]Could not free port {web_port}. "
+#             "Please stop the existing process manually and run [cyan]nanocats gateway[/cyan] again.[/red]"
+#         )
+#         return
 
-    console.print(f"[green]✓ Previous server stopped.[/green]")
-    try:
-        _run()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Web server stopped[/yellow]")
+#     console.print(f"[green]✓ Previous server stopped.[/green]")
+#     try:
+#         _run()
+#     except KeyboardInterrupt:
+#         console.print("\n[yellow]Web server stopped[/yellow]")
 
 
 def _interactive_select(options: list[str], title: str = "Select an option:") -> int:
@@ -296,18 +296,38 @@ def _interactive_select(options: list[str], title: str = "Select an option:") ->
     Returns:
         Index of the selected option (0-based)
     """
-    try:
-        # Use prompt_toolkit's built-in choice function
-        # options should be list of (value, label) tuples
-        option_tuples = [(opt, opt) for opt in options]
-        result = choice(
-            message=title + " ",
-            options=option_tuples,
-            default=options[0],
-        )
-        return options.index(result)
-    except Exception:
-        return 0  # Fallback to first option on any error
+    import sys
+    
+    # Check if we're in an interactive terminal
+    if sys.stdin.isatty():
+        try:
+            # Use prompt_toolkit's built-in choice function
+            # options should be list of (value, label) tuples
+            option_tuples = [(opt, opt) for opt in options]
+            result = choice(
+                message=title + " ",
+                options=option_tuples,
+                default=options[0],
+            )
+            return options.index(result)
+        except Exception:
+            pass  # Fall through to fallback
+    
+    # Fallback: show options and ask for number input
+    console.print(f"\n[bold]{title}[/bold]\n")
+    for i, opt in enumerate(options, 1):
+        console.print(f"  {i}. {opt}")
+    
+    default_idx = 1
+    while True:
+        try:
+            choice_str = typer.prompt("Select option", default=str(default_idx), show_default=True)
+            idx = int(choice_str) - 1
+            if 0 <= idx < len(options):
+                return idx
+        except ValueError:
+            pass
+        console.print("[red]Invalid option. Please try again.[/red]")
 
 
 @app.command()
@@ -320,9 +340,14 @@ def onboard():
 
     if config_path.exists():
         console.print(f"[yellow]Config already exists at {config_path}[/yellow]")
-        console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
-        console.print("  [bold]N[/bold] = refresh config, keeping existing values and adding new fields")
-        if typer.confirm("Overwrite?"):
+        
+        options = [
+            "Overwrite with defaults (existing values will be lost)",
+            "Refresh config, keeping existing values and adding new fields"
+        ]
+        choice = _interactive_select(options, "Choose action:")
+        
+        if choice == 0:
             config = Config()
             save_config(config)
             console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
@@ -334,8 +359,6 @@ def onboard():
         save_config(Config())
         console.print(f"[green]✓[/green] Created config at {config_path}")
 
-    console.print("[dim]Config template now uses `maxTokens` + `contextWindowTokens`; `memoryWindow` is no longer a runtime setting.[/dim]")
-
     # Create workspace
     workspace = get_workspace_path()
 
@@ -346,37 +369,13 @@ def onboard():
     sync_workspace_templates(workspace)
 
     console.print(f"\n{__logo__} nanocats is ready!")
-    web_port = _get_web_port()
     
-    console.print("\n[bold]Next Steps:[/bold]\n")
-    
-    console.print("[bold cyan]━━━ Gateway ━━━[/bold cyan]")
-    console.print("  Start web server:")
-    console.print("  [cyan]nanocats gateway[/cyan]")
-    console.print(f"\n  Access: [yellow]http://localhost:{web_port}[/yellow]")
-    console.print(f"  API Docs: [yellow]http://localhost:{web_port}/docs[/yellow]")
-    console.print("\n  [dim]Login with Agent ID and Token (configured via 'nanocats setup')[/dim]")
-
-    console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
-    console.print("  Show all commands:")
-    console.print("  [cyan]nanocats --help[/cyan]")
-    console.print("\n  Common commands:")
-    console.print("  [cyan]nanocats setup[/cyan]              # Interactive setup wizard")
-    console.print("  [cyan]nanocats gateway[/cyan]            # Start channel gateway")
-    console.print("  [cyan]nanocats status[/cyan]             # Show system status")
-    console.print("  [cyan]nanocats swarm list[/cyan]         # List configured agents")
-
-    console.print("\n[bold cyan]━━━ Configuration ━━━[/bold cyan]")
-    console.print("  Config file: [cyan]~/.nanocats/config.json[/cyan]")
-    console.print("  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
-    console.print("\n[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
-
     # Ask if user wants to run setup or start web
     console.print("[bold cyan]━━━ Quick Start ━━━[/bold cyan]\n")
 
     options = [
         "Run setup wizard (recommended for new users)",
-        "Start web interface",
+        "Start Gateway",
         "Skip for now"
     ]
     choice = _interactive_select(options, "What would you like to do next?")
@@ -386,7 +385,10 @@ def onboard():
         setup()
     elif choice == 1:
         console.print()
-        _start_web_server()
+        # Run gateway directly
+        from nanocats.config.loader import load_config
+        runtime_config = load_config()
+        _run_swarm_gateway(runtime_config)
     else:
         console.print("\n[dim]You can start the web server later with: nanocats gateway[/dim]\n")
 
@@ -751,41 +753,24 @@ def setup():
         console.print()
     
     web_port = _get_web_port()
-    
-    console.print("[bold]Next Steps:[/bold]\n")
-    
-    console.print("[bold cyan]━━━ Gateway ━━━[/bold cyan]")
-    console.print("  Start web server:")
-    console.print("  [cyan]nanocats gateway[/cyan]")
-    console.print(f"\n  Access: [yellow]http://localhost:{web_port}[/yellow]")
-    console.print(f"  API Docs: [yellow]http://localhost:{web_port}/docs[/yellow]")
-    console.print(f"\n  [dim]Login with:[/dim]")
-    console.print(f"  [dim]  Agent ID: [cyan]{agent_id}[/cyan][/dim]")
-    console.print(f"  [dim]  Token: [yellow]{access_token}[/yellow][/dim]")
-
-    console.print("\n[bold cyan]━━━ CLI Commands ━━━[/bold cyan]")
-    console.print("  Show all commands:")
-    console.print("  [cyan]nanocats --help[/cyan]")
-    console.print("\n  Common commands:")
-    console.print("  [cyan]nanocats gateway[/cyan]            # Start channel gateway")
-    console.print("  [cyan]nanocats status[/cyan]             # Show system status")
-    console.print("  [cyan]nanocats swarm list[/cyan]         # List configured agents")
-
-    console.print("\n[bold cyan]━━━ Configuration Files ━━━[/bold cyan]")
-    console.print(f"  Main config: [cyan]{config_path}[/cyan]")
-    console.print(f"  Agent configs: [cyan]~/.nanocats/agents/*.json[/cyan]")
-    console.print("\n[dim]⚠ Save your access token securely! You'll need it to login.[/dim]")
-    console.print("[dim]Full docs: https://github.com/Theembers/nanocats[/dim]\n")
 
     # Ask if user wants to start web server
-    console.print("[bold cyan]━━━ Start Web Server? ━━━[/bold cyan]\n")
-    console.print("Would you like to start the web interface now?")
-    console.print(f"  Access: [yellow]http://localhost:{web_port}[/yellow]")
-    console.print(f"  Login with Agent ID: [cyan]{agent_id}[/cyan] and your token\n")
+    console.print("[bold cyan]━━━ Start Gateway Server ━━━[/bold cyan]\n")
+    
+    # Run gateway directly with the loaded config
+    from nanocats.config.loader import load_config
+    runtime_config = load_config()
+    _run_swarm_gateway(runtime_config)
+    
+    console.print("[bold cyan]━━━ Gateway stopped ━━━[/bold cyan]\n")
 
-    if typer.confirm("Start web server?", default=True):
-        console.print()
-        _start_web_server()
+    # console.print("Would you like to start the Web UI now?")
+    # console.print(f"  Access: [yellow]http://localhost:{web_port}[/yellow]")
+    # console.print(f"  Login with Agent ID: [cyan]{agent_id}[/cyan] and your token\n")
+
+    # if typer.confirm("Start Web UI ?", default=True):
+    #     console.print()
+    #     _start_web_server()
 
 
 def _make_provider(config: Config):
@@ -925,6 +910,14 @@ def _run_swarm_gateway(config: Config) -> None:
     # Check if web channel is enabled and start web backend
     web_server_task = None
     if config.channels.web.enabled:
+        # Check if fastapi is installed
+        try:
+            import fastapi
+        except ImportError:
+            console.print("[red]ERROR: fastapi is required for Web UI but not installed.[/red]")
+            console.print("[dim]Please run: pip install nanocats[web]  # or: pip install fastapi uvicorn[/dim]")
+            raise typer.Exit(1)
+        
         web_server_task = _start_web_backend(config)
 
     bus = MessageBus()
