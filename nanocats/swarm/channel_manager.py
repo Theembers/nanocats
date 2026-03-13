@@ -39,6 +39,7 @@ class ChannelManager:
         "qq": "nanocats.channels.qq:QQChannel",
         "wecom": "nanocats.channels.wecom:WecomChannel",
         "mochat": "nanocats.channels.mochat:MochatChannel",
+        "web": "nanocats.channels.web:WebChannel",
     }
 
     def __init__(self, global_config: Config):
@@ -197,6 +198,7 @@ class ChannelManager:
             "qq": self._create_qq_config,
             "wecom": self._create_wecom_config,
             "mochat": self._create_mochat_config,
+            "web": self._create_web_config,
         }
 
         creator = config_classes.get(channel_type)
@@ -250,6 +252,10 @@ class ChannelManager:
     def _create_mochat_config(self, data: dict) -> Any:
         from nanocats.config.schema import MochatConfig
         return MochatConfig(**data)
+
+    def _create_web_config(self, data: dict) -> Any:
+        from nanocats.config.schema import WebChannelConfig
+        return WebChannelConfig(**data)
 
     async def teardown_agent_channels(self, agent_id: str) -> None:
         """

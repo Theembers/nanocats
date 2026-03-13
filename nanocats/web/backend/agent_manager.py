@@ -2,15 +2,17 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from loguru import logger
 
 from nanocats.agent.loop import AgentLoop
 from nanocats.bus.queue import MessageBus
+from nanocats.channels.web import WebChannel, WebChannelConfig
 from nanocats.config.loader import load_config, load_agent_config
 from nanocats.providers.openai_provider import OpenAIProvider
 from nanocats.session.manager import SessionManager
+from nanocats.swarm.channel_bus import AgentChannelBus
 
 
 class AgentManager:
@@ -19,21 +21,23 @@ class AgentManager:
     
     Each agent has its own AgentLoop instance with:
     - Independent workspace and session
-    - Shared message bus for the web interface
+    - WebChannel for WebSocket communication
+    - AgentChannelBus for direct message routing (bypassing async queue)
     """
-    
+
     def __init__(self):
         self._agent_loops: dict[str, AgentLoop] = {}
         self._message_buses: dict[str, MessageBus] = {}
         self._session_managers: dict[str, SessionManager] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._web_channels: dict[str, WebChannel] = {}  # WebChannel per agent
     
     def _get_agent_workspace(self, agent_id: str) -> Path:
         """Get workspace path for an agent."""
-        # For web interface, use project-local workspace to avoid sandbox restrictions
-        project_workspace = Path(__file__).parent.parent.parent.parent / "workspaces" / agent_id
-        project_workspace.mkdir(parents=True, exist_ok=True)
-        return project_workspace
+        # Use standard agent workspace path: ~/.nanocats/workspaces/{agent_id}
+        from nanocats.config.paths import get_workspace_path
+        workspace = get_workspace_path(f"~/.nanocats/workspaces/{agent_id}")
+        return workspace
     
     def _create_provider(self, agent_id: str):
         """Create LLM provider for an agent."""
@@ -123,10 +127,13 @@ class AgentManager:
             
             # Get MCP servers
             mcp_servers = config.tools.mcp_servers if hasattr(config.tools, 'mcp_servers') else {}
-            
-            # Create AgentLoop
+
+            # Create a temporary bus first (will be replaced with AgentChannelBus)
+            temp_bus = MessageBus()
+
+            # Create AgentLoop first (needed for the handler closure)
             agent_loop = AgentLoop(
-                bus=bus,
+                bus=temp_bus,
                 provider=provider,
                 workspace=workspace,
                 model=model,
@@ -141,9 +148,36 @@ class AgentManager:
                 channels_config=config.channels,
                 agent_id=agent_id,
             )
-            
+
+            # Create AgentChannelBus for direct routing (bypasses async queue)
+            # Must be created AFTER agent_loop to avoid UnboundLocalError
+            async def message_handler(msg):
+                """Handle inbound message by processing through agent loop."""
+                return await agent_loop._process_message(msg)
+
+            async def send_callback(msg):
+                """Handle outbound message by sending through WebChannel."""
+                web_ch = self._web_channels.get(agent_id)
+                if web_ch:
+                    await web_ch.send(msg)
+
+            channel_bus = AgentChannelBus(message_handler, send_callback)
+
+            # Replace the agent loop's bus with our channel bus
+            agent_loop.bus = channel_bus
+
+            # Create WebChannel for this agent
+            web_config = WebChannelConfig(
+                enabled=True,
+                allow_from=getattr(config.channels.web, 'allow_from', ["*"]),
+                heartbeat_interval=getattr(config.channels.web, 'heartbeat_interval', 30),
+                max_connections=getattr(config.channels.web, 'max_connections', 100),
+            )
+            web_channel = WebChannel(web_config, channel_bus)
+            self._web_channels[agent_id] = web_channel
+
             self._agent_loops[agent_id] = agent_loop
-            
+
             return agent_loop
     
     async def process_message(
@@ -185,7 +219,18 @@ class AgentManager:
             workspace = self._get_agent_workspace(agent_id)
             self._session_managers[agent_id] = SessionManager(workspace)
         return self._session_managers[agent_id]
-    
+
+    async def get_or_create_web_channel(self, agent_id: str) -> WebChannel:
+        """
+        Get or create a WebChannel for the given agent.
+
+        This allows WebSocket handlers to use the WebChannel for message processing,
+        enabling unified message flow through WebChannel -> AgentChannelBus -> AgentLoop.
+        """
+        # Ensure agent exists (this will create it if not exists)
+        await self.get_or_create_agent(agent_id)
+        return self._web_channels.get(agent_id)
+
     async def close_agent(self, agent_id: str):
         """Close an agent and cleanup resources."""
         if agent_id in self._agent_loops:
@@ -193,7 +238,13 @@ class AgentManager:
             agent.stop()
             await agent.close_mcp()
             del self._agent_loops[agent_id]
-        
+
+        # Stop WebChannel
+        if agent_id in self._web_channels:
+            web_channel = self._web_channels[agent_id]
+            await web_channel.stop()
+            del self._web_channels[agent_id]
+
         if agent_id in self._message_buses:
             del self._message_buses[agent_id]
         
