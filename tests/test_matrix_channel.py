@@ -12,7 +12,7 @@ from nanocats.channels.matrix import (
     TYPING_NOTICE_TIMEOUT_MS,
     MatrixChannel,
 )
-from nanocats.config.schema import MatrixConfig
+from nanocats.channels.matrix import MatrixConfig
 
 _ROOM_SEND_UNSET = object()
 

@@ -6,7 +6,7 @@ import pytest
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.email import EmailChannel
-from nanocats.config.schema import EmailConfig
+from nanocats.channels.email import EmailConfig
 
 
 def _make_config() -> EmailConfig:

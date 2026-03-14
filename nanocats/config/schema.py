@@ -14,235 +14,23 @@ class Base(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
-class WhatsAppConfig(Base):
-    """WhatsApp channel configuration."""
-
-    enabled: bool = False
-    bridge_url: str = "ws://localhost:3001"
-    bridge_token: str = ""  # Shared token for bridge auth (optional, recommended)
-    allow_from: list[str] = Field(default_factory=list)  # Allowed phone numbers
-
-
-class TelegramConfig(Base):
-    """Telegram channel configuration."""
-
-    enabled: bool = False
-    token: str = ""  # Bot token from @BotFather
-    allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs or usernames
-    proxy: str | None = (
-        None  # HTTP/SOCKS5 proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080"
-    )
-    reply_to_message: bool = False  # If true, bot replies quote the original message
-    group_policy: Literal["open", "mention"] = "mention"  # "mention" responds when @mentioned or replied to, "open" responds to all
-
-
-class FeishuConfig(Base):
-    """Feishu/Lark channel configuration using WebSocket long connection."""
-
-    enabled: bool = False
-    app_id: str = ""  # App ID from Feishu Open Platform
-    app_secret: str = ""  # App Secret from Feishu Open Platform
-    encrypt_key: str = ""  # Encrypt Key for event subscription (optional)
-    verification_token: str = ""  # Verification Token for event subscription (optional)
-    allow_from: list[str] = Field(default_factory=list)  # Allowed user open_ids
-    react_emoji: str = (
-        "THUMBSUP"  # Emoji type for message reactions (e.g. THUMBSUP, OK, DONE, SMILE)
-    )
-
-
-class DingTalkConfig(Base):
-    """DingTalk channel configuration using Stream mode."""
-
-    enabled: bool = False
-    client_id: str = ""  # AppKey
-    client_secret: str = ""  # AppSecret
-    allow_from: list[str] = Field(default_factory=list)  # Allowed staff_ids
-
-
-class DiscordConfig(Base):
-    """Discord channel configuration."""
-
-    enabled: bool = False
-    token: str = ""  # Bot token from Discord Developer Portal
-    allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs
-    gateway_url: str = "wss://gateway.discord.gg/?v=10&encoding=json"
-    intents: int = 37377  # GUILDS + GUILD_MESSAGES + DIRECT_MESSAGES + MESSAGE_CONTENT
-    group_policy: Literal["mention", "open"] = "mention"
-
-
-class MatrixConfig(Base):
-    """Matrix (Element) channel configuration."""
-
-    enabled: bool = False
-    homeserver: str = "https://matrix.org"
-    access_token: str = ""
-    user_id: str = ""  # @bot:matrix.org
-    device_id: str = ""
-    e2ee_enabled: bool = True  # Enable Matrix E2EE support (encryption + encrypted room handling).
-    sync_stop_grace_seconds: int = (
-        2  # Max seconds to wait for sync_forever to stop gracefully before cancellation fallback.
-    )
-    max_media_bytes: int = (
-        20 * 1024 * 1024
-    )  # Max attachment size accepted for Matrix media handling (inbound + outbound).
-    allow_from: list[str] = Field(default_factory=list)
-    group_policy: Literal["open", "mention", "allowlist"] = "open"
-    group_allow_from: list[str] = Field(default_factory=list)
-    allow_room_mentions: bool = False
-
-
-class EmailConfig(Base):
-    """Email channel configuration (IMAP inbound + SMTP outbound)."""
-
-    enabled: bool = False
-    consent_granted: bool = False  # Explicit owner permission to access mailbox data
-
-    # IMAP (receive)
-    imap_host: str = ""
-    imap_port: int = 993
-    imap_username: str = ""
-    imap_password: str = ""
-    imap_mailbox: str = "INBOX"
-    imap_use_ssl: bool = True
-
-    # SMTP (send)
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_use_tls: bool = True
-    smtp_use_ssl: bool = False
-    from_address: str = ""
-
-    # Behavior
-    auto_reply_enabled: bool = (
-        True  # If false, inbound email is read but no automatic reply is sent
-    )
-    poll_interval_seconds: int = 30
-    mark_seen: bool = True
-    max_body_chars: int = 12000
-    subject_prefix: str = "Re: "
-    allow_from: list[str] = Field(default_factory=list)  # Allowed sender email addresses
-
-
-class MochatMentionConfig(Base):
-    """Mochat mention behavior configuration."""
-
-    require_in_groups: bool = False
-
-
-class MochatGroupRule(Base):
-    """Mochat per-group mention requirement."""
-
-    require_mention: bool = False
-
-
-class MochatConfig(Base):
-    """Mochat channel configuration."""
-
-    enabled: bool = False
-    base_url: str = "https://mochat.io"
-    socket_url: str = ""
-    socket_path: str = "/socket.io"
-    socket_disable_msgpack: bool = False
-    socket_reconnect_delay_ms: int = 1000
-    socket_max_reconnect_delay_ms: int = 10000
-    socket_connect_timeout_ms: int = 10000
-    refresh_interval_ms: int = 30000
-    watch_timeout_ms: int = 25000
-    watch_limit: int = 100
-    retry_delay_ms: int = 500
-    max_retry_attempts: int = 0  # 0 means unlimited retries
-    claw_token: str = ""
-    agent_user_id: str = ""
-    sessions: list[str] = Field(default_factory=list)
-    panels: list[str] = Field(default_factory=list)
-    allow_from: list[str] = Field(default_factory=list)
-    mention: MochatMentionConfig = Field(default_factory=MochatMentionConfig)
-    groups: dict[str, MochatGroupRule] = Field(default_factory=dict)
-    reply_delay_mode: str = "non-mention"  # off | non-mention
-    reply_delay_ms: int = 120000
-
-
-class SlackDMConfig(Base):
-    """Slack DM policy configuration."""
-
-    enabled: bool = True
-    policy: str = "open"  # "open" or "allowlist"
-    allow_from: list[str] = Field(default_factory=list)  # Allowed Slack user IDs
-
-
-class SlackConfig(Base):
-    """Slack channel configuration."""
-
-    enabled: bool = False
-    mode: str = "socket"  # "socket" supported
-    webhook_path: str = "/slack/events"
-    bot_token: str = ""  # xoxb-...
-    app_token: str = ""  # xapp-...
-    user_token_read_only: bool = True
-    reply_in_thread: bool = True
-    react_emoji: str = "eyes"
-    allow_from: list[str] = Field(default_factory=list)  # Allowed Slack user IDs (sender-level)
-    group_policy: str = "mention"  # "mention", "open", "allowlist"
-    group_allow_from: list[str] = Field(default_factory=list)  # Allowed channel IDs if allowlist
-    dm: SlackDMConfig = Field(default_factory=SlackDMConfig)
-
-
-class QQConfig(Base):
-    """QQ channel configuration using botpy SDK."""
-
-    enabled: bool = False
-    app_id: str = ""  # 机器人 ID (AppID) from q.qq.com
-    secret: str = ""  # 机器人密钥 (AppSecret) from q.qq.com
-    allow_from: list[str] = Field(
-        default_factory=list
-    )  # Allowed user openids (empty = public access)
-
-
-class WecomConfig(Base):
-    """WeCom (Enterprise WeChat) AI Bot channel configuration."""
-
-    enabled: bool = False
-    bot_id: str = ""  # Bot ID from WeCom AI Bot platform
-    secret: str = ""  # Bot Secret from WeCom AI Bot platform
-    allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs
-    welcome_message: str = ""  # Welcome message for enter_chat event
-
-
-class WebChannelConfig(Base):
-    """Web channel configuration for browser-based chat via WebSocket."""
-
-    enabled: bool = True  # Web channel is enabled by default
-    port: int = 15751  # Web server port
-    allow_from: list[str] = Field(default_factory=lambda: ["*"])  # Allowed user IDs
-    heartbeat_interval: int = 30  # WebSocket heartbeat interval in seconds
-    max_connections: int = 100  # Maximum concurrent connections
-
-
 class ChannelsConfig(Base):
-    """Configuration for chat channels."""
+    """Configuration for chat channels.
+
+    Built-in and plugin channel configs are stored as extra fields (dicts).
+    Each channel parses its own config in __init__.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     send_progress: bool = True  # stream agent's text progress to the channel
     send_tool_hints: bool = False  # stream tool-call hints (e.g. read_file("…"))
-    whatsapp: WhatsAppConfig = Field(default_factory=WhatsAppConfig)
-    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
-    discord: DiscordConfig = Field(default_factory=DiscordConfig)
-    feishu: FeishuConfig = Field(default_factory=FeishuConfig)
-    mochat: MochatConfig = Field(default_factory=MochatConfig)
-    dingtalk: DingTalkConfig = Field(default_factory=DingTalkConfig)
-    email: EmailConfig = Field(default_factory=EmailConfig)
-    slack: SlackConfig = Field(default_factory=SlackConfig)
-    qq: QQConfig = Field(default_factory=QQConfig)
-    matrix: MatrixConfig = Field(default_factory=MatrixConfig)
-    wecom: WecomConfig = Field(default_factory=WecomConfig)
-    web: WebChannelConfig = Field(default_factory=WebChannelConfig)
 
 
 class AgentDefaults(Base):
     """Default agent configuration."""
 
-    workspace: str = "~/.nanocats/templates"
+    workspace: str = "~/.nanocats/workspace"
     model: str = "anthropic/claude-opus-4-5"
     provider: str = (
         "auto"  # Provider name (e.g. "anthropic", "openrouter") or "auto" for auto-detection
@@ -261,21 +49,10 @@ class AgentDefaults(Base):
         return self.memory_window is not None and "context_window_tokens" not in self.model_fields_set
 
 
-class SwarmConfig(Base):
-    """Swarm mode configuration."""
-
-    enabled: bool = False
-    max_agents: int = 20
-    default_agent_ttl: int = 3600  # seconds, 0 means no TTL
-    mcp_registry_path: str = "~/.nanocats/mcp"
-    agents_dir: str = "~/.nanocats/agents"
-
-
 class AgentsConfig(Base):
     """Agent configuration."""
 
     defaults: AgentDefaults = Field(default_factory=AgentDefaults)
-    swarm: SwarmConfig = Field(default_factory=SwarmConfig)
 
 
 class ProviderConfig(Base):
@@ -297,15 +74,18 @@ class ProvidersConfig(Base):
     deepseek: ProviderConfig = Field(default_factory=ProviderConfig)
     groq: ProviderConfig = Field(default_factory=ProviderConfig)
     zhipu: ProviderConfig = Field(default_factory=ProviderConfig)
-    dashscope: ProviderConfig = Field(default_factory=ProviderConfig)  # 阿里云通义千问
+    dashscope: ProviderConfig = Field(default_factory=ProviderConfig)
     vllm: ProviderConfig = Field(default_factory=ProviderConfig)
+    ollama: ProviderConfig = Field(default_factory=ProviderConfig)  # Ollama local models
     gemini: ProviderConfig = Field(default_factory=ProviderConfig)
     moonshot: ProviderConfig = Field(default_factory=ProviderConfig)
     minimax: ProviderConfig = Field(default_factory=ProviderConfig)
     aihubmix: ProviderConfig = Field(default_factory=ProviderConfig)  # AiHubMix API gateway
-    ollama: ProviderConfig = Field(default_factory=ProviderConfig)  # Ollama local models
     siliconflow: ProviderConfig = Field(default_factory=ProviderConfig)  # SiliconFlow (硅基流动)
     volcengine: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine (火山引擎)
+    volcengine_coding_plan: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine Coding Plan
+    byteplus: ProviderConfig = Field(default_factory=ProviderConfig)  # BytePlus (VolcEngine international)
+    byteplus_coding_plan: ProviderConfig = Field(default_factory=ProviderConfig)  # BytePlus Coding Plan
     openai_codex: ProviderConfig = Field(default_factory=ProviderConfig)  # OpenAI Codex (OAuth)
     github_copilot: ProviderConfig = Field(default_factory=ProviderConfig)  # Github Copilot (OAuth)
 
@@ -328,7 +108,9 @@ class GatewayConfig(Base):
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
-    api_key: str = ""  # Brave Search API key
+    provider: str = "brave"  # brave, tavily, duckduckgo, searxng, jina
+    api_key: str = ""
+    base_url: str = ""  # SearXNG base URL
     max_results: int = 5
 
 
@@ -419,12 +201,21 @@ class Config(BaseSettings):
 
         # Fallback: configured local providers can route models without
         # provider-specific keywords (for example plain "llama3.2" on Ollama).
+        # Prefer providers whose detect_by_base_keyword matches the configured api_base
+        # (e.g. Ollama's "11434" in "http://localhost:11434") over plain registry order.
+        local_fallback: tuple[ProviderConfig, str] | None = None
         for spec in PROVIDERS:
             if not spec.is_local:
                 continue
             p = getattr(self.providers, spec.name, None)
-            if p and p.api_base:
+            if not (p and p.api_base):
+                continue
+            if spec.detect_by_base_keyword and spec.detect_by_base_keyword in p.api_base:
                 return p, spec.name
+            if local_fallback is None:
+                local_fallback = (p, spec.name)
+        if local_fallback:
+            return local_fallback
 
         # Fallback: gateways first, then others (follows registry order)
         # OAuth providers are NOT valid fallbacks — they require explicit model selection
@@ -463,97 +254,8 @@ class Config(BaseSettings):
         # to avoid polluting the global litellm.api_base.
         if name:
             spec = find_by_name(name)
-            # Return default_api_base if explicitly configured (including standard providers like MiniMax)
-            if spec and spec.default_api_base:
+            if spec and (spec.is_gateway or spec.is_local) and spec.default_api_base:
                 return spec.default_api_base
         return None
 
     model_config = ConfigDict(env_prefix="NANOBOT_", env_nested_delimiter="__")
-
-
-# =============================================================================
-# Agent Instance Configuration (for Swarm mode)
-# =============================================================================
-
-
-class AgentPersonalityConfig(Base):
-    """Agent personality configuration."""
-
-    soul_file: str = "SOUL.md"
-    custom_instructions: str = ""
-    agents_file: str = "AGENTS.md"  # Additional agent-specific instructions
-
-
-class AgentMCPConfig(Base):
-    """Agent-level MCP configuration."""
-
-    enabled_servers: list[str] = Field(default_factory=list)
-    custom_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
-
-
-class AgentSkillsConfig(Base):
-    """Agent-level skills configuration."""
-
-    enabled: list[str] = Field(default_factory=list)
-    custom_path: str = "./skills"
-
-
-class AgentChannelBindingConfig(Base):
-    """Channel binding configuration for an agent."""
-
-    enabled: list[str] = Field(default_factory=list)  # List of channel types to enable
-    configs: dict[str, dict] = Field(default_factory=dict)  # Channel-type specific configs
-
-
-class AgentInstanceConfig(Base):
-    """Configuration for a single agent instance in swarm mode."""
-
-    id: str  # Unique agent identifier
-    name: str = ""  # Display name
-    type: Literal["supervisor", "user", "specialized", "task"] = "user"
-    parent: str | None = None  # Parent agent ID for hierarchical routing
-
-    # Workspace
-    workspace: str = ""  # If empty, defaults to ~/.nanocats/workspaces/{id}
-
-    # Personality
-    personality: AgentPersonalityConfig = Field(default_factory=AgentPersonalityConfig)
-
-    # Model configuration (inherits from defaults if not specified)
-    model: str | None = None
-    provider: str | None = None
-    max_tokens: int | None = None
-    context_window_tokens: int | None = None
-    temperature: float | None = None
-    max_tool_iterations: int | None = None
-
-    # MCP configuration
-    mcp: AgentMCPConfig = Field(default_factory=AgentMCPConfig)
-
-    # Skills configuration
-    skills: AgentSkillsConfig = Field(default_factory=AgentSkillsConfig)
-
-    # Channel bindings
-    channels: AgentChannelBindingConfig = Field(default_factory=AgentChannelBindingConfig)
-
-    # Routing rules
-    routing: dict[str, list[str]] = Field(default_factory=dict)  # channel -> [chat_ids]
-
-    # Lifecycle
-    ttl: int | None = None  # Time-to-live in seconds (None = no expiry)
-    auto_start: bool = True  # Start automatically when swarm starts
-
-    # User binding (only for user agent)
-    bound_user_key: str | None = None  # 1:1 binding with user identifier
-
-    # Session policy
-    session_policy: Literal["per_channel", "per_user", "global", "per_task"] = "per_channel"
-
-    # Access control
-    token: str | None = None  # Access token for web/API authentication
-
-    @property
-    def workspace_path(self) -> Path:
-        """Get expanded workspace path."""
-        ws = self.workspace or f"~/.nanocats/workspaces/{self.id}"
-        return Path(ws).expanduser()

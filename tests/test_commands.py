@@ -1,3 +1,4 @@
+import re
 import shutil
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,9 +8,15 @@ from typer.testing import CliRunner
 
 from nanocats.cli.commands import app
 from nanocats.config.schema import Config
-from nanocats.providers.openai_provider import OpenAIProvider
+from nanocats.providers.litellm_provider import LiteLLMProvider
 from nanocats.providers.openai_codex_provider import _strip_model_prefix
 from nanocats.providers.registry import find_by_model
+
+
+def _strip_ansi(text):
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
 
 runner = CliRunner()
 
@@ -143,6 +150,35 @@ def test_config_auto_detects_ollama_from_local_api_base():
     assert config.get_api_base() == "http://localhost:11434"
 
 
+def test_config_prefers_ollama_over_vllm_when_both_local_providers_configured():
+    config = Config.model_validate(
+        {
+            "agents": {"defaults": {"provider": "auto", "model": "llama3.2"}},
+            "providers": {
+                "vllm": {"apiBase": "http://localhost:8000"},
+                "ollama": {"apiBase": "http://localhost:11434"},
+            },
+        }
+    )
+
+    assert config.get_provider_name() == "ollama"
+    assert config.get_api_base() == "http://localhost:11434"
+
+
+def test_config_falls_back_to_vllm_when_ollama_not_configured():
+    config = Config.model_validate(
+        {
+            "agents": {"defaults": {"provider": "auto", "model": "llama3.2"}},
+            "providers": {
+                "vllm": {"apiBase": "http://localhost:8000"},
+            },
+        }
+    )
+
+    assert config.get_provider_name() == "vllm"
+    assert config.get_api_base() == "http://localhost:8000"
+
+
 def test_find_by_model_prefers_explicit_prefix_over_generic_codex_keyword():
     spec = find_by_model("github-copilot/gpt-5.3-codex")
 
@@ -150,14 +186,12 @@ def test_find_by_model_prefers_explicit_prefix_over_generic_codex_keyword():
     assert spec.name == "github_copilot"
 
 
-def test_openai_provider_init():
-    """Test OpenAIProvider can be initialized."""
-    provider = OpenAIProvider(
-        default_model="MiniMax-M2.5",
-        api_key="test-key",
-        api_base="https://api.minimaxi.com/v1"
-    )
-    assert provider.default_model == "MiniMax-M2.5"
+def test_litellm_provider_canonicalizes_github_copilot_hyphen_prefix():
+    provider = LiteLLMProvider(default_model="github-copilot/gpt-5.3-codex")
+
+    resolved = provider._resolve_model("github-copilot/gpt-5.3-codex")
+
+    assert resolved == "github_copilot/gpt-5.3-codex"
 
 
 def test_openai_codex_strip_prefix_supports_hyphen_and_underscore():
@@ -201,10 +235,11 @@ def test_agent_help_shows_workspace_and_config_options():
     result = runner.invoke(app, ["agent", "--help"])
 
     assert result.exit_code == 0
-    assert "--workspace" in result.stdout
-    assert "-w" in result.stdout
-    assert "--config" in result.stdout
-    assert "-c" in result.stdout
+    stripped_output = _strip_ansi(result.stdout)
+    assert "--workspace" in stripped_output
+    assert "-w" in stripped_output
+    assert "--config" in stripped_output
+    assert "-c" in stripped_output
 
 
 def test_agent_uses_default_config_when_no_workspace_or_config_flags(mock_agent_runtime):

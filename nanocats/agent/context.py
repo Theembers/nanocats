@@ -72,7 +72,7 @@ Skills with available="false" need dependencies installed first - you can try in
 - Use file tools when they are simpler or more reliable than shell commands.
 """
 
-        return f"""# nanocats 🐱
+        return f"""# nanocats 🐈
 
 You are nanocats, a helpful AI assistant.
 
@@ -109,23 +109,14 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
     def _load_bootstrap_files(self) -> str:
         """Load all bootstrap files from workspace."""
         parts = []
-        has_soul = False
 
         for filename in self.BOOTSTRAP_FILES:
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
                 parts.append(f"## {filename}\n\n{content}")
-                if filename == "SOUL.md":
-                    has_soul = True
 
-        result = "\n\n".join(parts) if parts else ""
-
-        # Add "embody its persona" instruction when SOUL.md exists
-        if has_soul:
-            result += "\n\n---\n\n**If SOUL.md is present, embody its persona and tone. Avoid stiff, generic replies.**"
-
-        return result
+        return "\n\n".join(parts) if parts else ""
 
     def build_messages(
         self,

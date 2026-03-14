@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
@@ -12,16 +14,6 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from loguru import logger
 
 from nanocats.agent.context import ContextBuilder
-
-# Try to import web logger for activity tracking
-try:
-    from nanocats.web.backend.agent_logger import (
-        log_model_call, log_tool_call, log_mcp_call, log_skill_call,
-        set_current_agent_id
-    )
-    WEB_LOGGING_AVAILABLE = True
-except ImportError:
-    WEB_LOGGING_AVAILABLE = False
 from nanocats.agent.memory import MemoryConsolidator
 from nanocats.agent.subagent import SubagentManager
 from nanocats.agent.tools.cron import CronTool
@@ -37,7 +29,7 @@ from nanocats.providers.base import LLMProvider
 from nanocats.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
-    from nanocats.config.schema import ChannelsConfig, ExecToolConfig
+    from nanocats.config.schema import ChannelsConfig, ExecToolConfig, WebSearchConfig
     from nanocats.cron.service import CronService
 
 
@@ -53,7 +45,7 @@ class AgentLoop:
     5. Sends responses back
     """
 
-    _TOOL_RESULT_MAX_CHARS = 500
+    _TOOL_RESULT_MAX_CHARS = 16_000
 
     def __init__(
         self,
@@ -63,7 +55,7 @@ class AgentLoop:
         model: str | None = None,
         max_iterations: int = 40,
         context_window_tokens: int = 65_536,
-        brave_api_key: str | None = None,
+        web_search_config: WebSearchConfig | None = None,
         web_proxy: str | None = None,
         exec_config: ExecToolConfig | None = None,
         cron_service: CronService | None = None,
@@ -71,18 +63,17 @@ class AgentLoop:
         session_manager: SessionManager | None = None,
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
-        agent_id: str | None = None,
     ):
-        from nanocats.config.schema import ExecToolConfig
+        from nanocats.config.schema import ExecToolConfig, WebSearchConfig
+
         self.bus = bus
         self.channels_config = channels_config
-        self.agent_id = agent_id
         self.provider = provider
         self.workspace = workspace
         self.model = model or provider.get_default_model()
         self.max_iterations = max_iterations
         self.context_window_tokens = context_window_tokens
-        self.brave_api_key = brave_api_key
+        self.web_search_config = web_search_config or WebSearchConfig()
         self.web_proxy = web_proxy
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
@@ -96,7 +87,7 @@ class AgentLoop:
             workspace=workspace,
             bus=bus,
             model=self.model,
-            brave_api_key=brave_api_key,
+            web_search_config=self.web_search_config,
             web_proxy=web_proxy,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
@@ -131,7 +122,7 @@ class AgentLoop:
             restrict_to_workspace=self.restrict_to_workspace,
             path_append=self.exec_config.path_append,
         ))
-        self.tools.register(WebSearchTool(api_key=self.brave_api_key, proxy=self.web_proxy))
+        self.tools.register(WebSearchTool(config=self.web_search_config, proxy=self.web_proxy))
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))
@@ -149,7 +140,7 @@ class AgentLoop:
             await self._mcp_stack.__aenter__()
             await connect_mcp_servers(self._mcp_servers, self.tools, self._mcp_stack)
             self._mcp_connected = True
-        except Exception as e:
+        except BaseException as e:
             logger.error("Failed to connect MCP servers (will retry next message): {}", e)
             if self._mcp_stack:
                 try:
@@ -195,51 +186,17 @@ class AgentLoop:
         iteration = 0
         final_content = None
         tools_used: list[str] = []
-        
-        # Set agent ID for web logging context
-        if WEB_LOGGING_AVAILABLE:
-            set_current_agent_id(self.agent_id)
 
         while iteration < self.max_iterations:
             iteration += 1
 
             tool_defs = self.tools.get_definitions()
 
-            # Log model call
             response = await self.provider.chat_with_retry(
                 messages=messages,
                 tools=tool_defs,
                 model=self.model,
             )
-            
-            # Log the model call to web interface
-            if WEB_LOGGING_AVAILABLE:
-                try:
-                    # Check for cache info from LLM response
-                    cached = False
-                    if response.usage:
-                        # Check various cache indicators from different providers
-                        usage = response.usage
-                        # OpenAI: prompt_token_details.cached_tokens
-                        # Anthropic: cache_creation_input_tokens, cache_read_input_tokens
-                        # LiteLLM: prompt_token_details
-                        cached = (
-                            usage.get('cached_tokens', 0) > 0 or
-                            usage.get('cache_read_input_tokens', 0) > 0 or
-                            usage.get('cache_creation_input_tokens', 0) > 0 or
-                            (isinstance(usage.get('prompt_token_details'), dict) and 
-                             usage.get('prompt_token_details', {}).get('cached_tokens', 0) > 0)
-                        )
-                    
-                    log_model_call(
-                        model=self.model,
-                        input_tokens=response.usage.get('prompt_tokens', 0) if response.usage else 0,
-                        output_tokens=response.usage.get('completion_tokens', 0) if response.usage else 0,
-                        cached=cached,
-                        agent_id=self.agent_id
-                    )
-                except Exception as e:
-                    logger.debug("Failed to log model call: {}", e)
 
             if response.has_tool_calls:
                 if on_progress:
@@ -249,14 +206,7 @@ class AgentLoop:
                     await on_progress(self._tool_hint(response.tool_calls), tool_hint=True)
 
                 tool_call_dicts = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments, ensure_ascii=False)
-                        }
-                    }
+                    tc.to_openai_tool_call()
                     for tc in response.tool_calls
                 ]
                 messages = self.context.add_assistant_message(
@@ -269,32 +219,7 @@ class AgentLoop:
                     tools_used.append(tool_call.name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
-                    
-                    # Execute tool and log the call
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
-                    
-                    # Log tool call to web interface
-                    if WEB_LOGGING_AVAILABLE:
-                        try:
-                            # Determine if this is an MCP or regular tool
-                            if hasattr(self.tools, '_mcp_tools') and tool_call.name in self.tools._mcp_tools:
-                                log_mcp_call(
-                                    server_name="mcp",
-                                    tool_name=tool_call.name,
-                                    arguments=tool_call.arguments,
-                                    result=result,
-                                    agent_id=self.agent_id
-                                )
-                            else:
-                                log_tool_call(
-                                    tool_name=tool_call.name,
-                                    arguments=tool_call.arguments,
-                                    result=result,
-                                    agent_id=self.agent_id
-                                )
-                        except Exception as e:
-                            logger.debug("Failed to log tool call: {}", e)
-                    
                     messages = self.context.add_tool_result(
                         messages, tool_call.id, tool_call.name, result
                     )
@@ -334,8 +259,11 @@ class AgentLoop:
             except asyncio.TimeoutError:
                 continue
 
-            if msg.content.strip().lower() == "/stop":
+            cmd = msg.content.strip().lower()
+            if cmd == "/stop":
                 await self._handle_stop(msg)
+            elif cmd == "/restart":
+                await self._handle_restart(msg)
             else:
                 task = asyncio.create_task(self._dispatch(msg))
                 self._active_tasks.setdefault(msg.session_key, []).append(task)
@@ -352,10 +280,24 @@ class AgentLoop:
                 pass
         sub_cancelled = await self.subagents.cancel_by_session(msg.session_key)
         total = cancelled + sub_cancelled
-        content = f"⏹ Stopped {total} task(s)." if total else "No active task to stop."
+        content = f"Stopped {total} task(s)." if total else "No active task to stop."
         await self.bus.publish_outbound(OutboundMessage(
             channel=msg.channel, chat_id=msg.chat_id, content=content,
         ))
+
+    async def _handle_restart(self, msg: InboundMessage) -> None:
+        """Restart the process in-place via os.execv."""
+        await self.bus.publish_outbound(OutboundMessage(
+            channel=msg.channel, chat_id=msg.chat_id, content="Restarting...",
+        ))
+
+        async def _do_restart():
+            await asyncio.sleep(1)
+            # Use -m nanocats instead of sys.argv[0] for Windows compatibility
+            # (sys.argv[0] may be just "nanocats" without full path on Windows)
+            os.execv(sys.executable, [sys.executable, "-m", "nanocats"] + sys.argv[1:])
+
+        asyncio.create_task(_do_restart())
 
     async def _dispatch(self, msg: InboundMessage) -> None:
         """Process a message under the global lock."""
@@ -451,9 +393,16 @@ class AgentLoop:
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content="New session started.")
         if cmd == "/help":
-            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanocats commands:\n/new — Start a new conversation\n/stop — Stop the current task\n/help — Show available commands")
-
+            lines = [
+                "🐈 nanocats commands:",
+                "/new — Start a new conversation",
+                "/stop — Stop the current task",
+                "/restart — Restart the bot",
+                "/help — Show available commands",
+            ]
+            return OutboundMessage(
+                channel=msg.channel, chat_id=msg.chat_id, content="\n".join(lines),
+            )
         await self.memory_consolidator.maybe_consolidate_by_tokens(session)
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))

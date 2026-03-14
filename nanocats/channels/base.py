@@ -1,7 +1,10 @@
 """Base channel interface for chat platforms."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Awaitable, Callable
+from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -18,6 +21,8 @@ class BaseChannel(ABC):
     """
 
     name: str = "base"
+    display_name: str = "Base"
+    transcription_api_key: str = ""
 
     def __init__(self, config: Any, bus: MessageBus):
         """
@@ -30,40 +35,19 @@ class BaseChannel(ABC):
         self.config = config
         self.bus = bus
         self._running = False
-        # Agent binding support (for swarm mode)
-        self._bound_agent_id: str | None = None
-        self._message_handler: Callable[[InboundMessage], Awaitable[None]] | None = None
 
-    def bind_agent(self, agent_id: str) -> None:
-        """
-        Bind this channel to a specific agent.
+    async def transcribe_audio(self, file_path: str | Path) -> str:
+        """Transcribe an audio file via Groq Whisper. Returns empty string on failure."""
+        if not self.transcription_api_key:
+            return ""
+        try:
+            from nanocats.providers.transcription import GroqTranscriptionProvider
 
-        In swarm mode, channels are bound to agents for message routing.
-
-        Args:
-            agent_id: The agent identifier to bind to.
-        """
-        self._bound_agent_id = agent_id
-
-    def set_message_handler(
-        self,
-        handler: Callable[[InboundMessage], Awaitable[None]]
-    ) -> None:
-        """
-        Set a custom message handler.
-
-        When set, incoming messages will be routed to this handler
-        instead of the bus directly.
-
-        Args:
-            handler: Async callback for handling inbound messages.
-        """
-        self._message_handler = handler
-
-    @property
-    def bound_agent(self) -> str | None:
-        """Get the bound agent ID, if any."""
-        return self._bound_agent_id
+            provider = GroqTranscriptionProvider(api_key=self.transcription_api_key)
+            return await provider.transcribe(file_path)
+        except Exception as e:
+            logger.warning("{}: audio transcription failed: {}", self.name, e)
+            return ""
 
     @abstractmethod
     async def start(self) -> None:
@@ -114,7 +98,7 @@ class BaseChannel(ABC):
         """
         Handle an incoming message from the chat platform.
 
-        This method checks permissions and forwards to the bus or custom handler.
+        This method checks permissions and forwards to the bus.
 
         Args:
             sender_id: The sender's identifier.
@@ -142,11 +126,12 @@ class BaseChannel(ABC):
             session_key_override=session_key,
         )
 
-        # Route to custom handler if set (swarm mode)
-        if self._message_handler:
-            await self._message_handler(msg)
-        else:
-            await self.bus.publish_inbound(msg)
+        await self.bus.publish_inbound(msg)
+
+    @classmethod
+    def default_config(cls) -> dict[str, Any]:
+        """Return default config for onboard. Override in plugins to auto-populate config.json."""
+        return {"enabled": False}
 
     @property
     def is_running(self) -> bool:

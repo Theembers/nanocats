@@ -2,9 +2,11 @@
 
 import asyncio
 import os
+import select
 import signal
 import sys
 from pathlib import Path
+from typing import Any
 
 # Force UTF-8 encoding for Windows console
 if sys.platform == "win32":
@@ -18,9 +20,16 @@ if sys.platform == "win32":
             pass
 
 import typer
-from prompt_toolkit.shortcuts import choice
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import ANSI, HTML
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.application import run_in_terminal
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.table import Table
+from rich.text import Text
 
 from nanocats import __logo__, __version__
 from nanocats.config.paths import get_workspace_path
@@ -34,6 +43,155 @@ app = typer.Typer(
 )
 
 console = Console()
+EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
+
+# ---------------------------------------------------------------------------
+# CLI input: prompt_toolkit for editing, paste, history, and display
+# ---------------------------------------------------------------------------
+
+_PROMPT_SESSION: PromptSession | None = None
+_SAVED_TERM_ATTRS = None  # original termios settings, restored on exit
+
+
+def _flush_pending_tty_input() -> None:
+    """Drop unread keypresses typed while the model was generating output."""
+    try:
+        fd = sys.stdin.fileno()
+        if not os.isatty(fd):
+            return
+    except Exception:
+        return
+
+    try:
+        import termios
+        termios.tcflush(fd, termios.TCIFLUSH)
+        return
+    except Exception:
+        pass
+
+    try:
+        while True:
+            ready, _, _ = select.select([fd], [], [], 0)
+            if not ready:
+                break
+            if not os.read(fd, 4096):
+                break
+    except Exception:
+        return
+
+
+def _restore_terminal() -> None:
+    """Restore terminal to its original state (echo, line buffering, etc.)."""
+    if _SAVED_TERM_ATTRS is None:
+        return
+    try:
+        import termios
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _SAVED_TERM_ATTRS)
+    except Exception:
+        pass
+
+
+def _init_prompt_session() -> None:
+    """Create the prompt_toolkit session with persistent file history."""
+    global _PROMPT_SESSION, _SAVED_TERM_ATTRS
+
+    # Save terminal state so we can restore it on exit
+    try:
+        import termios
+        _SAVED_TERM_ATTRS = termios.tcgetattr(sys.stdin.fileno())
+    except Exception:
+        pass
+
+    from nanocats.config.paths import get_cli_history_path
+
+    history_file = get_cli_history_path()
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+
+    _PROMPT_SESSION = PromptSession(
+        history=FileHistory(str(history_file)),
+        enable_open_in_editor=False,
+        multiline=False,   # Enter submits (single line mode)
+    )
+
+
+def _make_console() -> Console:
+    return Console(file=sys.stdout)
+
+
+def _render_interactive_ansi(render_fn) -> str:
+    """Render Rich output to ANSI so prompt_toolkit can print it safely."""
+    ansi_console = Console(
+        force_terminal=True,
+        color_system=console.color_system or "standard",
+        width=console.width,
+    )
+    with ansi_console.capture() as capture:
+        render_fn(ansi_console)
+    return capture.get()
+
+
+def _print_agent_response(response: str, render_markdown: bool) -> None:
+    """Render assistant response with consistent terminal styling."""
+    console = _make_console()
+    content = response or ""
+    body = Markdown(content) if render_markdown else Text(content)
+    console.print()
+    console.print(f"[cyan]{__logo__} nanocats[/cyan]")
+    console.print(body)
+    console.print()
+
+
+async def _print_interactive_line(text: str) -> None:
+    """Print async interactive updates with prompt_toolkit-safe Rich styling."""
+    def _write() -> None:
+        ansi = _render_interactive_ansi(
+            lambda c: c.print(f"  [dim]↳ {text}[/dim]")
+        )
+        print_formatted_text(ANSI(ansi), end="")
+
+    await run_in_terminal(_write)
+
+
+async def _print_interactive_response(response: str, render_markdown: bool) -> None:
+    """Print async interactive replies with prompt_toolkit-safe Rich styling."""
+    def _write() -> None:
+        content = response or ""
+        ansi = _render_interactive_ansi(
+            lambda c: (
+                c.print(),
+                c.print(f"[cyan]{__logo__} nanocats[/cyan]"),
+                c.print(Markdown(content) if render_markdown else Text(content)),
+                c.print(),
+            )
+        )
+        print_formatted_text(ANSI(ansi), end="")
+
+    await run_in_terminal(_write)
+
+
+def _is_exit_command(command: str) -> bool:
+    """Return True when input should end interactive chat."""
+    return command.lower() in EXIT_COMMANDS
+
+
+async def _read_interactive_input_async() -> str:
+    """Read user input using prompt_toolkit (handles paste, history, display).
+
+    prompt_toolkit natively handles:
+    - Multiline paste (bracketed paste mode)
+    - History navigation (up/down arrows)
+    - Clean display (no ghost characters or artifacts)
+    """
+    if _PROMPT_SESSION is None:
+        raise RuntimeError("Call _init_prompt_session() first")
+    try:
+        with patch_stdout():
+            return await _PROMPT_SESSION.prompt_async(
+                HTML("<b fg='ansiblue'>You:</b> "),
+            )
+    except EOFError as exc:
+        raise KeyboardInterrupt from exc
+
 
 
 def version_callback(value: bool):
@@ -53,281 +211,8 @@ def main(
 
 
 # ============================================================================
-# Help Command
-# ============================================================================
-
-
-@app.command()
-def help(
-    command: str | None = typer.Argument(None, help="Command to get help for"),
-):
-    """Show help information for nanocats commands."""
-    if command:
-        _show_command_help(command)
-    else:
-        _show_all_commands()
-
-
-def _show_all_commands():
-    """Display all available commands."""
-    console.print(f"\n[bold cyan]{__logo__} nanocats CLI Help\[/bold cyan]\n")
-    
-    # Main commands
-    console.print("[bold]Main Commands:[/bold]")
-    console.print("  [green]onboard[/green]          Initialize config and workspace")
-    console.print("  [green]setup[/green]            Interactive setup wizard")
-    console.print("  [green]gateway[/green]          Start Gateway service")
-    console.print("  [green]status[/green]           Show system status")
-    console.print("  [green]help[/green] [command]   Show help information\n")
-
-    # Sub commands
-    console.print("[bold]Sub Commands:[/bold]")
-    console.print("  [green]swarm status[/green]     Show Swarm status")
-    console.print("  [green]swarm list[/green]       List all Agents")
-    console.print("  [green]swarm create[/green]     Create new Agent")
-    console.print("  [green]swarm mcp[/green]        Manage MCP servers")
-    console.print("  [green]channels status[/green]  Show channel status")
-    console.print("  [green]channels login[/green]   WhatsApp device login")
-    console.print("  [green]provider login[/green]   OAuth login\n")
-    
-    console.print("[dim]Use \"nanocats help <command>\" for detailed command usage[/dim]\n")
-
-
-def _show_command_help(command: str):
-    """Display detailed help for a specific command."""
-    help_map = {
-        "onboard": {
-            "desc": "Initialize nanocats configuration and workspace",
-            "usage": "nanocats onboard",
-            "options": [],
-        },
-        "setup": {
-            "desc": "Interactive setup wizard for provider, agent, and channel configuration",
-            "usage": "nanocats setup",
-            "options": [],
-        },
-        "gateway": {
-            "desc": "Start Gateway service (Swarm mode)",
-            "usage": "nanocats gateway [OPTIONS]",
-            "options": [
-                ("-p, --port", "Gateway port"),
-                ("-w, --workspace", "Workspace directory"),
-                ("-c, --config", "Config file path"),
-                ("-v, --verbose", "Enable debug logging"),
-            ],
-        },
-
-        "status": {
-            "desc": "Show nanocats system status",
-            "usage": "nanocats status",
-            "options": [],
-        },
-        "swarm": {
-            "desc": "Swarm management commands",
-            "usage": "nanocats swarm <subcommand>",
-            "options": [
-                ("status", "Show Swarm status"),
-                ("list", "List all Agents"),
-                ("create <id>", "Create new Agent"),
-                ("mcp <action>", "Manage MCP servers (list/install/uninstall)"),
-            ],
-        },
-        "channels": {
-            "desc": "Channel management commands",
-            "usage": "nanocats channels <subcommand>",
-            "options": [
-                ("status", "Show channel status"),
-                ("login", "WhatsApp device login (QR scan)"),
-            ],
-        },
-        "provider": {
-            "desc": "OAuth provider login",
-            "usage": "nanocats provider login <provider>",
-            "options": [
-                ("openai-codex", "OpenAI Codex OAuth login"),
-                ("github-copilot", "GitHub Copilot OAuth login"),
-            ],
-        },
-    }
-    
-    if command not in help_map:
-        console.print(f"[red]Unknown command: {command}[/red]")
-        console.print("\nUse [cyan]nanocats help[/cyan] to see all available commands")
-        raise typer.Exit(1)
-    
-    info = help_map[command]
-    console.print(f"\n[bold cyan]{__logo__} nanocats help {command}[/bold cyan]\n")
-    console.print(f"[bold]描述:[/bold] {info['desc']}\n")
-    console.print(f"[bold]用法:[/bold] [green]{info['usage']}[/green]\n")
-    
-    if info["options"]:
-        console.print("[bold]选项/子命令:[/bold]")
-        for opt, desc in info["options"]:
-            console.print(f"  [green]{opt:<18}[/green] {desc}")
-        console.print()
-
-
-# ============================================================================
 # Onboard / Setup
 # ============================================================================
-
-DEFAULT_WEB_PORT = 15751
-
-
-def _get_web_port() -> int:
-    """Get web server port from config or return default."""
-    try:
-        from nanocats.config.loader import load_config
-        config = load_config()
-        return config.channels.web.port
-    except Exception:
-        return DEFAULT_WEB_PORT
-
-
-# def _start_web_server() -> None:
-#     """
-#     Start the web server on configured port.
-
-#     Logic:
-#     1. Try to start normally.
-#     2. If the port is already in use (Errno 48 / 98), check if the running
-#        process responds to our health endpoint.
-#        a. If it responds → it's already healthy: restart it so the latest
-#           code is loaded.
-#        b. Kill the old process and start a fresh server.
-#     3. On any other error, print a message and return.
-#     """
-#     import socket
-#     import time
-#     import urllib.request
-#     import uvicorn
-
-#     web_port = _get_web_port()
-
-#     def _port_in_use() -> bool:
-#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#             return s.connect_ex(("127.0.0.1", web_port)) == 0
-
-#     def _kill_port() -> bool:
-#         """Kill whatever is listening on web_port. Returns True on success."""
-#         import subprocess
-#         try:
-#             result = subprocess.run(
-#                 ["lsof", "-ti", f":{web_port}"],
-#                 capture_output=True, text=True
-#             )
-#             pids = result.stdout.strip().split()
-#             if not pids:
-#                 return False
-#             for pid in pids:
-#                 try:
-#                     os.kill(int(pid), signal.SIGTERM)
-#                 except ProcessLookupError:
-#                     pass
-#             # Give processes up to 3 s to exit
-#             for _ in range(15):
-#                 time.sleep(0.2)
-#                 if not _port_in_use():
-#                     return True
-#             # Force-kill if still up
-#             for pid in pids:
-#                 try:
-#                     os.kill(int(pid), signal.SIGKILL)
-#                 except ProcessLookupError:
-#                     pass
-#             time.sleep(0.5)
-#             return not _port_in_use()
-#         except FileNotFoundError:
-#             # lsof not available (Windows)
-#             return False
-
-#     def _print_banner() -> None:
-#         console.print("=" * 60)
-#         console.print("🐱 nanocats Web Interface")
-#         console.print("=" * 60)
-#         console.print(f"📱 Web UI:   http://localhost:{web_port}")
-#         console.print(f"📚 API Docs: http://localhost:{web_port}/docs")
-#         console.print("=" * 60)
-#         console.print("\n[dim]Press Ctrl+C to stop the server[/dim]\n")
-
-#     def _run() -> None:
-#         _print_banner()
-#         uvicorn.run(
-#             "nanocats.web.backend.main:app",
-#             host="0.0.0.0",
-#             port=web_port,
-#             reload=False,
-#             log_level="info",
-#         )
-
-#     # ── First attempt ────────────────────────────────────────────────────────
-#     if not _port_in_use():
-#         try:
-#             _run()
-#         except KeyboardInterrupt:
-#             console.print("\n[yellow]Web server stopped[/yellow]")
-#         return
-
-#     # ── Port is occupied ─────────────────────────────────────────────────────
-#     console.print(f"\n[yellow]Port {web_port} is already in use.[/yellow]")
-#     console.print("[dim]Restarting the web server with the latest code...[/dim]")
-
-#     if not _kill_port():
-#         console.print(
-#             f"[red]Could not free port {web_port}. "
-#             "Please stop the existing process manually and run [cyan]nanocats gateway[/cyan] again.[/red]"
-#         )
-#         return
-
-#     console.print(f"[green]✓ Previous server stopped.[/green]")
-#     try:
-#         _run()
-#     except KeyboardInterrupt:
-#         console.print("\n[yellow]Web server stopped[/yellow]")
-
-
-def _interactive_select(options: list[str], title: str = "Select an option:") -> int:
-    """Interactive selection using arrow keys and Enter.
-    
-    Args:
-        options: List of option strings to display
-        title: Title to show above the options
-    
-    Returns:
-        Index of the selected option (0-based)
-    """
-    import sys
-    
-    # Check if we're in an interactive terminal
-    if sys.stdin.isatty():
-        try:
-            # Use prompt_toolkit's built-in choice function
-            # options should be list of (value, label) tuples
-            option_tuples = [(opt, opt) for opt in options]
-            result = choice(
-                message=title + " ",
-                options=option_tuples,
-                default=options[0],
-            )
-            return options.index(result)
-        except Exception:
-            pass  # Fall through to fallback
-    
-    # Fallback: show options and ask for number input
-    console.print(f"\n[bold]{title}[/bold]\n")
-    for i, opt in enumerate(options, 1):
-        console.print(f"  {i}. {opt}")
-    
-    default_idx = 1
-    while True:
-        try:
-            choice_str = typer.prompt("Select option", default=str(default_idx), show_default=True)
-            idx = int(choice_str) - 1
-            if 0 <= idx < len(options):
-                return idx
-        except ValueError:
-            pass
-        console.print("[red]Invalid option. Please try again.[/red]")
 
 
 @app.command()
@@ -340,14 +225,9 @@ def onboard():
 
     if config_path.exists():
         console.print(f"[yellow]Config already exists at {config_path}[/yellow]")
-        
-        options = [
-            "Overwrite with defaults (existing values will be lost)",
-            "Refresh config, keeping existing values and adding new fields"
-        ]
-        choice = _interactive_select(options, "Choose action:")
-        
-        if choice == 0:
+        console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
+        console.print("  [bold]N[/bold] = refresh config, keeping existing values and adding new fields")
+        if typer.confirm("Overwrite?"):
             config = Config()
             save_config(config)
             console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
@@ -359,6 +239,10 @@ def onboard():
         save_config(Config())
         console.print(f"[green]✓[/green] Created config at {config_path}")
 
+    console.print("[dim]Config template now uses `maxTokens` + `contextWindowTokens`; `memoryWindow` is no longer a runtime setting.[/dim]")
+
+    _onboard_plugins(config_path)
+
     # Create workspace
     workspace = get_workspace_path()
 
@@ -369,406 +253,49 @@ def onboard():
     sync_workspace_templates(workspace)
 
     console.print(f"\n{__logo__} nanocats is ready!")
-    
-    # Ask if user wants to run setup or start web
-    console.print("[bold cyan]━━━ Quick Start ━━━[/bold cyan]\n")
-
-    options = [
-        "Run setup wizard (recommended for new users)",
-        "Start Gateway",
-        "Skip for now"
-    ]
-    choice = _interactive_select(options, "What would you like to do next?")
-
-    if choice == 0:
-        console.print()
-        setup()
-    elif choice == 1:
-        console.print()
-        # Run gateway directly
-        from nanocats.config.loader import load_config
-        runtime_config = load_config()
-        _run_swarm_gateway(runtime_config)
-    else:
-        console.print("\n[dim]You can start the web server later with: nanocats gateway[/dim]\n")
+    console.print("\nNext steps:")
+    console.print("  1. Add your API key to [cyan]~/.nanocats/config.json[/cyan]")
+    console.print("     Get one at: https://openrouter.ai/keys")
+    console.print("  2. Chat: [cyan]nanocats agent -m \"Hello!\"[/cyan]")
+    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanocats#-chat-apps[/dim]")
 
 
-@app.command()
-def setup():
-    """Interactive setup wizard for nanocats installation."""
+def _merge_missing_defaults(existing: Any, defaults: Any) -> Any:
+    """Recursively fill in missing values from defaults without overwriting user config."""
+    if not isinstance(existing, dict) or not isinstance(defaults, dict):
+        return existing
+
+    merged = dict(existing)
+    for key, value in defaults.items():
+        if key not in merged:
+            merged[key] = value
+        else:
+            merged[key] = _merge_missing_defaults(merged[key], value)
+    return merged
+
+
+def _onboard_plugins(config_path: Path) -> None:
+    """Inject default config for all discovered channels (built-in + plugins)."""
     import json
-    import secrets
-    import shutil
-    import subprocess
-    from pathlib import Path
-    
-    from nanocats.config.loader import get_config_path, load_config, save_config
-    from nanocats.config.schema import (
-        AgentInstanceConfig,
-        AgentChannelBindingConfig,
-        Config,
-    )
-    
-    console.print(f"\n{__logo__} [bold cyan]nanocats Setup Wizard[/bold cyan]\n")
-    console.print("This wizard will help you set up nanocats with:\n")
-    console.print("  1. Dependency verification")
-    console.print("  2. Model provider configuration")
-    console.print("  3. Master agent creation")
-    console.print("  4. Channel configuration\n")
-    
-    # =========================================================================
-    # Step 1: Dependency Verification
-    # =========================================================================
-    console.print("[bold]━━━ Step 1/4: Dependency Verification ━━━[/bold]\n")
-    
-    # Check Python version
-    py_version = sys.version_info
-    py_ok = py_version >= (3, 11)
-    console.print(f"  Python {py_version.major}.{py_version.minor}.{py_version.micro} " +
-                  ("[green]✓[/green]" if py_ok else "[red]✗ (requires 3.11+)[/red]"))
-    
-    # Check Node.js (optional, for WhatsApp bridge)
-    node_version = None
-    node_ok = False
-    if shutil.which("node"):
-        try:
-            result = subprocess.run(["node", "--version"], capture_output=True, text=True)
-            node_version = result.stdout.strip().lstrip("v")
-            major = int(node_version.split(".")[0])
-            node_ok = major >= 18
-        except Exception:
-            pass
-    console.print(f"  Node.js {node_version or 'not installed'} " +
-                  ("[green]✓[/green]" if node_ok else "[yellow]○ (optional, for WhatsApp)[/yellow]"))
-    
-    # Check npm
-    npm_ok = shutil.which("npm") is not None
-    console.print(f"  npm {'installed' if npm_ok else 'not installed'} " +
-                  ("[green]✓[/green]" if npm_ok else "[yellow]○ (optional)[/yellow]"))
-    
-    # Check core dependencies
-    core_deps = [
-        ("typer", "typer"),
-        ("rich", "rich"),
-        ("prompt_toolkit", "prompt_toolkit"),
-        ("pydantic", "pydantic"),
-        ("litellm", "litellm"),
-        ("loguru", "loguru"),
-    ]
-    
-    missing_deps = []
-    for name, module in core_deps:
-        try:
-            __import__(module)
-            console.print(f"  {name} [green]✓[/green]")
-        except ImportError:
-            console.print(f"  {name} [red]✗[/red]")
-            missing_deps.append(name)
-    
-    # Check web dependencies (optional)
-    web_deps_ok = True
-    try:
-        import fastapi
-        import uvicorn
-        console.print(f"  fastapi [green]✓[/green]")
-        console.print(f"  uvicorn [green]✓[/green]")
-    except ImportError:
-        web_deps_ok = False
-        console.print(f"  web deps [yellow]○ (optional, run: pip install nanocats[web])[/yellow]")
-    
-    if missing_deps:
-        console.print(f"\n[red]Missing required dependencies: {', '.join(missing_deps)}[/red]")
-        console.print("Install with: [cyan]pip install nanocats[/cyan]\n")
-        raise typer.Exit(1)
-    
-    console.print("\n[green]✓ All core dependencies satisfied[/green]\n")
-    
-    # =========================================================================
-    # Step 2: Model Provider Configuration
-    # =========================================================================
-    console.print("[bold]━━━ Step 2/4: Model Provider Configuration ━━━[/bold]\n")
-    
-    # Load or create config
-    config_path = get_config_path()
-    if config_path.exists():
-        config = load_config()
-        console.print(f"[dim]Using existing config: {config_path}[/dim]\n")
-    else:
-        config = Config()
-        console.print(f"[dim]Creating new config: {config_path}[/dim]\n")
-    
-    # Show available providers
-    console.print("Available model providers:\n")
-    providers = [
-        ("openrouter", "OpenRouter (recommended, access to all models)", "https://openrouter.ai/keys"),
-        ("anthropic", "Anthropic Claude (direct)", "https://console.anthropic.com"),
-        ("openai", "OpenAI GPT (direct)", "https://platform.openai.com"),
-        ("deepseek", "DeepSeek (direct)", "https://platform.deepseek.com"),
-        ("minimax", "MiniMax", "https://platform.minimaxi.com"),
-        ("qwen", "Qwen", "https://dashscope.console.aliyun.com"),
-        ("zhipu", "Zhipu AI", "https://open.bigmodel.cn"),
-        ("ollama", "Ollama (local, free)", None),
-        ("custom", "Custom OpenAI-compatible endpoint", None),
-    ]
-    
-    provider_options = [desc for _, desc, _ in providers]
-    provider_idx = _interactive_select(provider_options, "Select a model provider:")
-    provider_key = providers[provider_idx][0]
 
-    console.print()
-    
-    # Get API key if needed
-    if provider_key not in ("ollama", "custom"):
-        url = providers[[p[0] for p in providers].index(provider_key)][2]
-        console.print(f"[dim]Get your API key at: {url}[/dim]\n")
-        
-        existing_key = getattr(config.providers, provider_key, None)
-        existing_key = existing_key.api_key if existing_key else None
-        
-        if existing_key:
-            masked = existing_key[:8] + "..." + existing_key[-4:] if len(existing_key) > 12 else "***"
-            console.print(f"Existing API key found: {masked}")
-            if not typer.confirm("Update API key?", default=False):
-                api_key = existing_key
-            else:
-                api_key = typer.prompt("Enter API key", hide_input=True)
+    from nanocats.channels.registry import discover_all
+
+    all_channels = discover_all()
+    if not all_channels:
+        return
+
+    with open(config_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    channels = data.setdefault("channels", {})
+    for name, cls in all_channels.items():
+        if name not in channels:
+            channels[name] = cls.default_config()
         else:
-            api_key = typer.prompt("Enter API key", hide_input=True)
-        
-        # Update config
-        provider_config = getattr(config.providers, provider_key, None)
-        if provider_config:
-            provider_config.api_key = api_key
-        else:
-            from nanocats.config.schema import ProviderConfig
-            setattr(config.providers, provider_key, ProviderConfig(api_key=api_key))
-    
-    elif provider_key == "ollama":
-        console.print("[dim]Make sure Ollama is running: ollama serve[/dim]")
-    
-    elif provider_key == "custom":
-        api_base = typer.prompt("Enter API base URL", default="http://localhost:8000/v1")
-        api_key = typer.prompt("Enter API key (or press Enter to skip)", default="", hide_input=True)
-        
-        if hasattr(config.providers, "custom"):
-            config.providers.custom.api_base = api_base
-            if api_key:
-                config.providers.custom.api_key = api_key
-        else:
-            from nanocats.config.schema import ProviderConfig
-            config.providers.custom = ProviderConfig(api_base=api_base, api_key=api_key or None)
-    
-    # Select model
-    console.print()
-    model_suggestions = {
-        "openrouter": "anthropic/claude-sonnet-4",
-        "anthropic": "claude-sonnet-4-20250514",
-        "openai": "gpt-4o",
-        "deepseek": "deepseek-chat",
-        "minimax": "MiniMax-M2.5",
-        "qwen": "qwen3-max",
-        "zhipu": "glm-5",
-        "ollama": "llama3.2",
-        "custom": "local-model",
-    }
-    
-    default_model = model_suggestions.get(provider_key, "gpt-4o")
-    model = typer.prompt("Enter model name", default=default_model)
-    
-    config.agents.defaults.model = model
-    config.agents.defaults.provider = provider_key
-    
-    console.print(f"\n[green]✓ Provider configured: {provider_key} / {model}[/green]\n")
-    
-    # =========================================================================
-    # Step 3: Master Agent Configuration
-    # =========================================================================
-    console.print("[bold]━━━ Step 3/4: Master Agent Configuration ━━━[/bold]\n")
-    
-    # Agent ID
-    agent_id = typer.prompt("Agent ID", default="master")
-    # Agent name
-    agent_name = typer.prompt("Agent display name", default="Master Agent")
-    
-    # Access token
-    generated_token = secrets.token_urlsafe(16)
-    console.print(f"\n[dim]Generated access token: {generated_token}[/dim]")
-    use_generated = typer.confirm("Use generated token?", default=True)
-    
-    if use_generated:
-        access_token = generated_token
-    else:
-        access_token = typer.prompt("Enter custom access token", hide_input=True)
-    
-    # Agent type - always supervisor for Master
-    agent_type = "supervisor"
-    console.print(f"\n[dim]Agent type: [cyan]{agent_type}[/cyan] (Master agent)[/dim]")
-    
-    # Create agent config
-    agents_dir = Path.home() / ".nanocats" / "agents"
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    
-    agent_config = AgentInstanceConfig(
-        id=agent_id,
-        name=agent_name,
-        type=agent_type,
-        model=model,
-        provider=provider_key,
-        auto_start=True,
-    )
-    agent_config.token = access_token  # Store token
-    
-    # Save agent config
-    agent_config_path = agents_dir / f"{agent_id}.json"
-    with open(agent_config_path, "w", encoding="utf-8") as f:
-        json.dump(agent_config.model_dump(by_alias=True), f, indent=2, ensure_ascii=False)
-    
-    # Initialize agent workspace with template files
-    agent_workspace = Path.home() / ".nanocats" / "workspaces" / agent_id
-    sync_workspace_templates(agent_workspace, silent=True)
-    
-    console.print(f"\n[green]✓ Agent '{agent_id}' created at {agent_config_path}[/green]")
-    console.print(f"[green]✓ Workspace initialized at {agent_workspace}[/green]\n")
-    
-    # =========================================================================
-    # Step 4: Channel Configuration
-    # =========================================================================
-    console.print("[bold]━━━ Step 4/4: Channel Configuration ━━━[/bold]\n")
-    
-    console.print("Available channels:\n")
-    channels = [
-        ("telegram", "Telegram", "Bot token from @BotFather"),
-        ("discord", "Discord", "Bot token + Message Content intent"),
-        ("feishu", "Feishu (飞书)", "App ID + App Secret"),
-        ("dingtalk", "DingTalk (钉钉)", "App Key + App Secret"),
-        ("slack", "Slack", "Bot token + App-Level token"),
-        ("whatsapp", "WhatsApp", "QR code scan"),
-        ("email", "Email", "IMAP/SMTP credentials"),
-        ("none", "None (CLI only)", "Skip channel setup"),
-    ]
-    
-    channel_options = [f"{name} ({req})" for key, name, req in channels]
-    channel_idx = _interactive_select(channel_options, "Select a channel:")
-    selected_channel = channels[channel_idx][0]
+            channels[name] = _merge_missing_defaults(channels[name], cls.default_config())
 
-    # Configure selected channel
-    if selected_channel != "none":
-        console.print()
-        
-        if selected_channel == "telegram":
-            token = typer.prompt("Enter Telegram bot token")
-            allow_from = typer.prompt("Enter allowed user IDs (comma-separated, or * for all)", default="*")
-            config.channels.telegram.enabled = True
-            config.channels.telegram.token = token
-            if allow_from != "*":
-                config.channels.telegram.allow_from = allow_from.split(",")
-        
-        elif selected_channel == "discord":
-            token = typer.prompt("Enter Discord bot token")
-            config.channels.discord.enabled = True
-            config.channels.discord.token = token
-        
-        elif selected_channel == "feishu":
-            app_id = typer.prompt("Enter Feishu App ID")
-            app_secret = typer.prompt("Enter Feishu App Secret", hide_input=True)
-            config.channels.feishu.enabled = True
-            config.channels.feishu.app_id = app_id
-            config.channels.feishu.app_secret = app_secret
-        
-        elif selected_channel == "dingtalk":
-            client_id = typer.prompt("Enter DingTalk App Key")
-            client_secret = typer.prompt("Enter DingTalk App Secret", hide_input=True)
-            config.channels.dingtalk.enabled = True
-            config.channels.dingtalk.client_id = client_id
-            config.channels.dingtalk.client_secret = client_secret
-        
-        elif selected_channel == "slack":
-            bot_token = typer.prompt("Enter Slack bot token (xoxb-...)")
-            app_token = typer.prompt("Enter Slack app token (xapp-...)")
-            config.channels.slack.enabled = True
-            config.channels.slack.bot_token = bot_token
-            config.channels.slack.app_token = app_token
-        
-        elif selected_channel == "whatsapp":
-            console.print("[dim]Run 'nanocats channels login' to scan QR code[/dim]")
-            config.channels.whatsapp.enabled = True
-        
-        elif selected_channel == "email":
-            imap_host = typer.prompt("Enter IMAP host")
-            imap_user = typer.prompt("Enter IMAP username")
-            imap_pass = typer.prompt("Enter IMAP password", hide_input=True)
-            smtp_host = typer.prompt("Enter SMTP host")
-            config.channels.email.enabled = True
-            config.channels.email.imap_host = imap_host
-            config.channels.email.imap_user = imap_user
-            config.channels.email.imap_pass = imap_pass
-            config.channels.email.smtp_host = smtp_host
-        
-        # Enable channel for agent
-        agent_config.channels = AgentChannelBindingConfig(enabled=[selected_channel])
-        
-        console.print(f"\n[green]✓ Channel '{selected_channel}' configured[/green]\n")
-    
-    # =========================================================================
-    # Save and Summary
-    # =========================================================================
-    
-    # Enable swarm mode
-    config.agents.swarm.enabled = True
-    
-    # Save main config
-    save_config(config)
-    
-    # Create workspace
-    workspace = get_workspace_path()
-    if not workspace.exists():
-        workspace.mkdir(parents=True, exist_ok=True)
-    sync_workspace_templates(workspace)
-    
-    # Print summary
-    console.print("\n" + "=" * 60)
-    console.print(f"{__logo__} [bold green]Setup Complete![/bold green]")
-    console.print("=" * 60)
-    console.print()
-    console.print(f"[bold]Configuration:[/bold]")
-    console.print(f"  Config file: [cyan]{config_path}[/cyan]")
-    console.print(f"  Workspace: [cyan]{workspace}[/cyan]")
-    console.print()
-    console.print(f"[bold]Provider:[/bold]")
-    console.print(f"  Provider: [cyan]{provider_key}[/cyan]")
-    console.print(f"  Model: [cyan]{model}[/cyan]")
-    console.print()
-    console.print(f"[bold]Master Agent:[/bold]")
-    console.print(f"  ID: [cyan]{agent_id}[/cyan]")
-    console.print(f"  Name: [cyan]{agent_name}[/cyan]")
-    console.print(f"  Type: [cyan]{agent_type}[/cyan]")
-    console.print(f"  Access Token: [yellow]{access_token}[/yellow]")
-    console.print()
-    
-    if selected_channel != "none":
-        console.print(f"[bold]Channel:[/bold]")
-        console.print(f"  Enabled: [cyan]{selected_channel}[/cyan]")
-        console.print()
-    
-    web_port = _get_web_port()
-
-    # Ask if user wants to start web server
-    console.print("[bold cyan]━━━ Start Gateway Server ━━━[/bold cyan]\n")
-    
-    # Run gateway directly with the loaded config
-    from nanocats.config.loader import load_config
-    runtime_config = load_config()
-    _run_swarm_gateway(runtime_config)
-    
-    console.print("[bold cyan]━━━ Gateway stopped ━━━[/bold cyan]\n")
-
-    # console.print("Would you like to start the Web UI now?")
-    # console.print(f"  Access: [yellow]http://localhost:{web_port}[/yellow]")
-    # console.print(f"  Login with Agent ID: [cyan]{agent_id}[/cyan] and your token\n")
-
-    # if typer.confirm("Start Web UI ?", default=True):
-    #     console.print()
-    #     _start_web_server()
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def _make_provider(config: Config):
@@ -805,18 +332,19 @@ def _make_provider(config: Config):
             default_model=model,
         )
     else:
-        from nanocats.providers.openai_provider import OpenAIProvider
+        from nanocats.providers.litellm_provider import LiteLLMProvider
         from nanocats.providers.registry import find_by_name
         spec = find_by_name(provider_name)
         if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and (spec.is_oauth or spec.is_local)):
             console.print("[red]Error: No API key configured.[/red]")
             console.print("Set one in ~/.nanocats/config.json under providers section")
             raise typer.Exit(1)
-        provider = OpenAIProvider(
+        provider = LiteLLMProvider(
             api_key=p.api_key if p else None,
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,
+            provider_name=provider_name,
         )
 
     defaults = config.agents.defaults
@@ -889,299 +417,344 @@ def gateway(
 
     console.print(f"{__logo__} Starting nanocats gateway on port {port}...")
     sync_workspace_templates(config.workspace_path)
+    bus = MessageBus()
+    provider = _make_provider(config)
+    session_manager = SessionManager(config.workspace_path)
 
-    # Unified entry: always use swarm manager
-    # If no agents are configured, it will create a default agent
-    asyncio.run(_run_swarm_gateway(config))
-    return
+    # Create cron service first (callback set after agent creation)
+    cron_store_path = get_cron_dir() / "jobs.json"
+    cron = CronService(cron_store_path)
+
+    # Create agent with cron service
+    agent = AgentLoop(
+        bus=bus,
+        provider=provider,
+        workspace=config.workspace_path,
+        model=config.agents.defaults.model,
+        max_iterations=config.agents.defaults.max_tool_iterations,
+        context_window_tokens=config.agents.defaults.context_window_tokens,
+        web_search_config=config.tools.web.search,
+        web_proxy=config.tools.web.proxy or None,
+        exec_config=config.tools.exec,
+        cron_service=cron,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
+        session_manager=session_manager,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
+    )
+
+    # Set cron callback (needs agent)
+    async def on_cron_job(job: CronJob) -> str | None:
+        """Execute a cron job through the agent."""
+        from nanocats.agent.tools.cron import CronTool
+        from nanocats.agent.tools.message import MessageTool
+        reminder_note = (
+            "[Scheduled Task] Timer finished.\n\n"
+            f"Task '{job.name}' has been triggered.\n"
+            f"Scheduled instruction: {job.payload.message}"
+        )
+
+        # Prevent the agent from scheduling new cron jobs during execution
+        cron_tool = agent.tools.get("cron")
+        cron_token = None
+        if isinstance(cron_tool, CronTool):
+            cron_token = cron_tool.set_cron_context(True)
+        try:
+            response = await agent.process_direct(
+                reminder_note,
+                session_key=f"cron:{job.id}",
+                channel=job.payload.channel or "cli",
+                chat_id=job.payload.to or "direct",
+            )
+        finally:
+            if isinstance(cron_tool, CronTool) and cron_token is not None:
+                cron_tool.reset_cron_context(cron_token)
+
+        message_tool = agent.tools.get("message")
+        if isinstance(message_tool, MessageTool) and message_tool._sent_in_turn:
+            return response
+
+        if job.payload.deliver and job.payload.to and response:
+            from nanocats.bus.events import OutboundMessage
+            await bus.publish_outbound(OutboundMessage(
+                channel=job.payload.channel or "cli",
+                chat_id=job.payload.to,
+                content=response
+            ))
+        return response
+    cron.on_job = on_cron_job
+
+    # Create channel manager
+    channels = ChannelManager(config, bus)
+
+    def _pick_heartbeat_target() -> tuple[str, str]:
+        """Pick a routable channel/chat target for heartbeat-triggered messages."""
+        enabled = set(channels.enabled_channels)
+        # Prefer the most recently updated non-internal session on an enabled channel.
+        for item in session_manager.list_sessions():
+            key = item.get("key") or ""
+            if ":" not in key:
+                continue
+            channel, chat_id = key.split(":", 1)
+            if channel in {"cli", "system"}:
+                continue
+            if channel in enabled and chat_id:
+                return channel, chat_id
+        # Fallback keeps prior behavior but remains explicit.
+        return "cli", "direct"
+
+    # Create heartbeat service
+    async def on_heartbeat_execute(tasks: str) -> str:
+        """Phase 2: execute heartbeat tasks through the full agent loop."""
+        channel, chat_id = _pick_heartbeat_target()
+
+        async def _silent(*_args, **_kwargs):
+            pass
+
+        return await agent.process_direct(
+            tasks,
+            session_key="heartbeat",
+            channel=channel,
+            chat_id=chat_id,
+            on_progress=_silent,
+        )
+
+    async def on_heartbeat_notify(response: str) -> None:
+        """Deliver a heartbeat response to the user's channel."""
+        from nanocats.bus.events import OutboundMessage
+        channel, chat_id = _pick_heartbeat_target()
+        if channel == "cli":
+            return  # No external channel available to deliver to
+        await bus.publish_outbound(OutboundMessage(channel=channel, chat_id=chat_id, content=response))
+
+    hb_cfg = config.gateway.heartbeat
+    heartbeat = HeartbeatService(
+        workspace=config.workspace_path,
+        provider=provider,
+        model=agent.model,
+        on_execute=on_heartbeat_execute,
+        on_notify=on_heartbeat_notify,
+        interval_s=hb_cfg.interval_s,
+        enabled=hb_cfg.enabled,
+    )
+
+    if channels.enabled_channels:
+        console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
+    else:
+        console.print("[yellow]Warning: No channels enabled[/yellow]")
+
+    cron_status = cron.status()
+    if cron_status["jobs"] > 0:
+        console.print(f"[green]✓[/green] Cron: {cron_status['jobs']} scheduled jobs")
+
+    console.print(f"[green]✓[/green] Heartbeat: every {hb_cfg.interval_s}s")
+
+    async def run():
+        try:
+            await cron.start()
+            await heartbeat.start()
+            await asyncio.gather(
+                agent.run(),
+                channels.start_all(),
+            )
+        except KeyboardInterrupt:
+            console.print("\nShutting down...")
+        finally:
+            await agent.close_mcp()
+            heartbeat.stop()
+            cron.stop()
+            agent.stop()
+            await channels.stop_all()
+
+    asyncio.run(run())
 
 
-def _run_swarm_gateway(config: Config) -> None:
-    """Run the gateway in swarm mode."""
+
+
+# ============================================================================
+# Agent Commands
+# ============================================================================
+
+
+@app.command()
+def agent(
+    message: str = typer.Option(None, "--message", "-m", help="Message to send to the agent"),
+    session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
+    config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
+    markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
+    logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanocats runtime logs during chat"),
+):
+    """Interact with the agent directly."""
+    from loguru import logger
+
+    from nanocats.agent.loop import AgentLoop
     from nanocats.bus.queue import MessageBus
     from nanocats.config.paths import get_cron_dir
     from nanocats.cron.service import CronService
-    from nanocats.swarm.manager import SwarmManager
 
-    console.print("[cyan]Swarm mode enabled[/cyan]")
-
-    # Check if web channel is enabled and start web backend
-    web_server_task = None
-    if config.channels.web.enabled:
-        # Check if fastapi is installed
-        try:
-            import fastapi
-        except ImportError:
-            console.print("[red]ERROR: fastapi is required for Web UI but not installed.[/red]")
-            console.print("[dim]Please run: pip install nanocats[web]  # or: pip install fastapi uvicorn[/dim]")
-            raise typer.Exit(1)
-        
-        web_server_task = _start_web_backend(config)
+    config = _load_runtime_config(config, workspace)
+    _print_deprecated_memory_window_notice(config)
+    sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
     provider = _make_provider(config)
 
-    # Create cron service
+    # Create cron service for tool usage (no callback needed for CLI unless running)
     cron_store_path = get_cron_dir() / "jobs.json"
     cron = CronService(cron_store_path)
 
-    # Create swarm manager
-    swarm = SwarmManager(
-        config=config,
+    if logs:
+        logger.enable("nanocats")
+    else:
+        logger.disable("nanocats")
+
+    agent_loop = AgentLoop(
+        bus=bus,
         provider=provider,
+        workspace=config.workspace_path,
+        model=config.agents.defaults.model,
+        max_iterations=config.agents.defaults.max_tool_iterations,
+        context_window_tokens=config.agents.defaults.context_window_tokens,
+        web_search_config=config.tools.web.search,
+        web_proxy=config.tools.web.proxy or None,
+        exec_config=config.tools.exec,
         cron_service=cron,
+        restrict_to_workspace=config.tools.restrict_to_workspace,
+        mcp_servers=config.tools.mcp_servers,
+        channels_config=config.channels,
     )
 
-    async def run_swarm():
-        try:
-            await swarm.start()
+    # Show spinner when logs are off (no output to miss); skip when logs are on
+    def _thinking_ctx():
+        if logs:
+            from contextlib import nullcontext
+            return nullcontext()
+        # Animated spinner is safe to use with prompt_toolkit input handling
+        return console.status("[dim]nanocats is thinking...[/dim]", spinner="dots")
 
-            # Show status
-            agents = swarm.list_agents()
-            if agents:
-                console.print(f"[green]✓[/green] Started {len(agents)} agent(s):")
-                for a in agents:
-                    channels_str = ", ".join(a["channels"]) if a["channels"] else "none"
-                    console.print(f"  - {a['name']} ({a['type']}): channels={channels_str}")
-            else:
-                console.print("[yellow]Warning: No agents configured[/yellow]")
-                console.print("Create agent configs in ~/.nanocats/agents/")
+    async def _cli_progress(content: str, *, tool_hint: bool = False) -> None:
+        ch = agent_loop.channels_config
+        if ch and tool_hint and not ch.send_tool_hints:
+            return
+        if ch and not tool_hint and not ch.send_progress:
+            return
+        console.print(f"  [dim]↳ {content}[/dim]")
 
-            # Show web backend status
-            if config.channels.web.enabled:
-                web_port = config.channels.web.port
-                console.print(f"[green]✓[/green] Web UI: http://localhost:{web_port}")
+    if message:
+        # Single message mode — direct call, no bus needed
+        async def run_once():
+            with _thinking_ctx():
+                response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
+            _print_agent_response(response, render_markdown=markdown)
+            await agent_loop.close_mcp()
 
-            # Keep running
-            while swarm._running:
-                await asyncio.sleep(1)
-
-        except KeyboardInterrupt:
-            console.print("\nShutting down swarm...")
-        finally:
-            await swarm.stop()
-
-    asyncio.run(run_swarm())
-
-
-def _start_web_backend(config: Config):
-    """Start the web backend in a background thread."""
-    import threading
-    import uvicorn
-    from nanocats.web.backend import main as web_main
-
-    web_port = config.channels.web.port
-
-    def run():
-        uvicorn.run(
-            web_main.app,
-            host="0.0.0.0",
-            port=web_port,
-            log_level="warning",
-        )
-
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()
-    return thread
-
-
-
-
-# ============================================================================
-# Agent Commands
-# ============================================================================
-
-
-# ============================================================================
-# Swarm Commands
-# ============================================================================
-
-
-swarm_app = typer.Typer(help="Manage agent swarm")
-app.add_typer(swarm_app, name="swarm")
-
-
-@swarm_app.command("status")
-def swarm_status():
-    """Show swarm status."""
-    from nanocats.config.loader import load_config
-
-    config = load_config()
-
-    if not config.agents.swarm.enabled:
-        console.print("[yellow]Swarm mode is not enabled.[/yellow]")
-        console.print("Set 'agents.swarm.enabled = true' in config.json to enable.")
-        return
-
-    from nanocats.config.loader import load_agent_configs
-
-    agent_configs = load_agent_configs(config)
-
-    console.print(f"{__logo__} Swarm Status\n")
-    console.print(f"Max agents: {config.agents.swarm.max_agents}")
-    console.print(f"Agents dir: {config.agents.swarm.agents_dir}")
-    console.print(f"MCP registry: {config.agents.swarm.mcp_registry_path}")
-
-    if agent_configs:
-        console.print(f"\n[green]Configured agents ({len(agent_configs)}):[/green]")
-        table = Table()
-        table.add_column("ID", style="cyan")
-        table.add_column("Name")
-        table.add_column("Type")
-        table.add_column("Auto-start")
-        table.add_column("Channels")
-
-        for ac in agent_configs:
-            channels = ", ".join(ac.channels.enabled) if ac.channels.enabled else "-"
-            table.add_row(
-                ac.id,
-                ac.name or "-",
-                ac.type,
-                "yes" if ac.auto_start else "no",
-                channels,
-            )
-        console.print(table)
+        asyncio.run(run_once())
     else:
-        console.print("\n[yellow]No agents configured.[/yellow]")
-        console.print("Create agent configs in ~/.nanocats/agents/")
+        # Interactive mode — route through bus like other channels
+        from nanocats.bus.events import InboundMessage
+        _init_prompt_session()
+        console.print(f"{__logo__} Interactive mode (type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit)\n")
 
-
-@swarm_app.command("list")
-def swarm_list():
-    """List all configured agents."""
-    from nanocats.config.loader import load_config, load_agent_configs
-
-    config = load_config()
-    agent_configs = load_agent_configs(config)
-
-    if not agent_configs:
-        console.print("No agents configured.")
-        return
-
-    table = Table(title="Configured Agents")
-    table.add_column("ID", style="cyan")
-    table.add_column("Name")
-    table.add_column("Type")
-    table.add_column("Model")
-    table.add_column("Workspace")
-
-    for ac in agent_configs:
-        table.add_row(
-            ac.id,
-            ac.name or "-",
-            ac.type,
-            ac.model or "(default)",
-            str(ac.workspace_path),
-        )
-
-    console.print(table)
-
-
-@swarm_app.command("create")
-def swarm_create(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    name: str = typer.Option("", "--name", "-n", help="Agent display name"),
-    agent_type: str = typer.Option("user", "--type", "-t", help="Agent type (supervisor, user, specialized, task)"),
-    bound_user_key: str = typer.Option("", "--bound-user", "-b", help="User binding key (for user agent only)"),
-    model: str = typer.Option("", "--model", "-m", help="Model to use"),
-):
-    """Create a new agent configuration."""
-    from nanocats.config.loader import load_config, save_agent_config
-    from nanocats.config.schema import AgentInstanceConfig
-
-    config = load_config()
-
-    # Map agent type to session policy
-    session_policy_map = {
-        "user": "per_user",
-        "supervisor": "global",
-        "specialized": "per_channel",
-        "task": "per_task",
-    }
-    session_policy = session_policy_map.get(agent_type, "per_channel")
-
-    # Validate user binding for user agent
-    if agent_type == "user" and not bound_user_key:
-        console.print("[yellow]Warning:[/yellow] user agent should have --bound-user key for 1:1 binding")
-
-    # Create agent config
-    agent_config = AgentInstanceConfig(
-        id=agent_id,
-        name=name or agent_id,
-        type=agent_type,
-        model=model or None,
-        bound_user_key=bound_user_key or None,
-        session_policy=session_policy,
-    )
-
-    save_agent_config(agent_config, config)
-    console.print(f"[green]✓[/green] Created agent config: ~/.nanocats/agents/{agent_id}.json")
-    console.print(f"  Type: {agent_type}")
-    console.print(f"  Session policy: {session_policy}")
-    if bound_user_key:
-        console.print(f"  Bound user: {bound_user_key}")
-    console.print("Edit the file to configure channels, MCP, skills, etc.")
-
-
-@swarm_app.command("mcp")
-def swarm_mcp(
-    action: str = typer.Argument(..., help="Action: list, install, uninstall"),
-    name: str | None = typer.Argument(None, help="MCP server name"),
-    command: str = typer.Option("", "--command", "-c", help="MCP command (for install)"),
-    args: str = typer.Option("", "--args", "-a", help="MCP args (comma-separated, for install)"),
-):
-    """Manage MCP registry."""
-    from pathlib import Path
-
-    from nanocats.config.loader import load_config
-    from nanocats.config.schema import MCPServerConfig
-    from nanocats.swarm.mcp_registry import MCPRegistry
-
-    config = load_config()
-    registry = MCPRegistry(Path(config.agents.swarm.mcp_registry_path))
-
-    if action == "list":
-        servers = registry.list_servers()
-        if servers:
-            console.print("Installed MCP servers:")
-            for s in servers:
-                info = registry.get_server_info(s)
-                if info:
-                    cmd_str = info["command"] or info["url"] or "unknown"
-                    console.print(f"  - {s}: {cmd_str}")
+        if ":" in session_id:
+            cli_channel, cli_chat_id = session_id.split(":", 1)
         else:
-            console.print("No MCP servers installed.")
+            cli_channel, cli_chat_id = "cli", session_id
 
-    elif action == "install":
-        if not name or not command:
-            console.print("[red]Error: --name and --command required for install[/red]")
-            raise typer.Exit(1)
+        def _handle_signal(signum, frame):
+            sig_name = signal.Signals(signum).name
+            _restore_terminal()
+            console.print(f"\nReceived {sig_name}, goodbye!")
+            sys.exit(0)
 
-        mcp_config = MCPServerConfig(
-            command=command,
-            args=args.split(",") if args else [],
-        )
-        registry.install_server(name, mcp_config)
-        console.print(f"[green]✓[/green] Installed MCP server: {name}")
+        signal.signal(signal.SIGINT, _handle_signal)
+        signal.signal(signal.SIGTERM, _handle_signal)
+        # SIGHUP is not available on Windows
+        if hasattr(signal, 'SIGHUP'):
+            signal.signal(signal.SIGHUP, _handle_signal)
+        # Ignore SIGPIPE to prevent silent process termination when writing to closed pipes
+        # SIGPIPE is not available on Windows
+        if hasattr(signal, 'SIGPIPE'):
+            signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
-    elif action == "uninstall":
-        if not name:
-            console.print("[red]Error: --name required for uninstall[/red]")
-            raise typer.Exit(1)
+        async def run_interactive():
+            bus_task = asyncio.create_task(agent_loop.run())
+            turn_done = asyncio.Event()
+            turn_done.set()
+            turn_response: list[str] = []
 
-        if registry.uninstall_server(name):
-            console.print(f"[green]✓[/green] Uninstalled MCP server: {name}")
-        else:
-            console.print(f"[red]Error: MCP server '{name}' not found[/red]")
+            async def _consume_outbound():
+                while True:
+                    try:
+                        msg = await asyncio.wait_for(bus.consume_outbound(), timeout=1.0)
+                        if msg.metadata.get("_progress"):
+                            is_tool_hint = msg.metadata.get("_tool_hint", False)
+                            ch = agent_loop.channels_config
+                            if ch and is_tool_hint and not ch.send_tool_hints:
+                                pass
+                            elif ch and not is_tool_hint and not ch.send_progress:
+                                pass
+                            else:
+                                await _print_interactive_line(msg.content)
 
-    else:
-        console.print(f"[red]Unknown action: {action}[/red]")
-        console.print("Valid actions: list, install, uninstall")
+                        elif not turn_done.is_set():
+                            if msg.content:
+                                turn_response.append(msg.content)
+                            turn_done.set()
+                        elif msg.content:
+                            await _print_interactive_response(msg.content, render_markdown=markdown)
 
+                    except asyncio.TimeoutError:
+                        continue
+                    except asyncio.CancelledError:
+                        break
 
-# ============================================================================
-# Agent Commands
-# ============================================================================
+            outbound_task = asyncio.create_task(_consume_outbound())
+
+            try:
+                while True:
+                    try:
+                        _flush_pending_tty_input()
+                        user_input = await _read_interactive_input_async()
+                        command = user_input.strip()
+                        if not command:
+                            continue
+
+                        if _is_exit_command(command):
+                            _restore_terminal()
+                            console.print("\nGoodbye!")
+                            break
+
+                        turn_done.clear()
+                        turn_response.clear()
+
+                        await bus.publish_inbound(InboundMessage(
+                            channel=cli_channel,
+                            sender_id="user",
+                            chat_id=cli_chat_id,
+                            content=user_input,
+                        ))
+
+                        with _thinking_ctx():
+                            await turn_done.wait()
+
+                        if turn_response:
+                            _print_agent_response(turn_response[0], render_markdown=markdown)
+                    except KeyboardInterrupt:
+                        _restore_terminal()
+                        console.print("\nGoodbye!")
+                        break
+                    except EOFError:
+                        _restore_terminal()
+                        console.print("\nGoodbye!")
+                        break
+            finally:
+                agent_loop.stop()
+                outbound_task.cancel()
+                await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
+                await agent_loop.close_mcp()
+
+        asyncio.run(run_interactive())
 
 
 # ============================================================================
@@ -1196,6 +769,7 @@ app.add_typer(channels_app, name="channels")
 @channels_app.command("status")
 def channels_status():
     """Show channel status."""
+    from nanocats.channels.registry import discover_all
     from nanocats.config.loader import load_config
 
     config = load_config()
@@ -1203,85 +777,19 @@ def channels_status():
     table = Table(title="Channel Status")
     table.add_column("Channel", style="cyan")
     table.add_column("Enabled", style="green")
-    table.add_column("Configuration", style="yellow")
 
-    # WhatsApp
-    wa = config.channels.whatsapp
-    table.add_row(
-        "WhatsApp",
-        "✓" if wa.enabled else "✗",
-        wa.bridge_url
-    )
-
-    dc = config.channels.discord
-    table.add_row(
-        "Discord",
-        "✓" if dc.enabled else "✗",
-        dc.gateway_url
-    )
-
-    # Feishu
-    fs = config.channels.feishu
-    fs_config = f"app_id: {fs.app_id[:10]}..." if fs.app_id else "[dim]not configured[/dim]"
-    table.add_row(
-        "Feishu",
-        "✓" if fs.enabled else "✗",
-        fs_config
-    )
-
-    # Mochat
-    mc = config.channels.mochat
-    mc_base = mc.base_url or "[dim]not configured[/dim]"
-    table.add_row(
-        "Mochat",
-        "✓" if mc.enabled else "✗",
-        mc_base
-    )
-
-    # Telegram
-    tg = config.channels.telegram
-    tg_config = f"token: {tg.token[:10]}..." if tg.token else "[dim]not configured[/dim]"
-    table.add_row(
-        "Telegram",
-        "✓" if tg.enabled else "✗",
-        tg_config
-    )
-
-    # Slack
-    slack = config.channels.slack
-    slack_config = "socket" if slack.app_token and slack.bot_token else "[dim]not configured[/dim]"
-    table.add_row(
-        "Slack",
-        "✓" if slack.enabled else "✗",
-        slack_config
-    )
-
-    # DingTalk
-    dt = config.channels.dingtalk
-    dt_config = f"client_id: {dt.client_id[:10]}..." if dt.client_id else "[dim]not configured[/dim]"
-    table.add_row(
-        "DingTalk",
-        "✓" if dt.enabled else "✗",
-        dt_config
-    )
-
-    # QQ
-    qq = config.channels.qq
-    qq_config = f"app_id: {qq.app_id[:10]}..." if qq.app_id else "[dim]not configured[/dim]"
-    table.add_row(
-        "QQ",
-        "✓" if qq.enabled else "✗",
-        qq_config
-    )
-
-    # Email
-    em = config.channels.email
-    em_config = em.imap_host if em.imap_host else "[dim]not configured[/dim]"
-    table.add_row(
-        "Email",
-        "✓" if em.enabled else "✗",
-        em_config
-    )
+    for name, cls in sorted(discover_all().items()):
+        section = getattr(config.channels, name, None)
+        if section is None:
+            enabled = False
+        elif isinstance(section, dict):
+            enabled = section.get("enabled", False)
+        else:
+            enabled = getattr(section, "enabled", False)
+        table.add_row(
+            cls.display_name,
+            "[green]\u2713[/green]" if enabled else "[dim]\u2717[/dim]",
+        )
 
     console.print(table)
 
@@ -1301,7 +809,8 @@ def _get_bridge_dir() -> Path:
         return user_bridge
 
     # Check for npm
-    if not shutil.which("npm"):
+    npm_path = shutil.which("npm")
+    if not npm_path:
         console.print("[red]npm not found. Please install Node.js >= 18.[/red]")
         raise typer.Exit(1)
 
@@ -1331,10 +840,10 @@ def _get_bridge_dir() -> Path:
     # Install and build
     try:
         console.print("  Installing dependencies...")
-        subprocess.run(["npm", "install"], cwd=user_bridge, check=True, capture_output=True)
+        subprocess.run([npm_path, "install"], cwd=user_bridge, check=True, capture_output=True)
 
         console.print("  Building...")
-        subprocess.run(["npm", "run", "build"], cwd=user_bridge, check=True, capture_output=True)
+        subprocess.run([npm_path, "run", "build"], cwd=user_bridge, check=True, capture_output=True)
 
         console.print("[green]✓[/green] Bridge ready\n")
     except subprocess.CalledProcessError as e:
@@ -1349,6 +858,7 @@ def _get_bridge_dir() -> Path:
 @channels_app.command("login")
 def channels_login():
     """Link device via QR code."""
+    import shutil
     import subprocess
 
     from nanocats.config.loader import load_config
@@ -1361,16 +871,63 @@ def channels_login():
     console.print("Scan the QR code to connect.\n")
 
     env = {**os.environ}
-    if config.channels.whatsapp.bridge_token:
-        env["BRIDGE_TOKEN"] = config.channels.whatsapp.bridge_token
+    wa_cfg = getattr(config.channels, "whatsapp", None) or {}
+    bridge_token = wa_cfg.get("bridgeToken", "") if isinstance(wa_cfg, dict) else getattr(wa_cfg, "bridge_token", "")
+    if bridge_token:
+        env["BRIDGE_TOKEN"] = bridge_token
     env["AUTH_DIR"] = str(get_runtime_subdir("whatsapp-auth"))
 
+    npm_path = shutil.which("npm")
+    if not npm_path:
+        console.print("[red]npm not found. Please install Node.js.[/red]")
+        raise typer.Exit(1)
+
     try:
-        subprocess.run(["npm", "start"], cwd=bridge_dir, check=True, env=env)
+        subprocess.run([npm_path, "start"], cwd=bridge_dir, check=True, env=env)
     except subprocess.CalledProcessError as e:
         console.print(f"[red]Bridge failed: {e}[/red]")
-    except FileNotFoundError:
-        console.print("[red]npm not found. Please install Node.js.[/red]")
+
+
+# ============================================================================
+# Plugin Commands
+# ============================================================================
+
+plugins_app = typer.Typer(help="Manage channel plugins")
+app.add_typer(plugins_app, name="plugins")
+
+
+@plugins_app.command("list")
+def plugins_list():
+    """List all discovered channels (built-in and plugins)."""
+    from nanocats.channels.registry import discover_all, discover_channel_names
+    from nanocats.config.loader import load_config
+
+    config = load_config()
+    builtin_names = set(discover_channel_names())
+    all_channels = discover_all()
+
+    table = Table(title="Channel Plugins")
+    table.add_column("Name", style="cyan")
+    table.add_column("Source", style="magenta")
+    table.add_column("Enabled", style="green")
+
+    for name in sorted(all_channels):
+        cls = all_channels[name]
+        source = "builtin" if name in builtin_names else "plugin"
+        section = getattr(config.channels, name, None)
+        if section is None:
+            enabled = False
+        elif isinstance(section, dict):
+            enabled = section.get("enabled", False)
+        else:
+            enabled = getattr(section, "enabled", False)
+        table.add_row(
+            cls.display_name,
+            source,
+            "[green]yes[/green]" if enabled else "[dim]no[/dim]",
+        )
+
+    console.print(table)
 
 
 # ============================================================================
