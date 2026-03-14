@@ -64,6 +64,7 @@ def _flush_pending_tty_input() -> None:
 
     try:
         import termios
+
         termios.tcflush(fd, termios.TCIFLUSH)
         return
     except Exception:
@@ -86,6 +87,7 @@ def _restore_terminal() -> None:
         return
     try:
         import termios
+
         termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _SAVED_TERM_ATTRS)
     except Exception:
         pass
@@ -98,6 +100,7 @@ def _init_prompt_session() -> None:
     # Save terminal state so we can restore it on exit
     try:
         import termios
+
         _SAVED_TERM_ATTRS = termios.tcgetattr(sys.stdin.fileno())
     except Exception:
         pass
@@ -110,7 +113,7 @@ def _init_prompt_session() -> None:
     _PROMPT_SESSION = PromptSession(
         history=FileHistory(str(history_file)),
         enable_open_in_editor=False,
-        multiline=False,   # Enter submits (single line mode)
+        multiline=False,  # Enter submits (single line mode)
     )
 
 
@@ -143,10 +146,9 @@ def _print_agent_response(response: str, render_markdown: bool) -> None:
 
 async def _print_interactive_line(text: str) -> None:
     """Print async interactive updates with prompt_toolkit-safe Rich styling."""
+
     def _write() -> None:
-        ansi = _render_interactive_ansi(
-            lambda c: c.print(f"  [dim]↳ {text}[/dim]")
-        )
+        ansi = _render_interactive_ansi(lambda c: c.print(f"  [dim]↳ {text}[/dim]"))
         print_formatted_text(ANSI(ansi), end="")
 
     await run_in_terminal(_write)
@@ -154,6 +156,7 @@ async def _print_interactive_line(text: str) -> None:
 
 async def _print_interactive_response(response: str, render_markdown: bool) -> None:
     """Print async interactive replies with prompt_toolkit-safe Rich styling."""
+
     def _write() -> None:
         content = response or ""
         ansi = _render_interactive_ansi(
@@ -193,7 +196,6 @@ async def _read_interactive_input_async() -> str:
         raise KeyboardInterrupt from exc
 
 
-
 def version_callback(value: bool):
     if value:
         console.print(f"{__logo__} nanocats v{__version__}")
@@ -202,9 +204,7 @@ def version_callback(value: bool):
 
 @app.callback()
 def main(
-    version: bool = typer.Option(
-        None, "--version", "-v", callback=version_callback, is_eager=True
-    ),
+    version: bool = typer.Option(None, "--version", "-v", callback=version_callback, is_eager=True),
 ):
     """nanocats - Personal AI Assistant."""
     pass
@@ -218,32 +218,41 @@ def main(
 @app.command()
 def onboard():
     """Initialize nanocats configuration and workspace."""
+    import json
+
     from nanocats.config.loader import get_config_path, load_config, save_config
     from nanocats.config.schema import Config
+    from nanocats.providers.registry import PROVIDERS
 
     config_path = get_config_path()
 
+    existing_config = None
     if config_path.exists():
-        console.print(f"[yellow]Config already exists at {config_path}[/yellow]")
+        console.print(f"[yellow]⚠️  Config already exists at {config_path}[/yellow]")
         console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
-        console.print("  [bold]N[/bold] = refresh config, keeping existing values and adding new fields")
+        console.print(
+            "  [bold]N[/bold] = refresh config, keeping existing values and adding new fields"
+        )
         if typer.confirm("Overwrite?"):
             config = Config()
             save_config(config)
             console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
         else:
-            config = load_config()
-            save_config(config)
-            console.print(f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)")
+            existing_config = load_config()
+            save_config(existing_config)
+            console.print(
+                f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)"
+            )
     else:
         save_config(Config())
         console.print(f"[green]✓[/green] Created config at {config_path}")
 
-    console.print("[dim]Config template now uses `maxTokens` + `contextWindowTokens`; `memoryWindow` is no longer a runtime setting.[/dim]")
+    console.print(
+        "[dim]Config template now uses `maxTokens` + `contextWindowTokens`; `memoryWindow` is no longer a runtime setting.[/dim]"
+    )
 
     _onboard_plugins(config_path)
 
-    # Create workspace
     workspace = get_workspace_path()
 
     if not workspace.exists():
@@ -252,12 +261,177 @@ def onboard():
 
     sync_workspace_templates(workspace)
 
-    console.print(f"\n{__logo__} nanocats is ready!")
-    console.print("\nNext steps:")
-    console.print("  1. Add your API key to [cyan]~/.nanocats/config.json[/cyan]")
-    console.print("     Get one at: https://openrouter.ai/keys")
-    console.print("  2. Chat: [cyan]nanocats agent -m \"Hello!\"[/cyan]")
-    console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanocats#-chat-apps[/dim]")
+    console.print(f"\n{__logo__} nanocats Swarm Configuration\n")
+
+    available_providers = []
+    for spec in PROVIDERS:
+        if spec.is_oauth:
+            continue
+        available_providers.append(spec)
+
+    console.print("[bold]📌 Step 1: Select a Provider (enter number, or 0 to skip)[/bold]\n")
+
+    provider_options = [f"{p.label} ({p.name})" for p in available_providers]
+    provider_options.append("Skip (use existing)")
+
+    selected_idx = _interactive_select(provider_options)
+
+    provider_label = None
+
+    if selected_idx < len(available_providers):
+        selected_provider = available_providers[selected_idx]
+        provider_name = selected_provider.name
+        provider_label = selected_provider.label
+
+        console.print(f"\n[green]✅ Selected: {provider_label}[/green]\n")
+
+        existing_provider_key = None
+        if existing_config and existing_config.providers:
+            provider_key = provider_name.lower()
+            for key in existing_config.providers:
+                if key.lower().replace("_", "") == provider_key.lower().replace("_", ""):
+                    existing_provider_key = key
+                    break
+
+        if existing_provider_key:
+            existing_api_key = getattr(existing_config.providers, existing_provider_key, None)
+            if existing_api_key and getattr(existing_api_key, "api_key", None):
+                console.print(f"[dim]Found existing API key for {provider_label}[/dim]")
+                use_existing = typer.confirm("Use existing API key?", default=True)
+                if use_existing:
+                    api_key = existing_api_key.api_key
+                else:
+                    console.print(f"[bold]🔐 Enter new {provider_label} API key[/bold]")
+                    api_key = typer.prompt("API Key", type=str, hide_input=True)
+            else:
+                console.print(f"[bold]🔐 Step 2: Enter your {provider_label} API key[/bold]")
+                console.print("[dim]Key will be masked for security[/dim]")
+                api_key = typer.prompt("API Key", type=str, hide_input=True)
+        else:
+            console.print(f"[bold]🔐 Step 2: Enter your {provider_label} API key[/bold]")
+            console.print("[dim]Key will be masked for security[/dim]")
+            api_key = typer.prompt("API Key", type=str, hide_input=True)
+
+        console.print(f"\n[bold]🧠 Step 3: Select a Model (enter number, or 0 to skip)[/bold]\n")
+
+        models = selected_provider.recommended_models
+        if models:
+            model_options = [desc for _, desc in models]
+            model_options.append("Custom (enter manually)")
+            model_options.append("Skip (use existing)")
+
+            selected_model_idx = _interactive_select(model_options)
+
+            if selected_model_idx < len(models):
+                selected_model = models[selected_model_idx][0]
+            elif selected_model_idx == len(models):
+                selected_model = typer.prompt("Enter custom model name")
+            else:
+                selected_model = None
+        else:
+            selected_model = typer.prompt("Enter model name")
+
+        if selected_model:
+            console.print(f"\n[green]✅ Selected model: {selected_model}[/green]\n")
+    else:
+        provider_name = None
+        api_key = None
+        selected_model = None
+        if existing_config:
+            provider_name = existing_config.agents.defaults.provider
+            selected_model = existing_config.agents.defaults.model
+            console.print(
+                f"[dim]Using existing provider: {provider_name}, model: {selected_model}[/dim]\n"
+            )
+
+    with open(config_path, encoding="utf-8") as f:
+        config_data = json.load(f)
+
+    if provider_name:
+        config_data["agents"] = {
+            "defaults": {
+                "model": selected_model,
+                "provider": provider_name,
+            }
+        }
+    if provider_name and api_key:
+        config_data["providers"] = config_data.get("providers", {})
+        config_data["providers"][provider_name] = {
+            "apiKey": api_key,
+        }
+    config_data["channels"] = config_data.get("channels", {})
+    config_data["channels"]["web"] = config_data["channels"].get("web", {})
+    config_data["channels"]["web"]["enabled"] = True
+
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=2, ensure_ascii=False)
+
+    console.print(f"[green]✅ Config updated[/green]\n")
+
+    console.print("[bold]🤖 Step 4: Create Admin Agent (enter number, or 0 to skip)[/bold]\n")
+
+    agent_options = [
+        "Create new admin agent",
+        "Skip (use existing)",
+    ]
+    selected_agent_idx = _interactive_select(agent_options)
+
+    admin_config_path = None
+
+    if selected_agent_idx == 0:
+        agent_id = typer.prompt("Agent ID", type=str, default="admin", show_default=True)
+        agent_name = typer.prompt("Agent Name", type=str, default="Admin Agent", show_default=True)
+
+        admin_config_dir = Path.home() / ".nanocat" / "agents"
+        admin_config_dir.mkdir(parents=True, exist_ok=True)
+
+        admin_agent_config = {
+            "id": agent_id,
+            "name": agent_name,
+            "type": "admin",
+            "autoStart": True,
+            "model": selected_model,
+            "provider": provider_name,
+            "channels": {"configs": {"web": {"enabled": True, "allowFrom": ["*"]}}},
+        }
+
+        admin_config_path = admin_config_dir / f"{agent_id}.json"
+        with open(admin_config_path, "w", encoding="utf-8") as f:
+            json.dump(admin_agent_config, f, indent=2, ensure_ascii=False)
+
+        console.print(f"[green]✅ Created admin agent at {admin_config_path}[/green]\n")
+    else:
+        console.print("[dim]Skipped admin agent creation[/dim]\n")
+
+    console.print(f"\n{__logo__} nanocats Swarm is ready!\n")
+    console.print("Configuration complete:")
+    console.print(f"  🏭  Provider: {provider_label or 'existing'}")
+    console.print(f"  🧠  Model: {selected_model or 'existing'}")
+    if selected_agent_idx == 0:
+        console.print(f"  🤖  Admin Agent: {admin_config_path}")
+    else:
+        console.print("  🤖  Admin Agent: (skipped)")
+    console.print("\n📖 Next steps:")
+    console.print(f"  1. [cyan]nanocats gateway[/cyan] - Start the swarm gateway")
+    console.print(f"  2. [cyan]nanocats status[/cyan] - Check configuration")
+
+
+def _interactive_select(options: list[str], default: int = 0) -> int:
+    """Simple numbered selection."""
+    if not options:
+        return 0
+
+    for i, option in enumerate(options):
+        console.print(f"  [{i + 1}] {option}")
+
+    while True:
+        try:
+            choice = typer.prompt("Selection", type=int, default=default + 1)
+            if 1 <= choice <= len(options):
+                return choice - 1
+            console.print(f"[red]Please enter 1-{len(options)}[/red]")
+        except Exception:
+            console.print(f"[red]Invalid. Enter 1-{len(options)}[/red]")
 
 
 def _merge_missing_defaults(existing: Any, defaults: Any) -> Any:
@@ -316,6 +490,7 @@ def _make_provider(config: Config):
     # Custom: direct OpenAI-compatible endpoint, bypasses LiteLLM
     elif provider_name == "custom":
         from nanocats.providers.custom_provider import CustomProvider
+
         provider = CustomProvider(
             api_key=p.api_key if p else "no-key",
             api_base=config.get_api_base(model) or "http://localhost:8000/v1",
@@ -325,7 +500,9 @@ def _make_provider(config: Config):
     elif provider_name == "azure_openai":
         if not p or not p.api_key or not p.api_base:
             console.print("[red]Error: Azure OpenAI requires api_key and api_base.[/red]")
-            console.print("Set them in ~/.nanocats/config.json under providers.azure_openai section")
+            console.print(
+                "Set them in ~/.nanocats/config.json under providers.azure_openai section"
+            )
             console.print("Use the model field to specify the deployment name.")
             raise typer.Exit(1)
         provider = AzureOpenAIProvider(
@@ -336,6 +513,7 @@ def _make_provider(config: Config):
     # OpenAI SDK compatible providers (excluding Azure/Anthropic)
     elif spec and spec.use_openai_sdk:
         from nanocats.providers.custom_provider import CustomProvider
+
         api_key = p.api_key if p else "no-key"
         api_base = config.get_api_base(model) or spec.default_api_base
         if not api_base:
@@ -349,7 +527,12 @@ def _make_provider(config: Config):
         )
     else:
         from nanocats.providers.litellm_provider import LiteLLMProvider
-        if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and (spec.is_oauth or spec.is_local)):
+
+        if (
+            not model.startswith("bedrock/")
+            and not (p and p.api_key)
+            and not (spec and (spec.is_oauth or spec.is_local))
+        ):
             console.print("[red]Error: No API key configured.[/red]")
             console.print("Set one in ~/.nanocats/config.json under providers section")
             raise typer.Exit(1)
@@ -411,145 +594,58 @@ def gateway(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
-    """Start the nanocats gateway."""
-    from nanocats.agent.loop import AgentLoop
+    """Start the nanocats swarm gateway."""
     from nanocats.bus.queue import MessageBus
     from nanocats.channels.manager import ChannelManager
     from nanocats.config.paths import get_cron_dir
     from nanocats.cron.service import CronService
     from nanocats.cron.types import CronJob
     from nanocats.heartbeat.service import HeartbeatService
-    from nanocats.session.manager import SessionManager
+    from nanocats.swarm.manager import SwarmManager
 
     if verbose:
         import logging
+
         logging.basicConfig(level=logging.DEBUG)
 
     config = _load_runtime_config(config, workspace)
     _print_deprecated_memory_window_notice(config)
     port = port if port is not None else config.gateway.port
 
-    console.print(f"{__logo__} Starting nanocats gateway on port {port}...")
+    console.print(f"{__logo__} Starting nanocats swarm gateway on port {port}...")
     sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
-    session_manager = SessionManager(config.workspace_path)
 
-    # Create cron service first (callback set after agent creation)
+    swarm = SwarmManager(bus=bus, provider=provider)
+    channel_manager = ChannelManager(config, bus, agent_registry=swarm.registry)
+
     cron_store_path = get_cron_dir() / "jobs.json"
     cron = CronService(cron_store_path)
 
-    # Create agent with cron service
-    agent = AgentLoop(
-        bus=bus,
-        provider=provider,
-        workspace=config.workspace_path,
-        model=config.agents.defaults.model,
-        max_iterations=config.agents.defaults.max_tool_iterations,
-        context_window_tokens=config.agents.defaults.context_window_tokens,
-        web_search_config=config.tools.web.search,
-        web_proxy=config.tools.web.proxy or None,
-        exec_config=config.tools.exec,
-        cron_service=cron,
-        restrict_to_workspace=config.tools.restrict_to_workspace,
-        session_manager=session_manager,
-        mcp_servers=config.tools.mcp_servers,
-        channels_config=config.channels,
-    )
+    cron.on_job = None
 
-    # Set cron callback (needs agent)
-    async def on_cron_job(job: CronJob) -> str | None:
-        """Execute a cron job through the agent."""
-        from nanocats.agent.tools.cron import CronTool
-        from nanocats.agent.tools.message import MessageTool
-        reminder_note = (
-            "[Scheduled Task] Timer finished.\n\n"
-            f"Task '{job.name}' has been triggered.\n"
-            f"Scheduled instruction: {job.payload.message}"
-        )
-
-        # Prevent the agent from scheduling new cron jobs during execution
-        cron_tool = agent.tools.get("cron")
-        cron_token = None
-        if isinstance(cron_tool, CronTool):
-            cron_token = cron_tool.set_cron_context(True)
-        try:
-            response = await agent.process_direct(
-                reminder_note,
-                session_key=f"cron:{job.id}",
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to or "direct",
-            )
-        finally:
-            if isinstance(cron_tool, CronTool) and cron_token is not None:
-                cron_tool.reset_cron_context(cron_token)
-
-        message_tool = agent.tools.get("message")
-        if isinstance(message_tool, MessageTool) and message_tool._sent_in_turn:
-            return response
-
-        if job.payload.deliver and job.payload.to and response:
-            from nanocats.bus.events import OutboundMessage
-            await bus.publish_outbound(OutboundMessage(
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to,
-                content=response
-            ))
-        return response
-    cron.on_job = on_cron_job
-
-    # Create channel manager
-    channels = ChannelManager(config, bus)
+    channels = channel_manager
 
     def _pick_heartbeat_target() -> tuple[str, str]:
-        """Pick a routable channel/chat target for heartbeat-triggered messages."""
         enabled = set(channels.enabled_channels)
-        # Prefer the most recently updated non-internal session on an enabled channel.
-        for item in session_manager.list_sessions():
-            key = item.get("key") or ""
-            if ":" not in key:
-                continue
-            channel, chat_id = key.split(":", 1)
-            if channel in {"cli", "system"}:
-                continue
-            if channel in enabled and chat_id:
-                return channel, chat_id
-        # Fallback keeps prior behavior but remains explicit.
         return "cli", "direct"
 
-    # Create heartbeat service
     async def on_heartbeat_execute(tasks: str) -> str:
-        """Phase 2: execute heartbeat tasks through the full agent loop."""
-        channel, chat_id = _pick_heartbeat_target()
-
-        async def _silent(*_args, **_kwargs):
-            pass
-
-        return await agent.process_direct(
-            tasks,
-            session_key="heartbeat",
-            channel=channel,
-            chat_id=chat_id,
-            on_progress=_silent,
-        )
+        return "Heartbeat not yet supported in swarm mode"
 
     async def on_heartbeat_notify(response: str) -> None:
-        """Deliver a heartbeat response to the user's channel."""
-        from nanocats.bus.events import OutboundMessage
-        channel, chat_id = _pick_heartbeat_target()
-        if channel == "cli":
-            return  # No external channel available to deliver to
-        await bus.publish_outbound(OutboundMessage(channel=channel, chat_id=chat_id, content=response))
+        pass
 
     hb_cfg = config.gateway.heartbeat
     heartbeat = HeartbeatService(
         workspace=config.workspace_path,
         provider=provider,
-        model=agent.model,
+        model=config.agents.defaults.model,
         on_execute=on_heartbeat_execute,
         on_notify=on_heartbeat_notify,
         interval_s=hb_cfg.interval_s,
-        enabled=hb_cfg.enabled,
+        enabled=False,
     )
 
     if channels.enabled_channels:
@@ -557,32 +653,27 @@ def gateway(
     else:
         console.print("[yellow]Warning: No channels enabled[/yellow]")
 
-    cron_status = cron.status()
-    if cron_status["jobs"] > 0:
-        console.print(f"[green]✓[/green] Cron: {cron_status['jobs']} scheduled jobs")
+    console.print(f"[green]✓[/green] Swarm: {len(swarm.registry.get_all())} agents configured")
 
-    console.print(f"[green]✓[/green] Heartbeat: every {hb_cfg.interval_s}s")
+    console.print("[bold]🚀 Starting services...[/bold]")
 
     async def run():
         try:
-            await cron.start()
-            await heartbeat.start()
             await asyncio.gather(
-                agent.run(),
+                swarm.start(),
                 channels.start_all(),
             )
+            console.print("[green]✅ All services started successfully![/green]")
+            console.print(f"[dim]Gateway running at http://localhost:{port}[/dim]")
+            console.print("[dim]Press Ctrl+C to stop[/dim]")
         except KeyboardInterrupt:
             console.print("\nShutting down...")
         finally:
-            await agent.close_mcp()
-            heartbeat.stop()
-            cron.stop()
-            agent.stop()
+            await swarm.stop()
             await channels.stop_all()
+            console.print("[green]✅ Gateway stopped[/green]")
 
     asyncio.run(run())
-
-
 
 
 # ============================================================================
@@ -596,8 +687,12 @@ def agent(
     session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
-    markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
-    logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanocats runtime logs during chat"),
+    markdown: bool = typer.Option(
+        True, "--markdown/--no-markdown", help="Render assistant output as Markdown"
+    ),
+    logs: bool = typer.Option(
+        False, "--logs/--no-logs", help="Show nanocats runtime logs during chat"
+    ),
 ):
     """Interact with the agent directly."""
     from loguru import logger
@@ -643,6 +738,7 @@ def agent(
     def _thinking_ctx():
         if logs:
             from contextlib import nullcontext
+
             return nullcontext()
         # Animated spinner is safe to use with prompt_toolkit input handling
         return console.status("[dim]nanocats is thinking...[/dim]", spinner="dots")
@@ -659,7 +755,9 @@ def agent(
         # Single message mode — direct call, no bus needed
         async def run_once():
             with _thinking_ctx():
-                response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
+                response = await agent_loop.process_direct(
+                    message, session_id, on_progress=_cli_progress
+                )
             _print_agent_response(response, render_markdown=markdown)
             await agent_loop.close_mcp()
 
@@ -667,8 +765,11 @@ def agent(
     else:
         # Interactive mode — route through bus like other channels
         from nanocats.bus.events import InboundMessage
+
         _init_prompt_session()
-        console.print(f"{__logo__} Interactive mode (type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit)\n")
+        console.print(
+            f"{__logo__} Interactive mode (type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit)\n"
+        )
 
         if ":" in session_id:
             cli_channel, cli_chat_id = session_id.split(":", 1)
@@ -684,11 +785,11 @@ def agent(
         signal.signal(signal.SIGINT, _handle_signal)
         signal.signal(signal.SIGTERM, _handle_signal)
         # SIGHUP is not available on Windows
-        if hasattr(signal, 'SIGHUP'):
+        if hasattr(signal, "SIGHUP"):
             signal.signal(signal.SIGHUP, _handle_signal)
         # Ignore SIGPIPE to prevent silent process termination when writing to closed pipes
         # SIGPIPE is not available on Windows
-        if hasattr(signal, 'SIGPIPE'):
+        if hasattr(signal, "SIGPIPE"):
             signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
         async def run_interactive():
@@ -742,12 +843,14 @@ def agent(
                         turn_done.clear()
                         turn_response.clear()
 
-                        await bus.publish_inbound(InboundMessage(
-                            channel=cli_channel,
-                            sender_id="user",
-                            chat_id=cli_chat_id,
-                            content=user_input,
-                        ))
+                        await bus.publish_inbound(
+                            InboundMessage(
+                                channel=cli_channel,
+                                sender_id="user",
+                                chat_id=cli_chat_id,
+                                content=user_input,
+                            )
+                        )
 
                         with _thinking_ctx():
                             await turn_done.wait()
@@ -886,7 +989,11 @@ def channels_login():
 
     env = {**os.environ}
     wa_cfg = getattr(config.channels, "whatsapp", None) or {}
-    bridge_token = wa_cfg.get("bridgeToken", "") if isinstance(wa_cfg, dict) else getattr(wa_cfg, "bridge_token", "")
+    bridge_token = (
+        wa_cfg.get("bridgeToken", "")
+        if isinstance(wa_cfg, dict)
+        else getattr(wa_cfg, "bridge_token", "")
+    )
     if bridge_token:
         env["BRIDGE_TOKEN"] = bridge_token
     env["AUTH_DIR"] = str(get_runtime_subdir("whatsapp-auth"))
@@ -960,8 +1067,12 @@ def status():
 
     console.print(f"{__logo__} nanocats Status\n")
 
-    console.print(f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}")
-    console.print(f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}")
+    console.print(
+        f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}"
+    )
+    console.print(
+        f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}"
+    )
 
     if config_path.exists():
         from nanocats.providers.registry import PROVIDERS
@@ -983,7 +1094,9 @@ def status():
                     console.print(f"{spec.label}: [dim]not set[/dim]")
             else:
                 has_key = bool(p.api_key)
-                console.print(f"{spec.label}: {'[green]✓[/green]' if has_key else '[dim]not set[/dim]'}")
+                console.print(
+                    f"{spec.label}: {'[green]✓[/green]' if has_key else '[dim]not set[/dim]'}"
+                )
 
 
 # ============================================================================
@@ -1001,12 +1114,15 @@ def _register_login(name: str):
     def decorator(fn):
         _LOGIN_HANDLERS[name] = fn
         return fn
+
     return decorator
 
 
 @provider_app.command("login")
 def provider_login(
-    provider: str = typer.Argument(..., help="OAuth provider (e.g. 'openai-codex', 'github-copilot')"),
+    provider: str = typer.Argument(
+        ..., help="OAuth provider (e.g. 'openai-codex', 'github-copilot')"
+    ),
 ):
     """Authenticate with an OAuth provider."""
     from nanocats.providers.registry import PROVIDERS
@@ -1031,6 +1147,7 @@ def provider_login(
 def _login_openai_codex() -> None:
     try:
         from oauth_cli_kit import get_token, login_oauth_interactive
+
         token = None
         try:
             token = get_token()
@@ -1045,7 +1162,9 @@ def _login_openai_codex() -> None:
         if not (token and token.access):
             console.print("[red]✗ Authentication failed[/red]")
             raise typer.Exit(1)
-        console.print(f"[green]✓ Authenticated with OpenAI Codex[/green]  [dim]{token.account_id}[/dim]")
+        console.print(
+            f"[green]✓ Authenticated with OpenAI Codex[/green]  [dim]{token.account_id}[/dim]"
+        )
     except ImportError:
         console.print("[red]oauth_cli_kit not installed. Run: pip install oauth-cli-kit[/red]")
         raise typer.Exit(1)
@@ -1059,7 +1178,12 @@ def _login_github_copilot() -> None:
 
     async def _trigger():
         from litellm import acompletion
-        await acompletion(model="github_copilot/gpt-4o", messages=[{"role": "user", "content": "hi"}], max_tokens=1)
+
+        await acompletion(
+            model="github_copilot/gpt-4o",
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+        )
 
     try:
         asyncio.run(_trigger())

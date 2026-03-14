@@ -7,21 +7,41 @@ from typing import Any
 
 @dataclass
 class InboundMessage:
-    """Message received from a chat channel."""
-
-    channel: str  # telegram, discord, slack, whatsapp
-    sender_id: str  # User identifier
-    chat_id: str  # Chat/channel identifier
-    content: str  # Message text
+    channel: str
+    sender_id: str
+    chat_id: str
+    content: str
     timestamp: datetime = field(default_factory=datetime.now)
-    media: list[str] = field(default_factory=list)  # Media URLs
-    metadata: dict[str, Any] = field(default_factory=dict)  # Channel-specific data
-    session_key_override: str | None = None  # Optional override for thread-scoped sessions
+    media: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    session_key_override: str | None = None
+
+    agent_id: str | None = None
+    agent_type: str | None = None
+    session_group_id: str | None = None
+
+    _session_key: str | None = field(default=None, repr=False)
+
+    def __post_init__(self):
+        if self.session_key_override:
+            self._session_key = self.session_key_override
 
     @property
     def session_key(self) -> str:
-        """Unique key for session identification."""
-        return self.session_key_override or f"{self.channel}:{self.chat_id}"
+        if self._session_key:
+            return self._session_key
+        return f"{self.channel}:{self.chat_id}"
+
+    def to_session_message(self) -> dict:
+        return {
+            "role": "user",
+            "content": self.content,
+            "_source": {
+                "channel": self.channel,
+                "chat_id": self.chat_id,
+                "sender_id": self.sender_id,
+            },
+        }
 
 
 @dataclass
@@ -34,5 +54,3 @@ class OutboundMessage:
     reply_to: str | None = None
     media: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-
-

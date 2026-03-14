@@ -1,11 +1,63 @@
 """Configuration schema using Pydantic."""
 
+from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
+
+
+class AgentType(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
+    SPECIALIZED = "specialized"
+    TASK = "task"
+
+
+class ChannelConfig(BaseModel):
+    enabled: bool = False
+    allow_from: list[str] = Field(default_factory=list)
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class SessionGroup(BaseModel):
+    group_id: str
+    chat_ids: dict[str, str]
+
+
+class AgentChannelsConfig(BaseModel):
+    configs: dict[str, ChannelConfig] = Field(default_factory=dict)
+    session_groups: list[SessionGroup] = Field(default_factory=list)
+    allow_agents: list[str] = Field(default_factory=list)
+
+
+class AgentConfig(BaseModel):
+    model_config = {"extra": "allow"}
+
+    id: str
+    name: str
+    type: AgentType = AgentType.USER
+
+    channels: AgentChannelsConfig = Field(default_factory=AgentChannelsConfig)
+
+    session_policy: str = "per_user"
+
+    model: str = "anthropic/claude-opus-4-5"
+    provider: str = "anthropic"
+
+    ttl: int | None = None
+    auto_start: bool = True
+
+    bound_user_key: str | None = None
+    token: str | None = None
+
+    routing: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def workspace(self) -> Path:
+        return Path.home() / ".nanocats" / "workspaces" / self.id
 
 
 class Base(BaseModel):
@@ -46,7 +98,9 @@ class AgentDefaults(Base):
     @property
     def should_warn_deprecated_memory_window(self) -> bool:
         """Return True when old memoryWindow is present without contextWindowTokens."""
-        return self.memory_window is not None and "context_window_tokens" not in self.model_fields_set
+        return (
+            self.memory_window is not None and "context_window_tokens" not in self.model_fields_set
+        )
 
 
 class AgentsConfig(Base):
@@ -67,7 +121,9 @@ class ProvidersConfig(Base):
     """Configuration for LLM providers."""
 
     custom: ProviderConfig = Field(default_factory=ProviderConfig)  # Any OpenAI-compatible endpoint
-    azure_openai: ProviderConfig = Field(default_factory=ProviderConfig)  # Azure OpenAI (model = deployment name)
+    azure_openai: ProviderConfig = Field(
+        default_factory=ProviderConfig
+    )  # Azure OpenAI (model = deployment name)
     anthropic: ProviderConfig = Field(default_factory=ProviderConfig)
     openai: ProviderConfig = Field(default_factory=ProviderConfig)
     openrouter: ProviderConfig = Field(default_factory=ProviderConfig)
@@ -83,9 +139,15 @@ class ProvidersConfig(Base):
     aihubmix: ProviderConfig = Field(default_factory=ProviderConfig)  # AiHubMix API gateway
     siliconflow: ProviderConfig = Field(default_factory=ProviderConfig)  # SiliconFlow (硅基流动)
     volcengine: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine (火山引擎)
-    volcengine_coding_plan: ProviderConfig = Field(default_factory=ProviderConfig)  # VolcEngine Coding Plan
-    byteplus: ProviderConfig = Field(default_factory=ProviderConfig)  # BytePlus (VolcEngine international)
-    byteplus_coding_plan: ProviderConfig = Field(default_factory=ProviderConfig)  # BytePlus Coding Plan
+    volcengine_coding_plan: ProviderConfig = Field(
+        default_factory=ProviderConfig
+    )  # VolcEngine Coding Plan
+    byteplus: ProviderConfig = Field(
+        default_factory=ProviderConfig
+    )  # BytePlus (VolcEngine international)
+    byteplus_coding_plan: ProviderConfig = Field(
+        default_factory=ProviderConfig
+    )  # BytePlus Coding Plan
     openai_codex: ProviderConfig = Field(default_factory=ProviderConfig)  # OpenAI Codex (OAuth)
     github_copilot: ProviderConfig = Field(default_factory=ProviderConfig)  # Github Copilot (OAuth)
 

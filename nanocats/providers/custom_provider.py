@@ -102,6 +102,8 @@ class CustomProvider(LLMProvider):
                 "prompt_tokens": u.prompt_tokens,
                 "completion_tokens": u.completion_tokens,
                 "total_tokens": u.total_tokens,
+                "cached_tokens": 0,
+                "audio_tokens": 0,
             }
             # Extract cache tokens from prompt_tokens_details
             if hasattr(u, "prompt_tokens_details") and u.prompt_tokens_details:

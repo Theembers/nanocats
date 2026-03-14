@@ -37,10 +37,10 @@ class WebChannel(BaseChannel):
     def default_config(cls) -> dict[str, Any]:
         return WebChannelConfig().model_dump(by_alias=True)
 
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, agent_registry: Any = None):
         if isinstance(config, dict):
             config = WebChannelConfig.model_validate(config)
-        super().__init__(config, bus)
+        super().__init__(config, bus, agent_registry)
         self._app: FastAPI | None = None
         self._server: Server | None = None
         # 存储 WebSocket 连接: session_id -> websocket (实例变量)
@@ -70,19 +70,15 @@ class WebChannel(BaseChannel):
 
                 user_id = data.get("user_id")
                 if not user_id:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "user_id is required in first message"
-                    })
+                    await websocket.send_json(
+                        {"type": "error", "message": "user_id is required in first message"}
+                    )
                     await websocket.close(code=4001, reason="Missing user_id")
                     return
 
                 # 权限检查
                 if not self.is_allowed(user_id):
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "Access denied"
-                    })
+                    await websocket.send_json({"type": "error", "message": "Access denied"})
                     await websocket.close(code=4003, reason="Access denied")
                     return
 
@@ -92,11 +88,13 @@ class WebChannel(BaseChannel):
                 logger.info("Web client connected: user_id={}", user_id)
 
                 # 发送欢迎消息
-                await websocket.send_json({
-                    "type": "welcome",
-                    "session_id": session_id,
-                    "message": "Connected to nanocats"
-                })
+                await websocket.send_json(
+                    {
+                        "type": "welcome",
+                        "session_id": session_id,
+                        "message": "Connected to nanocats",
+                    }
+                )
 
                 # 第一个消息也需要处理
                 content = data.get("content", "")
@@ -130,10 +128,7 @@ class WebChannel(BaseChannel):
                         continue
                     except ValueError as e:
                         logger.warning("Invalid JSON from client: {}", e)
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": "Invalid JSON"
-                        })
+                        await websocket.send_json({"type": "error", "message": "Invalid JSON"})
 
             except WebSocketDisconnect:
                 logger.info("Web client disconnected: session_id={}", session_id)
@@ -153,7 +148,7 @@ class WebChannel(BaseChannel):
             log_level="warning",
         )
         self._server = Server(config)
-        
+
         logger.info("Starting Web channel on {}:{}", self.config.host, self.config.port)
         asyncio.create_task(self._server.serve())
 
@@ -179,10 +174,12 @@ class WebChannel(BaseChannel):
         ws = self._connections.get(msg.chat_id)
         if ws:
             try:
-                await ws.send_json({
-                    "type": "message",
-                    "content": msg.content,
-                    "sender": msg.sender,
-                })
+                await ws.send_json(
+                    {
+                        "type": "message",
+                        "content": msg.content,
+                        "sender": msg.sender,
+                    }
+                )
             except Exception as e:
                 logger.warning("Failed to send message to web client: {}", e)

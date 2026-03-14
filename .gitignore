@@ -24,3 +24,4 @@ nano.*.save
 .qoder/
 workspaces/
 .vibe/
+.vibe-think/

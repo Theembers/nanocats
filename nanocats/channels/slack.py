@@ -54,10 +54,10 @@ class SlackChannel(BaseChannel):
     def default_config(cls) -> dict[str, Any]:
         return SlackConfig().model_dump(by_alias=True)
 
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, agent_registry: Any = None):
         if isinstance(config, dict):
             config = SlackConfig.model_validate(config)
-        super().__init__(config, bus)
+        super().__init__(config, bus, agent_registry)
         self.config: SlackConfig = config
         self._web_client: AsyncWebClient | None = None
         self._socket_client: SocketModeClient | None = None
@@ -149,9 +149,7 @@ class SlackChannel(BaseChannel):
             return
 
         # Acknowledge right away
-        await client.send_socket_mode_response(
-            SocketModeResponse(envelope_id=req.envelope_id)
-        )
+        await client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
 
         payload = req.payload or {}
         event = payload.get("event") or {}

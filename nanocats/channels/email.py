@@ -85,10 +85,10 @@ class EmailChannel(BaseChannel):
     def default_config(cls) -> dict[str, Any]:
         return EmailConfig().model_dump(by_alias=True)
 
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, agent_registry: Any = None):
         if isinstance(config, dict):
             config = EmailConfig.model_validate(config)
-        super().__init__(config, bus)
+        super().__init__(config, bus, agent_registry)
         self.config: EmailConfig = config
         self._last_subject_by_chat: dict[str, str] = {}
         self._last_message_id_by_chat: dict[str, str] = {}
@@ -171,7 +171,9 @@ class EmailChannel(BaseChannel):
                 subject = override
 
         email_msg = EmailMessage()
-        email_msg["From"] = self.config.from_address or self.config.smtp_username or self.config.imap_username
+        email_msg["From"] = (
+            self.config.from_address or self.config.smtp_username or self.config.imap_username
+        )
         email_msg["To"] = to_addr
         email_msg["Subject"] = subject
         email_msg.set_content(msg.content or "")
@@ -203,7 +205,7 @@ class EmailChannel(BaseChannel):
             missing.append("smtp_password")
 
         if missing:
-            logger.error("Email channel not configured, missing: {}", ', '.join(missing))
+            logger.error("Email channel not configured, missing: {}", ", ".join(missing))
             return False
         return True
 
@@ -346,7 +348,9 @@ class EmailChannel(BaseChannel):
                     # mark_seen is the primary dedup; this set is a safety net
                     if len(self._processed_uids) > self._MAX_PROCESSED_UIDS:
                         # Evict a random half to cap memory; mark_seen is the primary dedup
-                        self._processed_uids = set(list(self._processed_uids)[len(self._processed_uids) // 2:])
+                        self._processed_uids = set(
+                            list(self._processed_uids)[len(self._processed_uids) // 2 :]
+                        )
 
                 if mark_seen:
                     client.store(imap_id, "+FLAGS", "\\Seen")
@@ -367,7 +371,11 @@ class EmailChannel(BaseChannel):
     @staticmethod
     def _extract_message_bytes(fetched: list[Any]) -> bytes | None:
         for item in fetched:
-            if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], (bytes, bytearray)):
+            if (
+                isinstance(item, tuple)
+                and len(item) >= 2
+                and isinstance(item[1], (bytes, bytearray))
+            ):
                 return bytes(item[1])
         return None
 

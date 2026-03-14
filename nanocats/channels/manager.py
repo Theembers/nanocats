@@ -13,42 +13,71 @@ from nanocats.config.schema import Config
 
 
 class ChannelManager:
-    """
-    Manages chat channels and coordinates message routing.
-
-    Responsibilities:
-    - Initialize enabled channels (Telegram, WhatsApp, etc.)
-    - Start/stop channels
-    - Route outbound messages
-    """
-
-    def __init__(self, config: Config, bus: MessageBus):
+    def __init__(
+        self,
+        config: Config,
+        bus: MessageBus,
+        agent_registry: Any = None,
+    ):
         self.config = config
         self.bus = bus
+        self.agent_registry = agent_registry
         self.channels: dict[str, BaseChannel] = {}
         self._dispatch_task: asyncio.Task | None = None
 
         self._init_channels()
 
     def _init_channels(self) -> None:
-        """Initialize channels discovered via pkgutil scan + entry_points plugins."""
         from nanocats.channels.registry import discover_all
 
         groq_key = self.config.providers.groq.api_key
+        all_channels = discover_all()
 
-        for name, cls in discover_all().items():
+        enabled_channels: dict[str, dict] = {}
+
+        for name, cls in all_channels.items():
             section = getattr(self.config.channels, name, None)
             if section is None:
                 continue
+
+            channel_config = {}
+            if isinstance(section, dict):
+                channel_config = dict(section)
+                enabled = section.get("enabled", False)
+            else:
+                channel_config = section.model_dump() if hasattr(section, "model_dump") else {}
+                enabled = getattr(section, "enabled", False)
+
+            if enabled:
+                enabled_channels[name] = channel_config
+
+        if self.agent_registry:
+            for agent_config in self.agent_registry.get_all().values():
+                for ch_name, ch_config in agent_config.channels.configs.items():
+                    if ch_config.enabled:
+                        if ch_name not in enabled_channels:
+                            enabled_channels[ch_name] = {}
+                        if isinstance(ch_config.extra, dict):
+                            enabled_channels[ch_name].update(ch_config.extra)
+                        if ch_config.allow_from:
+                            enabled_channels[ch_name]["allow_from"] = ch_config.allow_from
+                        if "enabled" not in enabled_channels[ch_name]:
+                            enabled_channels[ch_name]["enabled"] = True
+                        logger.debug("Channel {} enabled by agent {}", ch_name, agent_config.id)
+
+        for name, channel_config in enabled_channels.items():
+            cls = all_channels.get(name)
+            if not cls:
+                continue
+
             enabled = (
-                section.get("enabled", False)
-                if isinstance(section, dict)
-                else getattr(section, "enabled", False)
+                channel_config.get("enabled", False) if isinstance(channel_config, dict) else False
             )
             if not enabled:
                 continue
+
             try:
-                channel = cls(section, self.bus)
+                channel = cls(channel_config, self.bus, self.agent_registry)
                 channel.transcription_api_key = groq_key
                 self.channels[name] = channel
                 logger.info("{} channel enabled", cls.display_name)
@@ -116,15 +145,15 @@ class ChannelManager:
 
         while True:
             try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_outbound(),
-                    timeout=1.0
-                )
+                msg = await asyncio.wait_for(self.bus.consume_outbound(), timeout=1.0)
 
                 if msg.metadata.get("_progress"):
                     if msg.metadata.get("_tool_hint") and not self.config.channels.send_tool_hints:
                         continue
-                    if not msg.metadata.get("_tool_hint") and not self.config.channels.send_progress:
+                    if (
+                        not msg.metadata.get("_tool_hint")
+                        and not self.config.channels.send_progress
+                    ):
                         continue
 
                 channel = self.channels.get(msg.channel)
@@ -148,10 +177,7 @@ class ChannelManager:
     def get_status(self) -> dict[str, Any]:
         """Get status of all channels."""
         return {
-            name: {
-                "enabled": True,
-                "running": channel.is_running
-            }
+            name: {"enabled": True, "running": channel.is_running}
             for name, channel in self.channels.items()
         }
 

@@ -4,36 +4,31 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from nanocats.bus.events import InboundMessage, OutboundMessage
 from nanocats.bus.queue import MessageBus
 
+if TYPE_CHECKING:
+    from nanocats.agent.registry import AgentRegistry
+
 
 class BaseChannel(ABC):
-    """
-    Abstract base class for chat channel implementations.
-
-    Each channel (Telegram, Discord, etc.) should implement this interface
-    to integrate with the nanocats message bus.
-    """
-
     name: str = "base"
     display_name: str = "Base"
     transcription_api_key: str = ""
 
-    def __init__(self, config: Any, bus: MessageBus):
-        """
-        Initialize the channel.
-
-        Args:
-            config: Channel-specific configuration.
-            bus: The message bus for communication.
-        """
+    def __init__(
+        self,
+        config: Any,
+        bus: MessageBus,
+        agent_registry: "AgentRegistry | None" = None,
+    ):
         self.config = config
         self.bus = bus
+        self.agent_registry = agent_registry
         self._running = False
 
     async def transcribe_audio(self, file_path: str | Path) -> str:
@@ -95,24 +90,12 @@ class BaseChannel(ABC):
         metadata: dict[str, Any] | None = None,
         session_key: str | None = None,
     ) -> None:
-        """
-        Handle an incoming message from the chat platform.
-
-        This method checks permissions and forwards to the bus.
-
-        Args:
-            sender_id: The sender's identifier.
-            chat_id: The chat/channel identifier.
-            content: Message text content.
-            media: Optional list of media URLs.
-            metadata: Optional channel-specific metadata.
-            session_key: Optional session key override (e.g. thread-scoped sessions).
-        """
         if not self.is_allowed(sender_id):
             logger.warning(
                 "Access denied for sender {} on channel {}. "
                 "Add them to allowFrom list in config to grant access.",
-                sender_id, self.name,
+                sender_id,
+                self.name,
             )
             return
 
@@ -126,7 +109,44 @@ class BaseChannel(ABC):
             session_key_override=session_key,
         )
 
+        if self.agent_registry:
+            await self._resolve_agent_info(msg)
+
         await self.bus.publish_inbound(msg)
+
+    async def _resolve_agent_info(self, msg: InboundMessage) -> None:
+        if not self.agent_registry:
+            return
+
+        logger.debug(
+            "Resolving agent for channel={}, chat_id={}",
+            msg.channel,
+            msg.chat_id,
+        )
+
+        result = self.agent_registry.find_by_channel(msg.channel, msg.chat_id)
+        if result:
+            agent, group_id = result
+            session_key = self.agent_registry.resolve_session_key(agent, group_id)
+
+            logger.info(
+                "Routed to agent={} (type={}), session_key={}, group_id={}",
+                agent.id,
+                agent.type.value,
+                session_key,
+                group_id,
+            )
+
+            msg.agent_id = agent.id
+            msg.agent_type = agent.type.value
+            msg._session_key = session_key
+            msg.session_group_id = group_id
+        else:
+            logger.warning(
+                "No agent resolved for channel={}, chat_id={}",
+                msg.channel,
+                msg.chat_id,
+            )
 
     @classmethod
     def default_config(cls) -> dict[str, Any]:

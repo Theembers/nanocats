@@ -63,6 +63,9 @@ class ProviderSpec:
     # Use OpenAI SDK instead of LiteLLM for this provider (Azure/Anthropic excluded)
     use_openai_sdk: bool = False
 
+    # Recommended models for onboard wizard
+    recommended_models: tuple[tuple[str, str], ...] = ()  # (model_id, description)
+
     @property
     def label(self) -> str:
         return self.display_name or self.name.title()
@@ -81,8 +84,8 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Custom",
         litellm_prefix="",
         is_direct=True,
+        recommended_models=(("gpt-4o", "GPT-4o"), ("llama-3.1-70b", "Llama 3.1 70B")),
     ),
-
     # === Azure OpenAI (direct API calls with API version 2024-10-21) =====
     ProviderSpec(
         name="azure_openai",
@@ -91,6 +94,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Azure OpenAI",
         litellm_prefix="",
         is_direct=True,
+        recommended_models=(("gpt-4o", "GPT-4o"), ("gpt-4o-mini", "GPT-4o Mini")),
     ),
     # === Gateways (detected by api_key / api_base, not model name) =========
     # Gateways can route any model, so they win in fallback.
@@ -112,6 +116,47 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         model_overrides=(),
         supports_prompt_caching=True,
         use_openai_sdk=True,
+        recommended_models=(
+            ("anthropic/claude-opus-4-5", "Claude 4 Opus ⭐"),
+            ("anthropic/claude-sonnet-4-20250514", "Claude 4 Sonnet"),
+            ("anthropic/claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
+            ("openai/gpt-4o", "GPT-4o"),
+            ("openai/gpt-4o-mini", "GPT-4o Mini"),
+            ("google/gemini-2.0-flash-exp", "Gemini 2.0 Flash"),
+            ("deepseek/deepseek-chat", "DeepSeek Chat"),
+        ),
+    ),
+    # === Gateways (detected by api_key / api_base, not model name) =========
+    # Gateways can route any model, so they win in fallback.
+    # OpenRouter: global gateway, keys start with "sk-or-"
+    ProviderSpec(
+        name="openrouter",
+        keywords=("openrouter",),
+        env_key="OPENROUTER_API_KEY",
+        display_name="OpenRouter",
+        litellm_prefix="openrouter",  # claude-3 → openrouter/claude-3
+        skip_prefixes=(),
+        env_extras=(),
+        is_gateway=True,
+        is_local=False,
+        detect_by_key_prefix="sk-or-",
+        detect_by_base_keyword="openrouter",
+        default_api_base="https://openrouter.ai/api/v1",
+        strip_model_prefix=False,
+        model_overrides=(),
+        supports_prompt_caching=True,
+        use_openai_sdk=True,
+        recommended_models=(
+            # Latest models as of March 2026
+            ("anthropic/claude-opus-4-6", "Claude 4.6 Opus ⭐"),
+            ("anthropic/claude-sonnet-4-6", "Claude 4.6 Sonnet"),
+            ("openai/gpt-5.4", "GPT-5.4 ⭐ (1M ctx)"),
+            ("openai/o3", "OpenAI O3 Reasoning"),
+            ("openai/o4-mini", "OpenAI O4-Mini"),
+            ("google/gemini-2.5-pro", "Gemini 2.5 Pro"),
+            ("google/gemini-2.5-flash", "Gemini 2.5 Flash"),
+            ("deepseek/deepseek-v3.2", "DeepSeek V3.2"),
+        ),
     ),
     # AiHubMix: global gateway, OpenAI-compatible interface.
     # strip_model_prefix=True: it doesn't understand "anthropic/claude-3",
@@ -132,6 +177,12 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=True,  # anthropic/claude-3 → claude-3 → openai/claude-3
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("claude-sonnet-4-6", "Claude 4.6 Sonnet"),
+            ("gpt-5.4", "GPT-5.4"),
+            ("gpt-4o", "GPT-4o"),
+            ("gpt-4o-mini", "GPT-4o Mini"),
+        ),
     ),
     # SiliconFlow (硅基流动): OpenAI-compatible gateway, model names keep org prefix
     ProviderSpec(
@@ -150,8 +201,13 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("Qwen/Qwen2.5-72B-Instruct", "Qwen 2.5 72B ⭐"),
+            ("THUDM/glm-4-9b-chat", "GLM-4 9B"),
+            ("deepseek-ai/DeepSeek-V2-Chat", "DeepSeek V2"),
+            ("Qwen/Qwen3-235B-A22B", "Qwen3 235B (MoE)"),
+        ),
     ),
-
     # VolcEngine (火山引擎): OpenAI-compatible gateway, pay-per-use models
     ProviderSpec(
         name="volcengine",
@@ -169,27 +225,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("doubao-pro-32k", "豆包 Pro 32K"),
+            ("doubao-lite-4k", "豆包 Lite 4K"),
+        ),
     ),
-
-    # VolcEngine Coding Plan (火山引擎 Coding Plan): same key as volcengine
-    ProviderSpec(
-        name="volcengine_coding_plan",
-        keywords=("volcengine-plan",),
-        env_key="OPENAI_API_KEY",
-        display_name="VolcEngine Coding Plan",
-        litellm_prefix="volcengine",
-        skip_prefixes=(),
-        env_extras=(),
-        is_gateway=True,
-        is_local=False,
-        detect_by_key_prefix="",
-        detect_by_base_keyword="",
-        default_api_base="https://ark.cn-beijing.volces.com/api/coding/v3",
-        strip_model_prefix=True,
-        model_overrides=(),
-        use_openai_sdk=True,
-    ),
-
     # BytePlus: VolcEngine international, pay-per-use models
     ProviderSpec(
         name="byteplus",
@@ -208,7 +248,6 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         model_overrides=(),
         use_openai_sdk=True,
     ),
-
     # BytePlus Coding Plan: same key as byteplus
     ProviderSpec(
         name="byteplus_coding_plan",
@@ -227,8 +266,6 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         model_overrides=(),
         use_openai_sdk=True,
     ),
-
-
     # === Standard providers (matched by model-name keywords) ===============
     # Anthropic: LiteLLM recognizes "claude-*" natively, no prefix needed.
     ProviderSpec(
@@ -247,6 +284,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         supports_prompt_caching=True,
+        recommended_models=(
+            ("claude-opus-4-6", "Claude 4.6 Opus ⭐"),
+            ("claude-sonnet-4-6", "Claude 4.6 Sonnet"),
+            ("claude-haiku-4-5-20251001", "Claude 4.5 Haiku"),
+        ),
     ),
     # OpenAI: LiteLLM recognizes "gpt-*" natively, no prefix needed.
     ProviderSpec(
@@ -265,6 +307,13 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("gpt-5.4", "GPT-5.4 ⭐ (1M ctx)"),
+            ("gpt-4o", "GPT-4o"),
+            ("gpt-4o-mini", "GPT-4o Mini"),
+            ("o3", "OpenAI O3 Reasoning"),
+            ("o4-mini", "OpenAI O4-Mini"),
+        ),
     ),
     # OpenAI Codex: uses OAuth, not API key.
     ProviderSpec(
@@ -319,6 +368,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("deepseek-v3.2", "DeepSeek V3.2 ⭐"),
+            ("deepseek-chat", "DeepSeek Chat"),
+            ("deepseek-reasoner", "DeepSeek Reasoner (R1)"),
+        ),
     ),
     # Gemini: needs "gemini/" prefix for LiteLLM.
     ProviderSpec(
@@ -337,6 +391,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("gemini-2.5-pro", "Gemini 2.5 Pro ⭐"),
+            ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+            ("gemini-2.5-flash-lite-preview", "Gemini 2.5 Flash Lite"),
+        ),
     ),
     # Zhipu: LiteLLM uses "zai/" prefix.
     # Also mirrors key to ZHIPUAI_API_KEY (some LiteLLM paths check that).
@@ -357,6 +416,12 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("glm-4-9b", "GLM-4 9B ⭐"),
+            ("glm-4-flash", "GLM-4 Flash"),
+            ("glm-4-plus", "GLM-4 Plus"),
+            ("glm-5", "GLM-5 (latest)"),
+        ),
     ),
     # DashScope: Qwen models, needs "dashscope/" prefix.
     ProviderSpec(
@@ -375,6 +440,13 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("qwen-max", "Qwen Max ⭐"),
+            ("qwen-plus", "Qwen Plus"),
+            ("qwen-turbo", "Qwen Turbo"),
+            ("qwen3-235b-a22b", "Qwen3 235B (MoE)"),
+            ("qwen3-30b-a3b", "Qwen3 30B (MoE)"),
+        ),
     ),
     # Moonshot: Kimi models, needs "moonshot/" prefix.
     # LiteLLM requires MOONSHOT_API_BASE env var to find the endpoint.
@@ -395,6 +467,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(("kimi-k2.5", {"temperature": 1.0}),),
         use_openai_sdk=True,
+        recommended_models=(
+            ("kimi-k2.5", "Kimi K2.5 ⭐"),
+            ("kimi-latest", "Kimi Latest"),
+            ("kimi-preview-0701", "Kimi Preview"),
+        ),
     ),
     # MiniMax: needs "minimax/" prefix for LiteLLM routing.
     # Uses OpenAI-compatible API at api.minimax.io/v1.
@@ -403,7 +480,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         keywords=("minimax",),
         env_key="MINIMAX_API_KEY",
         display_name="MiniMax",
-        litellm_prefix="minimax",  # MiniMax-M2.1 → minimax/MiniMax-M2.1
+        litellm_prefix="minimax",
         skip_prefixes=("minimax/", "openrouter/"),
         env_extras=(),
         is_gateway=False,
@@ -414,6 +491,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("MiniMax-M2.5", "MiniMax M2.5 ⭐"),
+            ("MiniMax-Text-01", "MiniMax Text 01"),
+            ("MiniMax-M2", "MiniMax M2"),
+        ),
     ),
     # === Local deployment (matched by config key, NOT by api_base) =========
     # vLLM / any OpenAI-compatible local server.
@@ -434,6 +516,12 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("llama-3.3-70b-instruct", "Llama 3.3 70B ⭐"),
+            ("llama-3.1-70b-instruct", "Llama 3.1 70B"),
+            ("qwen2.5-72b-instruct", "Qwen 2.5 72B"),
+            ("Qwen3-235B-A22B", "Qwen3 235B (MoE)"),
+        ),
     ),
     # === Ollama (local, OpenAI-compatible) ===================================
     ProviderSpec(
@@ -452,6 +540,15 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("llama3.3", "Llama 3.3 ⭐"),
+            ("llama3.2", "Llama 3.2"),
+            ("qwen3", "Qwen3"),
+            ("qwen2.5", "Qwen 2.5"),
+            ("mistral", "Mistral"),
+            ("gemma3", "Gemma 3"),
+            ("phi4", "Phi 4"),
+        ),
     ),
     # === Auxiliary (not a primary LLM provider) ============================
     # Groq: mainly used for Whisper voice transcription, also usable for LLM.
@@ -472,6 +569,11 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         use_openai_sdk=True,
+        recommended_models=(
+            ("llama-3.3-70b-versatile", "Llama 3.3 70B ⭐"),
+            ("llama-3.1-70b-stance", "Llama 3.1 70B"),
+            ("mixtral-8x7b-32768", "Mixtral 8x7B"),
+        ),
     ),
 )
 

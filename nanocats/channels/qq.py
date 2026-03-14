@@ -71,10 +71,10 @@ class QQChannel(BaseChannel):
     def default_config(cls) -> dict[str, Any]:
         return QQConfig().model_dump(by_alias=True)
 
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, agent_registry: Any = None):
         if isinstance(config, dict):
             config = QQConfig.model_validate(config)
-        super().__init__(config, bus)
+        super().__init__(config, bus, agent_registry)
         self.config: QQConfig = config
         self._client: "botpy.Client | None" = None
         self._processed_ids: deque = deque(maxlen=1000)
@@ -169,7 +169,10 @@ class QQChannel(BaseChannel):
                 user_id = data.author.member_openid
                 self._chat_type_cache[chat_id] = "group"
             else:
-                chat_id = str(getattr(data.author, 'id', None) or getattr(data.author, 'user_openid', 'unknown'))
+                chat_id = str(
+                    getattr(data.author, "id", None)
+                    or getattr(data.author, "user_openid", "unknown")
+                )
                 user_id = chat_id
                 self._chat_type_cache[chat_id] = "c2c"
 

@@ -8,7 +8,7 @@
 
 ### 1.1 核心设计理念
 
-nanocat 采用 **Swarm 统一架构**，所有运行模式（单 Agent、Swarm、Web）均通过 SwarmManager 统一管理。
+nanocats 采用 **Swarm 统一架构**，所有运行模式（单 Agent、Swarm、Web）均通过 SwarmManager 统一管理。
 
 **核心理念**：
 - **统一入口**：所有模式共用同一套启动流程
@@ -105,7 +105,7 @@ graph TB
 ### 2.2 目录结构
 
 ```
-~/.nanocat/
+~/.nanocats/
 ├── templates/              # 全局模板空间
 │   ├── AGENTS.md
 │   ├── TOOLS.md
