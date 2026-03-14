@@ -60,6 +60,9 @@ class ProviderSpec:
     # Provider supports cache_control on content blocks (e.g. Anthropic prompt caching)
     supports_prompt_caching: bool = False
 
+    # Use OpenAI SDK instead of LiteLLM for this provider (Azure/Anthropic excluded)
+    use_openai_sdk: bool = False
+
     @property
     def label(self) -> str:
         return self.display_name or self.name.title()
@@ -108,6 +111,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         strip_model_prefix=False,
         model_overrides=(),
         supports_prompt_caching=True,
+        use_openai_sdk=True,
     ),
     # AiHubMix: global gateway, OpenAI-compatible interface.
     # strip_model_prefix=True: it doesn't understand "anthropic/claude-3",
@@ -127,6 +131,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://aihubmix.com/v1",
         strip_model_prefix=True,  # anthropic/claude-3 → claude-3 → openai/claude-3
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # SiliconFlow (硅基流动): OpenAI-compatible gateway, model names keep org prefix
     ProviderSpec(
@@ -144,6 +149,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://api.siliconflow.cn/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 
     # VolcEngine (火山引擎): OpenAI-compatible gateway, pay-per-use models
@@ -162,6 +168,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://ark.cn-beijing.volces.com/api/v3",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 
     # VolcEngine Coding Plan (火山引擎 Coding Plan): same key as volcengine
@@ -180,6 +187,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://ark.cn-beijing.volces.com/api/coding/v3",
         strip_model_prefix=True,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 
     # BytePlus: VolcEngine international, pay-per-use models
@@ -198,6 +206,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://ark.ap-southeast.bytepluses.com/api/v3",
         strip_model_prefix=True,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 
     # BytePlus Coding Plan: same key as byteplus
@@ -216,6 +225,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://ark.ap-southeast.bytepluses.com/api/coding/v3",
         strip_model_prefix=True,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 
 
@@ -254,6 +264,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # OpenAI Codex: uses OAuth, not API key.
     ProviderSpec(
@@ -304,9 +315,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=False,
         detect_by_key_prefix="",
         detect_by_base_keyword="",
-        default_api_base="",
+        default_api_base="https://api.deepseek.com/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # Gemini: needs "gemini/" prefix for LiteLLM.
     ProviderSpec(
@@ -321,9 +333,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=False,
         detect_by_key_prefix="",
         detect_by_base_keyword="",
-        default_api_base="",
+        default_api_base="https://generativelanguage.googleapis.com/v1beta/openai",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # Zhipu: LiteLLM uses "zai/" prefix.
     # Also mirrors key to ZHIPUAI_API_KEY (some LiteLLM paths check that).
@@ -340,9 +353,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=False,
         detect_by_key_prefix="",
         detect_by_base_keyword="",
-        default_api_base="",
+        default_api_base="https://open.bigmodel.cn/api/paas/v4",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # DashScope: Qwen models, needs "dashscope/" prefix.
     ProviderSpec(
@@ -357,9 +371,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=False,
         detect_by_key_prefix="",
         detect_by_base_keyword="",
-        default_api_base="",
+        default_api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # Moonshot: Kimi models, needs "moonshot/" prefix.
     # LiteLLM requires MOONSHOT_API_BASE env var to find the endpoint.
@@ -371,7 +386,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         display_name="Moonshot",
         litellm_prefix="moonshot",  # kimi-k2.5 → moonshot/kimi-k2.5
         skip_prefixes=("moonshot/", "openrouter/"),
-        env_extras=(("MOONSHOT_API_BASE", "{api_base}"),),
+        env_extras=(),
         is_gateway=False,
         is_local=False,
         detect_by_key_prefix="",
@@ -379,6 +394,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://api.moonshot.ai/v1",  # intl; use api.moonshot.cn for China
         strip_model_prefix=False,
         model_overrides=(("kimi-k2.5", {"temperature": 1.0}),),
+        use_openai_sdk=True,
     ),
     # MiniMax: needs "minimax/" prefix for LiteLLM routing.
     # Uses OpenAI-compatible API at api.minimax.io/v1.
@@ -397,6 +413,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://api.minimaxi.com/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # === Local deployment (matched by config key, NOT by api_base) =========
     # vLLM / any OpenAI-compatible local server.
@@ -416,6 +433,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="",  # user must provide in config
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # === Ollama (local, OpenAI-compatible) ===================================
     ProviderSpec(
@@ -430,9 +448,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=True,
         detect_by_key_prefix="",
         detect_by_base_keyword="11434",
-        default_api_base="http://localhost:11434",
+        default_api_base="http://localhost:11434/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
     # === Auxiliary (not a primary LLM provider) ============================
     # Groq: mainly used for Whisper voice transcription, also usable for LLM.
@@ -449,9 +468,10 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_local=False,
         detect_by_key_prefix="",
         detect_by_base_keyword="",
-        default_api_base="",
+        default_api_base="https://api.groq.com/openai/v1",
         strip_model_prefix=False,
         model_overrides=(),
+        use_openai_sdk=True,
     ),
 )
 

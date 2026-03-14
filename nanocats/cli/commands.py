@@ -303,10 +303,12 @@ def _make_provider(config: Config):
     from nanocats.providers.base import GenerationSettings
     from nanocats.providers.openai_codex_provider import OpenAICodexProvider
     from nanocats.providers.azure_openai_provider import AzureOpenAIProvider
+    from nanocats.providers.registry import find_by_name
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
+    spec = find_by_name(provider_name) if provider_name else None
 
     # OpenAI Codex (OAuth)
     if provider_name == "openai_codex" or model.startswith("openai-codex/"):
@@ -331,10 +333,22 @@ def _make_provider(config: Config):
             api_base=p.api_base,
             default_model=model,
         )
+    # OpenAI SDK compatible providers (excluding Azure/Anthropic)
+    elif spec and spec.use_openai_sdk:
+        from nanocats.providers.custom_provider import CustomProvider
+        api_key = p.api_key if p else "no-key"
+        api_base = config.get_api_base(model) or spec.default_api_base
+        if not api_base:
+            console.print(f"[red]Error: {provider_name} requires api_base configuration.[/red]")
+            raise typer.Exit(1)
+        provider = CustomProvider(
+            api_key=api_key,
+            api_base=api_base,
+            default_model=model,
+            supports_prompt_caching=spec.supports_prompt_caching,
+        )
     else:
         from nanocats.providers.litellm_provider import LiteLLMProvider
-        from nanocats.providers.registry import find_by_name
-        spec = find_by_name(provider_name)
         if not model.startswith("bedrock/") and not (p and p.api_key) and not (spec and (spec.is_oauth or spec.is_local)):
             console.print("[red]Error: No API key configured.[/red]")
             console.print("Set one in ~/.nanocats/config.json under providers section")

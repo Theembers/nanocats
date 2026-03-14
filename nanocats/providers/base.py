@@ -223,6 +223,8 @@ class LLMProvider(ABC):
                     reasoning_effort=reasoning_effort,
                     tool_choice=tool_choice,
                 )
+                # Log the usage
+                logger.debug("🧠: LLM usage: {}", response.usage)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
