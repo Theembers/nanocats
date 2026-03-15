@@ -16,10 +16,19 @@ class AgentType(str, Enum):
     TASK = "task"
 
 
+class FrontendConfig(BaseModel):
+    """Frontend server configuration."""
+
+    enabled: bool = False
+    port: int = 5173
+    mode: Literal["dev", "preview"] = "dev"
+
+
 class ChannelConfig(BaseModel):
     enabled: bool = False
     allow_from: list[str] = Field(default_factory=list)
     extra: dict[str, Any] = Field(default_factory=dict)
+    frontend: FrontendConfig | None = None
 
 
 class SessionGroup(BaseModel):
@@ -210,6 +219,17 @@ class ToolsConfig(Base):
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
 
+class WebUIConfig(Base):
+    """WebUI server configuration."""
+
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 15651
+    jwt_secret: str = ""
+    jwt_expire_hours: int = 168  # 7 days
+    session_timeout_minutes: int = 30
+
+
 class Config(BaseSettings):
     """Root configuration for nanocats."""
 
@@ -218,6 +238,7 @@ class Config(BaseSettings):
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    web: WebUIConfig = Field(default_factory=WebUIConfig)
 
     @property
     def workspace_path(self) -> Path:
