@@ -211,57 +211,156 @@ def main(
 
 
 # ============================================================================
+# Help Command
+# ============================================================================
+
+
+@app.command()
+def help(
+    command: str | None = typer.Argument(None, help="Command to get help for"),
+):
+    """Show help information for nanocats commands."""
+    if command:
+        _show_command_help(command)
+    else:
+        _show_all_commands()
+
+
+def _show_all_commands():
+    """Display all available commands."""
+    console.print(f"\n[bold cyan]{__logo__} nanocats CLI Help[/bold cyan]\n")
+
+    # Main commands
+    console.print("[bold]Main Commands:[/bold]")
+    console.print("  [green]onboard[/green]          Initialize config and workspace")
+    console.print("  [green]gateway[/green]           Start Gateway service")
+    console.print("  [green]agent[/green]             Chat with agent")
+    console.print("  [green]status[/green]            Show system status")
+    console.print("  [green]help[/green] [command]   Show help information\n")
+
+    # Sub commands
+    console.print("[bold]Sub Commands:[/bold]")
+    console.print("  [green]swarm status[/green]      Show Swarm status and list agents")
+    console.print("  [green]swarm create[/green]     Create new Agent")
+    console.print("  [green]channels status[/green]   Show channel status")
+    console.print("  [green]channels login[/green]   WhatsApp device login")
+    console.print("  [green]provider login[/green]    OAuth login\n")
+
+    console.print('[dim]Use "nanocats help <command>" for detailed command usage[/dim]\n')
+
+
+def _show_command_help(command: str):
+    """Display detailed help for a specific command."""
+    help_map = {
+        "onboard": {
+            "desc": "Initialize nanocats configuration and workspace",
+            "usage": "nanocats onboard",
+            "options": [],
+        },
+        "gateway": {
+            "desc": "Start Gateway service (Swarm mode)",
+            "usage": "nanocats gateway [OPTIONS]",
+            "options": [
+                ("-p, --port", "Gateway port"),
+                ("-w, --workspace", "Workspace directory"),
+                ("-c, --config", "Config file path"),
+                ("-v, --verbose", "Enable debug logging"),
+            ],
+        },
+        "agent": {
+            "desc": "Chat with the agent",
+            "usage": "nanocat s agent [OPTIONS]",
+            "options": [
+                ("-m, --message", "Message to send"),
+                ("-s, --session", "Session ID (default: cli:direct)"),
+                ("--markdown/--no-markdown", "Render output as Markdown"),
+                ("--logs/--no-logs", "Show runtime logs"),
+            ],
+        },
+        "status": {
+            "desc": "Show nanocats system status",
+            "usage": "nanocats status",
+            "options": [],
+        },
+        "swarm": {
+            "desc": "Swarm management commands",
+            "usage": "nanocats swarm <subcommand>",
+            "options": [
+                ("status", "Show Swarm status and list agents"),
+                ("create <id>", "Create new Agent"),
+            ],
+        },
+        "channels": {
+            "desc": "Channel management commands",
+            "usage": "nanocats channels <subcommand>",
+            "options": [
+                ("status", "Show channel status"),
+                ("login", "WhatsApp device login (QR scan)"),
+            ],
+        },
+        "provider": {
+            "desc": "OAuth provider login",
+            "usage": "nanocats provider login <provider>",
+            "options": [
+                ("openai-codex", "OpenAI Codex OAuth login"),
+                ("github-copilot", "GitHub Copilot OAuth login"),
+            ],
+        },
+    }
+
+    if command not in help_map:
+        console.print(f"[red]Unknown command: {command}[/red]")
+        console.print("\nUse [cyan]nanocats help[/cyan] to see all available commands")
+        raise typer.Exit(1)
+
+    info = help_map[command]
+    console.print(f"\n[bold cyan]{__logo__} nanocats help {command}[/bold cyan]\n")
+    console.print(f"[bold]Description:[/bold] {info['desc']}\n")
+    console.print(f"[bold]Usage:[/bold] [green]{info['usage']}[/green]\n")
+
+    if info["options"]:
+        console.print("[bold]Options/Subcommands:[/bold]")
+        for opt, desc in info["options"]:
+            console.print(f"  [green]{opt:<18}[/green] {desc}")
+        console.print()
+
+
+# ============================================================================
 # Onboard / Setup
 # ============================================================================
 
 
 @app.command()
 def onboard():
-    """Initialize nanocats configuration and workspace."""
+    """Interactive setup wizard for nanocats."""
     import json
+    import secrets
 
     from nanocats.config.loader import get_config_path, load_config, save_config
     from nanocats.config.schema import Config
     from nanocats.providers.registry import PROVIDERS
+    from nanocats.config.paths import get_workspace_path
+
+    console.print(f"\n[bold cyan]{__logo__} Setup Wizard[/bold cyan]\n")
+    console.print("[dim]This wizard will help you configure nanocats:\n[/dim]")
+    console.print("  [yellow]1.[/yellow] Model provider configuration")
+    console.print("  [yellow]2.[/yellow] Model selection")
+    console.print("  [yellow]3.[/yellow] Master agent creation")
+    console.print("  [yellow]4.[/yellow] Channel configuration\n")
+
+    console.print("[bold cyan]━━━ Step 1/4: Model Provider ━━━[/bold cyan]\n")
 
     config_path = get_config_path()
-
-    existing_config = None
     if config_path.exists():
-        console.print(f"[yellow]⚠️  Config already exists at {config_path}[/yellow]")
-        console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
-        console.print(
-            "  [bold]N[/bold] = refresh config, keeping existing values and adding new fields"
-        )
-        if typer.confirm("Overwrite?"):
-            config = Config()
-            save_config(config)
-            console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
-        else:
-            existing_config = load_config()
-            save_config(existing_config)
-            console.print(
-                f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)"
-            )
+        config = load_config()
+        console.print(f"[dim]Using existing config: {config_path}[/dim]\n")
     else:
-        save_config(Config())
-        console.print(f"[green]✓[/green] Created config at {config_path}")
+        config = Config()
+        console.print(f"[dim]Creating new config: {config_path}[/dim]\n")
 
-    console.print(
-        "[dim]Config template now uses `maxTokens` + `contextWindowTokens`; `memoryWindow` is no longer a runtime setting.[/dim]"
-    )
-
-    _onboard_plugins(config_path)
-
-    workspace = get_workspace_path()
-
-    if not workspace.exists():
-        workspace.mkdir(parents=True, exist_ok=True)
-        console.print(f"[green]✓[/green] Created workspace at {workspace}")
-
-    sync_workspace_templates(workspace)
-
-    console.print(f"\n{__logo__} nanocats Swarm Configuration\n")
+    provider_name = None
+    api_key = None
+    selected_model = None
 
     available_providers = []
     for spec in PROVIDERS:
@@ -269,83 +368,94 @@ def onboard():
             continue
         available_providers.append(spec)
 
-    console.print("[bold]📌 Step 1: Select a Provider (enter number, or 0 to skip)[/bold]\n")
-
     provider_options = [f"{p.label} ({p.name})" for p in available_providers]
-    provider_options.append("Skip (use existing)")
+    if config_path.exists():
+        provider_options.insert(0, "Skip (use existing)")
 
-    selected_idx = _interactive_select(provider_options)
+    selected_idx = _interactive_select(provider_options, "Select a model provider:")
 
     provider_label = None
 
-    if selected_idx < len(available_providers):
-        selected_provider = available_providers[selected_idx]
+    if config_path.exists() and selected_idx == 0:
+        provider_name = None
+    elif not config_path.exists() or selected_idx > 0:
+        selected_provider = available_providers[selected_idx - (1 if config_path.exists() else 0)]
         provider_name = selected_provider.name
         provider_label = selected_provider.label
 
-        console.print(f"\n[green]✅ Selected: {provider_label}[/green]\n")
+        console.print(f"\n[green]✓[/green] Selected: [bold]{provider_label}[/bold]\n")
 
         existing_provider_key = None
-        if existing_config and existing_config.providers:
+        if config and hasattr(config, "providers") and config.providers:
             provider_key = provider_name.lower()
-            for key in existing_config.providers:
+            for key in dir(config.providers):
+                if key.startswith("_"):
+                    continue
                 if key.lower().replace("_", "") == provider_key.lower().replace("_", ""):
                     existing_provider_key = key
                     break
 
         if existing_provider_key:
-            existing_api_key = getattr(existing_config.providers, existing_provider_key, None)
+            existing_api_key = getattr(config.providers, existing_provider_key, None)
             if existing_api_key and getattr(existing_api_key, "api_key", None):
                 console.print(f"[dim]Found existing API key for {provider_label}[/dim]")
                 use_existing = typer.confirm("Use existing API key?", default=True)
                 if use_existing:
                     api_key = existing_api_key.api_key
                 else:
-                    console.print(f"[bold]🔐 Enter new {provider_label} API key[/bold]")
+                    console.print(f"\n[bold]🔐 Enter {provider_label} API key[/bold]")
                     api_key = typer.prompt("API Key", type=str, hide_input=True)
             else:
-                console.print(f"[bold]🔐 Step 2: Enter your {provider_label} API key[/bold]")
-                console.print("[dim]Key will be masked for security[/dim]")
+                console.print(f"\n[bold]🔐 Enter {provider_label} API key[/bold]")
                 api_key = typer.prompt("API Key", type=str, hide_input=True)
         else:
-            console.print(f"[bold]🔐 Step 2: Enter your {provider_label} API key[/bold]")
-            console.print("[dim]Key will be masked for security[/dim]")
+            console.print(f"\n[bold]🔐 Enter {provider_label} API key[/bold]")
             api_key = typer.prompt("API Key", type=str, hide_input=True)
 
-        console.print(f"\n[bold]🧠 Step 3: Select a Model (enter number, or 0 to skip)[/bold]\n")
+        console.print(f"\n[bold cyan]━━━ Step 2/4: Model Selection ━━━[/bold cyan]\n")
 
         models = selected_provider.recommended_models
         if models:
             model_options = [desc for _, desc in models]
             model_options.append("Custom (enter manually)")
-            model_options.append("Skip (use existing)")
+            # Model Skip only makes sense when user kept existing provider AND config has a model
+            model_has_existing = (
+                config_path.exists()
+                and config
+                and config.agents
+                and config.agents.defaults
+                and config.agents.defaults.model
+            )
+            if model_has_existing:
+                model_options.insert(0, "Skip (use existing)")
 
-            selected_model_idx = _interactive_select(model_options)
+            selected_model_idx = _interactive_select(model_options, "Select a model:")
 
-            if selected_model_idx < len(models):
-                selected_model = models[selected_model_idx][0]
-            elif selected_model_idx == len(models):
-                selected_model = typer.prompt("Enter custom model name")
+            if model_has_existing and selected_model_idx == 0:
+                selected_model = config.agents.defaults.model
+            elif selected_model_idx <= len(models):
+                selected_model = models[selected_model_idx - (1 if model_has_existing else 0)][0]
             else:
-                selected_model = None
+                selected_model = typer.prompt("Enter custom model name")
         else:
             selected_model = typer.prompt("Enter model name")
 
         if selected_model:
-            console.print(f"\n[green]✅ Selected model: {selected_model}[/green]\n")
+            console.print(f"\n[green]✓[/green] Selected model: [bold]{selected_model}[/bold]\n")
     else:
         provider_name = None
         api_key = None
         selected_model = None
-        if existing_config:
-            provider_name = existing_config.agents.defaults.provider
-            selected_model = existing_config.agents.defaults.model
-            console.print(
-                f"[dim]Using existing provider: {provider_name}, model: {selected_model}[/dim]\n"
-            )
+        if config:
+            provider_name = config.agents.defaults.provider
+            selected_model = config.agents.defaults.model
+            console.print(f"\n[dim]Using existing: {provider_name} / {selected_model}[/dim]\n")
 
-    with open(config_path, encoding="utf-8") as f:
-        config_data = json.load(f)
+    if config_path.exists():
+        with open(config_path, encoding="utf-8") as f:
+            config_data = json.load(f)
+    else:
+        config_data = {}
 
     if provider_name:
         config_data["agents"] = {
@@ -363,63 +473,95 @@ def onboard():
     config_data["channels"]["web"] = config_data["channels"].get("web", {})
     config_data["channels"]["web"]["enabled"] = True
 
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2, ensure_ascii=False)
 
-    console.print(f"[green]✅ Config updated[/green]\n")
+    console.print(f"\n[bold cyan]━━━ Step 3/4: Master Agent ━━━[/bold cyan]\n")
 
-    console.print("[bold]🤖 Step 4: Create Admin Agent (enter number, or 0 to skip)[/bold]\n")
+    admin_config_dir = Path.home() / ".nanocats" / "agents"
+    has_existing_agent = admin_config_dir.exists() and list(admin_config_dir.glob("*.json"))
 
-    agent_options = [
-        "Create new admin agent",
-        "Skip (use existing)",
-    ]
-    selected_agent_idx = _interactive_select(agent_options)
+    if has_existing_agent:
+        agent_options = [
+            "Create new master agent",
+            "Skip (use existing)",
+        ]
+        selected_agent_idx = _interactive_select(agent_options, "Create master agent?")
+    else:
+        selected_agent_idx = 0
 
     admin_config_path = None
+    agent_id = None
+    access_token = None
 
     if selected_agent_idx == 0:
-        agent_id = typer.prompt("Agent ID", type=str, default="admin", show_default=True)
-        agent_name = typer.prompt("Agent Name", type=str, default="Admin Agent", show_default=True)
+        agent_id = typer.prompt("Agent ID", type=str, default="master", show_default=True)
+        agent_name = typer.prompt("Agent Name", type=str, default="Master Agent", show_default=True)
 
-        admin_config_dir = Path.home() / ".nanocat" / "agents"
+        generated_token = secrets.token_urlsafe(16)
+        console.print(f"\n[dim]Generated token: {generated_token}[/dim]")
+        use_generated = typer.confirm("Use generated token?", default=True)
+
+        if use_generated:
+            access_token = generated_token
+        else:
+            access_token = typer.prompt("Enter custom token", hide_input=True)
+
+        admin_config_dir = Path.home() / ".nanocats" / "agents"
         admin_config_dir.mkdir(parents=True, exist_ok=True)
 
         admin_agent_config = {
             "id": agent_id,
             "name": agent_name,
-            "type": "admin",
+            "type": "supervisor",
             "autoStart": True,
             "model": selected_model,
             "provider": provider_name,
-            "channels": {"configs": {"web": {"enabled": True, "allowFrom": ["*"]}}},
+            "token": access_token,
+            "channels": {"enabled": ["web"]},
         }
 
         admin_config_path = admin_config_dir / f"{agent_id}.json"
         with open(admin_config_path, "w", encoding="utf-8") as f:
             json.dump(admin_agent_config, f, indent=2, ensure_ascii=False)
 
-        console.print(f"[green]✅ Created admin agent at {admin_config_path}[/green]\n")
+        console.print(f"\n[green]✓[/green] Created agent: [bold]{agent_id}[/bold]\n")
     else:
-        console.print("[dim]Skipped admin agent creation[/dim]\n")
+        console.print(f"\n[dim]Skipped agent creation[/dim]\n")
 
-    console.print(f"\n{__logo__} nanocats Swarm is ready!\n")
-    console.print("Configuration complete:")
-    console.print(f"  🏭  Provider: {provider_label or 'existing'}")
-    console.print(f"  🧠  Model: {selected_model or 'existing'}")
+    workspace = get_workspace_path()
+    if not workspace.exists():
+        workspace.mkdir(parents=True, exist_ok=True)
+        console.print(f"[green]✓[/green] Created workspace at {workspace}")
+
+    sync_workspace_templates(workspace)
+
+    console.print(f"\n[bold cyan]━━━ Setup Complete ━━━[/bold cyan]\n")
+    console.print(f"[bold]Configuration:[/bold]")
+    console.print(f"  [dim]Config:[/dim] [cyan]{config_path}[/cyan]")
+    console.print(f"  [dim]Workspace:[/dim] [cyan]{workspace}[/cyan]")
+    console.print(f"\n[bold]Provider:[/bold]")
+    console.print(f"  [dim]Name:[/dim] [green]{provider_label or 'existing'}[/green]")
+    console.print(f"  [dim]Model:[/dim] [green]{selected_model or 'existing'}[/green]")
+
     if selected_agent_idx == 0:
-        console.print(f"  🤖  Admin Agent: {admin_config_path}")
-    else:
-        console.print("  🤖  Admin Agent: (skipped)")
-    console.print("\n📖 Next steps:")
-    console.print(f"  1. [cyan]nanocats gateway[/cyan] - Start the swarm gateway")
-    console.print(f"  2. [cyan]nanocats status[/cyan] - Check configuration")
+        console.print(f"\n[bold]Master Agent:[/bold]")
+        console.print(f"  [dim]ID:[/dim] [cyan]{agent_id}[/cyan]")
+        console.print(f"  [dim]Token:[/dim] [yellow]{access_token}[/yellow]")
+
+    console.print(f"\n[bold green]✓ Setup complete![/bold green]\n")
+    console.print("[dim]Next steps:[/dim]")
+    console.print("  [cyan]nanocats help[/cyan] - View all available commands")
+    console.print("  [cyan]nanocats gateway[/cyan] - Start the gateway\n")
 
 
-def _interactive_select(options: list[str], default: int = 0) -> int:
-    """Simple numbered selection."""
+def _interactive_select(options: list[str], title: str = "", default: int = 0) -> int:
     if not options:
         return 0
+
+    if title:
+        console.print(f"\n[bold]{title}[/bold]\n")
 
     for i, option in enumerate(options):
         console.print(f"  [{i + 1}] {option}")
@@ -877,6 +1019,131 @@ def agent(
 # ============================================================================
 # Channel Commands
 # ============================================================================
+
+
+swarm_app = typer.Typer(help="Manage agent swarm")
+app.add_typer(swarm_app, name="swarm")
+
+
+@swarm_app.command("status")
+def swarm_status():
+    """Show swarm status and list all configured agents."""
+    from nanocats.config.loader import load_config
+
+    config = load_config()
+
+    console.print(f"{__logo__} Swarm Status\n")
+
+    agents_dir = Path.home() / ".nanocats" / "agents"
+
+    has_swarm_config = hasattr(config.agents, "swarm") and config.agents.swarm is not None
+    if has_swarm_config:
+        if hasattr(config.agents.swarm, "max_agents"):
+            console.print(f"Max agents: {config.agents.swarm.max_agents}")
+    console.print(f"Agents dir: {agents_dir}")
+
+    if not agents_dir.exists():
+        console.print("\n[yellow]No agents configured.[/yellow]")
+        console.print("Create agent configs in ~/.nanocats/agents/")
+        return
+
+    agent_files = list(agents_dir.glob("*.json"))
+
+    if agent_files:
+        console.print(f"\n[green]Configured agents ({len(agent_files)}):[/green]")
+        table = Table()
+        table.add_column("ID", style="cyan")
+        table.add_column("Name")
+        table.add_column("Type")
+        table.add_column("Auto-start")
+        table.add_column("Channels")
+
+        import json
+
+        for path in sorted(agent_files):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                agent_id = data.get("id", path.stem)
+                name = data.get("name", "-")
+                agent_type = data.get("type", "user")
+                auto_start = "yes" if data.get("autoStart", True) else "no"
+                channels = data.get("channels", {}).get("enabled", [])
+                channels_str = ", ".join(channels) if channels else "-"
+                table.add_row(agent_id, name, agent_type, auto_start, channels_str)
+            except Exception:
+                table.add_row(path.stem, "-", "-", "-", "-")
+
+        console.print(table)
+    else:
+        console.print("\n[yellow]No agents configured.[/yellow]")
+        console.print("Create agent configs in ~/.nanocats/agents/")
+
+
+@swarm_app.command("create")
+def swarm_create(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    name: str = typer.Option("", "--name", "-n", help="Agent display name"),
+    agent_type: str = typer.Option(
+        "user", "--type", "-t", help="Agent type (admin, user, specialized, task)"
+    ),
+    bound_user_key: str = typer.Option(
+        "", "--bound-user", "-b", help="User binding key (for user agent only)"
+    ),
+    model: str = typer.Option("", "--model", "-m", help="Model to use"),
+):
+    """Create a new agent configuration."""
+    import json
+    from pathlib import Path
+
+    from nanocats.config.schema import AgentChannelsConfig, AgentConfig, AgentType
+
+    valid_types = {"admin", "user", "specialized", "task"}
+    if agent_type not in valid_types:
+        console.print(f"[red]Invalid agent type: {agent_type}[/red]")
+        console.print(f"Valid types: {', '.join(valid_types)}")
+        raise typer.Exit(1)
+
+    session_policy_map = {
+        "user": "per_user",
+        "admin": "global",
+        "specialized": "per_channel",
+        "task": "per_task",
+    }
+    session_policy = session_policy_map.get(agent_type, "per_user")
+
+    if agent_type == "user" and not bound_user_key:
+        console.print(
+            "[yellow]Warning:[/yellow] user agent should have --bound-user key for 1:1 binding"
+        )
+
+    agents_dir = Path.home() / ".nanocats" / "agents"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+
+    agent_data = {
+        "id": agent_id,
+        "name": name or agent_id,
+        "type": agent_type,
+        "sessionPolicy": session_policy,
+        "model": model or "anthropic/claude-opus-4-5",
+        "provider": "anthropic",
+        "autoStart": True,
+        "channels": {"enabled": ["web"]},
+    }
+
+    if bound_user_key:
+        agent_data["boundUserKey"] = bound_user_key
+
+    agent_config_path = agents_dir / f"{agent_id}.json"
+    with open(agent_config_path, "w", encoding="utf-8") as f:
+        json.dump(agent_data, f, indent=2, ensure_ascii=False)
+
+    console.print(f"[green]✓[/green] Created agent config: {agent_config_path}")
+    console.print(f"  Type: {agent_type}")
+    console.print(f"  Session policy: {session_policy}")
+    if bound_user_key:
+        console.print(f"  Bound user: {bound_user_key}")
+    console.print("Edit the file to configure channels, MCP, skills, etc.")
 
 
 channels_app = typer.Typer(help="Manage channels")
