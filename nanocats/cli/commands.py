@@ -269,7 +269,7 @@ def _show_command_help(command: str):
         },
         "agent": {
             "desc": "Chat with the agent",
-            "usage": "nanocat s agent [OPTIONS]",
+            "usage": "nanocats agent [OPTIONS]",
             "options": [
                 ("-m, --message", "Message to send"),
                 ("-s, --session", "Session ID (default: cli:direct)"),
@@ -1045,10 +1045,8 @@ def _create_agent_config(
         "model": final_model,
         "provider": provider,
         "autoStart": True,
-        "channels": {"enabled": ["web"]},
+        "channels": {"configs": {"web": {"enabled": True, "allowFrom": ["*"]}}},
     }
-
-    return agent_data
 
     return agent_data
 
@@ -1096,7 +1094,8 @@ def swarm_status():
                 name = data.get("name", "-")
                 agent_type = data.get("type", "user")
                 auto_start = "yes" if data.get("autoStart", True) else "no"
-                channels = data.get("channels", {}).get("enabled", [])
+                configs = data.get("channels", {}).get("configs", {})
+                channels = list(configs.keys()) if configs else []
                 channels_str = ", ".join(channels) if channels else "-"
                 table.add_row(agent_id, name, agent_type, auto_start, channels_str)
             except Exception:

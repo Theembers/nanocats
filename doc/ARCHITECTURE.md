@@ -1,7 +1,7 @@
 # nanocats 架构设计文档
 
 > 基于源码分析的全量架构文档
-> 版本: 0.1.5
+> 版本: 0.1.6
 > 生成日期: 2026-03-15
 
 ---
@@ -830,15 +830,31 @@ async def start(self) -> None:
 
 #### 3.4.4 ChannelManager (`channels/manager.py`)
 
+ChannelManager 负责初始化和管理所有通道。它从两个来源合并配置：
+
+1. **主配置** (`~/.nanocats/config.json`) - 简化格式: `channels.web.enabled: true`
+   - 仅用于决定 gateway 启动时启用哪些通道
+2. **Agent 配置** (`~/.nanocats/agents/{id}.json`) - 详细格式: `channels.configs.web.allowFrom: [...]`
+   - 用于消息路由时的权限验证
+
 ```python
 class ChannelManager:
     def __init__(self, config, bus, agent_registry):
         self.channels = {}  # name -> Channel instance
         
-        # 自动发现通道
+        # 1. 从主配置获取启用的通道
         for name, cls in discover_all().items():
-            if config.channels.get(name, {}).get("enabled"):
+            section = getattr(config.channels, name, None)
+            if section and section.enabled:
                 self.channels[name] = cls(config, bus, agent_registry)
+        
+        # 2. 从 Agent 配置补充 allow_from
+        if agent_registry:
+            for agent in agent_registry.get_all().values():
+                for ch_name, ch_config in agent.channels.configs.items():
+                    if ch_config.enabled and ch_name in self.channels:
+                        channel = self.channels[ch_name]
+                        channel.config.allow_from = ch_config.allow_from
     
     async def start_all(self) -> None:
         for channel in self.channels.values():
@@ -852,6 +868,10 @@ class ChannelManager:
             if channel:
                 await channel.send(msg)
 ```
+
+**配置优先级**:
+- 通道启用状态: 主配置 (`channels.{name}.enabled`)
+- 权限控制: Agent 配置 (`channels.configs.{name}.allowFrom`)
 
 ---
 
@@ -1548,6 +1568,8 @@ Feishu:    {"receive_id": "ou_xxx", "msg_type": "text", "content": {...}}
 
 **位置**: `~/.nanocats/agents/{agent_id}.json`
 
+**注意**: Agent 配置必须使用详细格式 (`channels.configs`)，简化格式 (`channels.enabled`) 仅适用于主配置。
+
 ```json
 {
   "id": "myagent",
@@ -1557,11 +1579,14 @@ Feishu:    {"receive_id": "ou_xxx", "msg_type": "text", "content": {...}}
   "provider": "anthropic",
   "autoStart": true,
   "channels": {
-    "enabled": ["web", "telegram"],
     "configs": {
       "telegram": {
         "enabled": true,
         "allowFrom": ["123456789"]
+      },
+      "web": {
+        "enabled": true,
+        "allowFrom": ["*"]
       }
     },
     "session_groups": [
@@ -1583,6 +1608,15 @@ Feishu:    {"receive_id": "ou_xxx", "msg_type": "text", "content": {...}}
   }
 }
 ```
+
+**配置说明**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| channels.configs | object | 渠道配置字典 (必须) |
+| channels.configs.{channel}.enabled | boolean | 是否启用该渠道 |
+| channels.configs.{channel}.allowFrom | array | 允许访问的用户 ID 列表 (`*` 表示所有用户) |
+| channels.session_groups | array | 会话分组列表 (可选) |
 
 ---
 

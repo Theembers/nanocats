@@ -121,15 +121,29 @@ nanocats gateway
 
 1. 通过 @BotFather 创建机器人
 2. 复制 Bot Token
-3. 在 `~/.nanocats/config.json` 中配置:
+3. 在 `~/.nanocats/config.json` 中配置 (主配置):
 
 ```json
 {
   "channels": {
     "telegram": {
       "enabled": true,
-      "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
+      "token": "YOUR_BOT_TOKEN"
+    }
+  }
+}
+```
+
+4. 在 Agent 配置 `~/.nanocats/agents/{agent_id}.json` 中配置权限:
+
+```json
+{
+  "channels": {
+    "configs": {
+      "telegram": {
+        "enabled": true,
+        "allowFrom": ["YOUR_USER_ID"]
+      }
     }
   }
 }
@@ -139,15 +153,29 @@ nanocats gateway
 
 1. 在 https://discord.com/developers/applications 创建应用
 2. 添加机器人并启用 **MESSAGE CONTENT INTENT**
-3. 复制 Bot Token 并配置:
+3. 复制 Bot Token 并在主配置中配置:
 
 ```json
 {
   "channels": {
     "discord": {
       "enabled": true,
-      "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
+      "token": "YOUR_BOT_TOKEN"
+    }
+  }
+}
+```
+
+4. 在 Agent 配置中配置权限:
+
+```json
+{
+  "channels": {
+    "configs": {
+      "discord": {
+        "enabled": true,
+        "allowFrom": ["YOUR_USER_ID"]
+      }
     }
   }
 }
@@ -157,14 +185,28 @@ nanocats gateway
 
 Web 通道提供基于浏览器的 WebSocket 聊天接口:
 
+**主配置** (`~/.nanocats/config.json`):
 ```json
 {
   "channels": {
     "web": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 15751,
-      "allowFrom": ["*"]
+      "port": 15751
+    }
+  }
+}
+```
+
+**Agent 配置** (`~/.nanocats/agents/{agent_id}.json`):
+```json
+{
+  "channels": {
+    "configs": {
+      "web": {
+        "enabled": true,
+        "allowFrom": ["*"]
+      }
     }
   }
 }
@@ -222,6 +264,16 @@ nanocats 支持多种代理类型:
   "name": "My Agent",
   "type": "user",
   "channels": {
+    "configs": {
+      "telegram": {
+        "enabled": true,
+        "allowFrom": ["123456789"]
+      },
+      "discord": {
+        "enabled": true,
+        "allowFrom": ["channel_111", "channel_222"]
+      }
+    },
     "session_groups": [
       {
         "group_id": "work",
@@ -293,7 +345,7 @@ nanocats 支持多种代理类型:
 |------|------|
 | `nanocats onboard` | 初始化配置和工作空间 |
 | `nanocats agent` | 与代理聊天 (交互模式) |
-| `nanocat s agent -m "..."` | 发送单条消息 |
+| `nanocats agent -m "..."` | 发送单条消息 |
 | `nanocats gateway` | 启动网关，包含所有启用的通道 |
 | `nanocats status` | 显示系统状态 |
 | `nanocats swarm status` | 显示代理集群状态 |

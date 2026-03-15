@@ -92,7 +92,7 @@ Edit `~/.nanocats/config.json`:
 nanocats agent
 
 # Single message
-nanocat s agent -m "Hello"
+nanocats agent -m "Hello"
 ```
 
 **4. Connect to chat channels**
@@ -121,15 +121,29 @@ Connect nanocats to your favorite messaging platforms.
 
 1. Create a bot via @BotFather
 2. Copy the bot token
-3. Configure in `~/.nanocats/config.json`:
+3. Configure in `~/.nanocats/config.json` (main config):
 
 ```json
 {
   "channels": {
     "telegram": {
       "enabled": true,
-      "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
+      "token": "YOUR_BOT_TOKEN"
+    }
+  }
+}
+```
+
+4. Configure permissions in Agent config `~/.nanocats/agents/{agent_id}.json`:
+
+```json
+{
+  "channels": {
+    "configs": {
+      "telegram": {
+        "enabled": true,
+        "allowFrom": ["YOUR_USER_ID"]
+      }
     }
   }
 }
@@ -139,15 +153,29 @@ Connect nanocats to your favorite messaging platforms.
 
 1. Create an application at https://discord.com/developers/applications
 2. Add a Bot and enable **MESSAGE CONTENT INTENT**
-3. Copy the bot token and configure:
+3. Copy the bot token and configure in main config:
 
 ```json
 {
   "channels": {
     "discord": {
       "enabled": true,
-      "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
+      "token": "YOUR_BOT_TOKEN"
+    }
+  }
+}
+```
+
+4. Configure permissions in Agent config:
+
+```json
+{
+  "channels": {
+    "configs": {
+      "discord": {
+        "enabled": true,
+        "allowFrom": ["YOUR_USER_ID"]
+      }
     }
   }
 }
@@ -157,14 +185,28 @@ Connect nanocats to your favorite messaging platforms.
 
 The Web channel provides a WebSocket interface for browser-based chat:
 
+**Main config** (`~/.nanocats/config.json`):
 ```json
 {
   "channels": {
     "web": {
       "enabled": true,
       "host": "0.0.0.0",
-      "port": 15751,
-      "allowFrom": ["*"]
+      "port": 15751
+    }
+  }
+}
+```
+
+**Agent config** (`~/.nanocats/agents/{agent_id}.json`):
+```json
+{
+  "channels": {
+    "configs": {
+      "web": {
+        "enabled": true,
+        "allowFrom": ["*"]
+      }
     }
   }
 }
@@ -222,6 +264,16 @@ For User type agents, you can configure session groups to group multiple chat ID
   "name": "My Agent",
   "type": "user",
   "channels": {
+    "configs": {
+      "telegram": {
+        "enabled": true,
+        "allowFrom": ["123456789"]
+      },
+      "discord": {
+        "enabled": true,
+        "allowFrom": ["channel_111", "channel_222"]
+      }
+    },
     "session_groups": [
       {
         "group_id": "work",
