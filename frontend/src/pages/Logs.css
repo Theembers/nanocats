@@ -1,0 +1,76 @@
+.logs-page {
+  padding: 20px;
+}
+
+.logs-page h1 {
+  margin: 0 0 20px;
+}
+
+.logs-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.logs-filters select,
+.logs-filters input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.logs-table {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.logs-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.logs-table th,
+.logs-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.logs-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.logs-table tr:hover {
+  background: #fafafa;
+}
+
+.log-level {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.log-level.DEBUG { background: #e0e0e0; color: #666; }
+.log-level.INFO { background: #e3f2fd; color: #1565c0; }
+.log-level.WARNING { background: #fff3e0; color: #e65100; }
+.log-level.ERROR { background: #ffebee; color: #c62828; }
+
+.log-type {
+  padding: 2px 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.log-message {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
