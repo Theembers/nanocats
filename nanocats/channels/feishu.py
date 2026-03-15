@@ -243,7 +243,7 @@ class FeishuConfig(Base):
     encrypt_key: str = ""
     verification_token: str = ""
     allow_from: list[str] = Field(default_factory=list)
-    react_emoji: str = "THUMBSUP"
+    react_emoji: str = "Typing"
     group_policy: Literal["open", "mention"] = "mention"
 
 
@@ -430,11 +430,11 @@ class FeishuChannel(BaseChannel):
         except Exception as e:
             logger.warning("Error adding reaction: {}", e)
 
-    async def _add_reaction(self, message_id: str, emoji_type: str = "THUMBSUP") -> None:
+    async def _add_reaction(self, message_id: str, emoji_type: str = "Typing") -> None:
         """
         Add a reaction emoji to a message (non-blocking).
 
-        Common emoji types: THUMBSUP, OK, EYES, DONE, OnIt, HEART
+        Common emoji types: Typing, OK, EYES, DONE, OnIt, HEART
         """
         if not self._client:
             return

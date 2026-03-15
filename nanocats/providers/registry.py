@@ -97,35 +97,6 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         recommended_models=(("gpt-4o", "GPT-4o"), ("gpt-4o-mini", "GPT-4o Mini")),
     ),
     # === Gateways (detected by api_key / api_base, not model name) =========
-    # Gateways can route any model, so they win in fallback.
-    # OpenRouter: global gateway, keys start with "sk-or-"
-    ProviderSpec(
-        name="openrouter",
-        keywords=("openrouter",),
-        env_key="OPENROUTER_API_KEY",
-        display_name="OpenRouter",
-        litellm_prefix="openrouter",  # claude-3 → openrouter/claude-3
-        skip_prefixes=(),
-        env_extras=(),
-        is_gateway=True,
-        is_local=False,
-        detect_by_key_prefix="sk-or-",
-        detect_by_base_keyword="openrouter",
-        default_api_base="https://openrouter.ai/api/v1",
-        strip_model_prefix=False,
-        model_overrides=(),
-        supports_prompt_caching=True,
-        use_openai_sdk=True,
-        recommended_models=(
-            ("anthropic/claude-opus-4-5", "Claude 4 Opus ⭐"),
-            ("anthropic/claude-sonnet-4-20250514", "Claude 4 Sonnet"),
-            ("anthropic/claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
-            ("openai/gpt-4o", "GPT-4o"),
-            ("openai/gpt-4o-mini", "GPT-4o Mini"),
-            ("google/gemini-2.0-flash-exp", "Gemini 2.0 Flash"),
-            ("deepseek/deepseek-chat", "DeepSeek Chat"),
-        ),
-    ),
     # === Gateways (detected by api_key / api_base, not model name) =========
     # Gateways can route any model, so they win in fallback.
     # OpenRouter: global gateway, keys start with "sk-or-"
