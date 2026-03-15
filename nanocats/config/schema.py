@@ -51,7 +51,6 @@ class AgentConfig(BaseModel):
     auto_start: bool = True
 
     bound_user_key: str | None = None
-    token: str | None = None
 
     routing: dict[str, Any] = Field(default_factory=dict)
 

@@ -334,10 +334,9 @@ def _show_command_help(command: str):
 def onboard():
     """Interactive setup wizard for nanocats."""
     import json
-    import secrets
 
     from nanocats.config.loader import get_config_path, load_config, save_config
-    from nanocats.config.schema import Config
+    from nanocats.config.schema import AgentType, Config
     from nanocats.providers.registry import PROVIDERS
     from nanocats.config.paths import get_workspace_path
 
@@ -348,7 +347,7 @@ def onboard():
     console.print("  [yellow]3.[/yellow] Master agent creation")
     console.print("  [yellow]4.[/yellow] Channel configuration\n")
 
-    console.print("[bold cyan]━━━ Step 1/4: Model Provider ━━━[/bold cyan]\n")
+    console.print("[bold cyan]━━━ Step 1/3: Model Provider ━━━[/bold cyan]\n")
 
     config_path = get_config_path()
     if config_path.exists():
@@ -412,7 +411,7 @@ def onboard():
             console.print(f"\n[bold]🔐 Enter {provider_label} API key[/bold]")
             api_key = typer.prompt("API Key", type=str, hide_input=True)
 
-        console.print(f"\n[bold cyan]━━━ Step 2/4: Model Selection ━━━[/bold cyan]\n")
+        console.print(f"\n[bold cyan]━━━ Step 2/3: Model Selection ━━━[/bold cyan]\n")
 
         models = selected_provider.recommended_models
         if models:
@@ -477,7 +476,7 @@ def onboard():
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2, ensure_ascii=False)
 
-    console.print(f"\n[bold cyan]━━━ Step 3/4: Master Agent ━━━[/bold cyan]\n")
+    console.print(f"\n[bold cyan]━━━ Step 3/3: Master Agent ━━━[/bold cyan]\n")
 
     admin_config_dir = Path.home() / ".nanocats" / "agents"
     has_existing_agent = admin_config_dir.exists() and list(admin_config_dir.glob("*.json"))
@@ -491,42 +490,25 @@ def onboard():
     else:
         selected_agent_idx = 0
 
-    admin_config_path = None
-    agent_id = None
-    access_token = None
-
     if selected_agent_idx == 0:
         agent_id = typer.prompt("Agent ID", type=str, default="master", show_default=True)
         agent_name = typer.prompt("Agent Name", type=str, default="Master Agent", show_default=True)
 
-        generated_token = secrets.token_urlsafe(16)
-        console.print(f"\n[dim]Generated token: {generated_token}[/dim]")
-        use_generated = typer.confirm("Use generated token?", default=True)
-
-        if use_generated:
-            access_token = generated_token
-        else:
-            access_token = typer.prompt("Enter custom token", hide_input=True)
-
-        admin_config_dir = Path.home() / ".nanocats" / "agents"
         admin_config_dir.mkdir(parents=True, exist_ok=True)
 
-        admin_agent_config = {
-            "id": agent_id,
-            "name": agent_name,
-            "type": "supervisor",
-            "autoStart": True,
-            "model": selected_model,
-            "provider": provider_name,
-            "token": access_token,
-            "channels": {"enabled": ["web"]},
-        }
+        agent_data = _create_agent_config(
+            agent_id=agent_id,
+            name=agent_name,
+            agent_type=AgentType.ADMIN,
+            model=selected_model,
+        )
 
         admin_config_path = admin_config_dir / f"{agent_id}.json"
         with open(admin_config_path, "w", encoding="utf-8") as f:
-            json.dump(admin_agent_config, f, indent=2, ensure_ascii=False)
+            json.dump(agent_data, f, indent=2, ensure_ascii=False)
 
         console.print(f"\n[green]✓[/green] Created agent: [bold]{agent_id}[/bold]\n")
+        
     else:
         console.print(f"\n[dim]Skipped agent creation[/dim]\n")
 
@@ -548,7 +530,8 @@ def onboard():
     if selected_agent_idx == 0:
         console.print(f"\n[bold]Master Agent:[/bold]")
         console.print(f"  [dim]ID:[/dim] [cyan]{agent_id}[/cyan]")
-        console.print(f"  [dim]Token:[/dim] [yellow]{access_token}[/yellow]")
+        console.print(f"  [dim]Name:[/dim] [cyan]{agent_name}[/cyan]")
+
 
     console.print(f"\n[bold green]✓ Setup complete![/bold green]\n")
     console.print("[dim]Next steps:[/dim]")
@@ -1025,6 +1008,54 @@ swarm_app = typer.Typer(help="Manage agent swarm")
 app.add_typer(swarm_app, name="swarm")
 
 
+def _create_agent_config(
+    agent_id: str,
+    name: str,
+    agent_type: str,
+    model: str | None = None,
+    bound_user_key: str | None = None,
+) -> dict:
+    """Create agent config dict using defaults from config.json."""
+    from nanocats.config.loader import load_config
+    from nanocats.config.schema import AgentType
+
+    config = load_config()
+    default_provider = config.agents.defaults.provider
+    default_model = config.agents.defaults.model
+
+    provider = default_provider
+    final_model = default_model
+
+    if model:
+        if "/" in model:
+            provider, final_model = model.split("/", 1)
+        else:
+            final_model = model
+
+    session_policy_map = {
+        "user": "per_user",
+        "admin": "global",
+        "specialized": "per_channel",
+        "task": "per_task",
+    }
+
+    agent_data = {
+        "id": agent_id,
+        "name": name or agent_id,
+        "type": agent_type,
+        "sessionPolicy": session_policy_map.get(agent_type, "per_user"),
+        "model": final_model,
+        "provider": provider,
+        "autoStart": True,
+        "channels": {"enabled": ["web"]},
+    }
+
+    if bound_user_key:
+        agent_data["boundUserKey"] = bound_user_key
+
+    return agent_data
+
+
 @swarm_app.command("status")
 def swarm_status():
     """Show swarm status and list all configured agents."""
@@ -1090,13 +1121,13 @@ def swarm_create(
     bound_user_key: str = typer.Option(
         "", "--bound-user", "-b", help="User binding key (for user agent only)"
     ),
-    model: str = typer.Option("", "--model", "-m", help="Model to use"),
+    model: str = typer.Option(
+        "", "--model", "-m", help="Model to use (e.g., minimax/MiniMax-M2.5)"
+    ),
 ):
     """Create a new agent configuration."""
     import json
     from pathlib import Path
-
-    from nanocats.config.schema import AgentChannelsConfig, AgentConfig, AgentType
 
     valid_types = {"admin", "user", "specialized", "task"}
     if agent_type not in valid_types:
@@ -1104,35 +1135,15 @@ def swarm_create(
         console.print(f"Valid types: {', '.join(valid_types)}")
         raise typer.Exit(1)
 
-    session_policy_map = {
-        "user": "per_user",
-        "admin": "global",
-        "specialized": "per_channel",
-        "task": "per_task",
-    }
-    session_policy = session_policy_map.get(agent_type, "per_user")
-
     if agent_type == "user" and not bound_user_key:
         console.print(
             "[yellow]Warning:[/yellow] user agent should have --bound-user key for 1:1 binding"
         )
 
+    agent_data = _create_agent_config(agent_id, name, agent_type, model, bound_user_key)
+
     agents_dir = Path.home() / ".nanocats" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
-
-    agent_data = {
-        "id": agent_id,
-        "name": name or agent_id,
-        "type": agent_type,
-        "sessionPolicy": session_policy,
-        "model": model or "anthropic/claude-opus-4-5",
-        "provider": "anthropic",
-        "autoStart": True,
-        "channels": {"enabled": ["web"]},
-    }
-
-    if bound_user_key:
-        agent_data["boundUserKey"] = bound_user_key
 
     agent_config_path = agents_dir / f"{agent_id}.json"
     with open(agent_config_path, "w", encoding="utf-8") as f:
@@ -1140,7 +1151,8 @@ def swarm_create(
 
     console.print(f"[green]✓[/green] Created agent config: {agent_config_path}")
     console.print(f"  Type: {agent_type}")
-    console.print(f"  Session policy: {session_policy}")
+    console.print(f"  Model: {agent_data['model']}")
+    console.print(f"  Provider: {agent_data['provider']}")
     if bound_user_key:
         console.print(f"  Bound user: {bound_user_key}")
     console.print("Edit the file to configure channels, MCP, skills, etc.")
