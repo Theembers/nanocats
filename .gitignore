@@ -26,3 +26,4 @@ workspaces/
 .vibe/
 .vibe-think/
 frontend/node_modules
+.DS_Store
