@@ -723,13 +723,11 @@ def gateway(
     from nanocats.channels.manager import ChannelManager
     from nanocats.config.paths import get_cron_dir
     from nanocats.cron.service import CronService
-    from nanocats.cron.types import CronJob
     from nanocats.heartbeat.service import HeartbeatService
     from nanocats.swarm.manager import SwarmManager
 
     if verbose:
         import logging
-
         logging.basicConfig(level=logging.DEBUG)
 
     config = _load_runtime_config(config, workspace)
@@ -746,7 +744,6 @@ def gateway(
 
     cron_store_path = get_cron_dir() / "jobs.json"
     cron = CronService(cron_store_path)
-
     cron.on_job = None
 
     channels = channel_manager
@@ -778,25 +775,110 @@ def gateway(
         console.print("[yellow]Warning: No channels enabled[/yellow]")
 
     console.print(f"[green]✓[/green] Swarm: {len(swarm.registry.get_all())} agents configured")
-
     console.print("[bold]🚀 Starting services...[/bold]")
 
+    # ====================== 最终完整优化版 run()（解决所有问题） ======================
     async def run():
-        try:
-            await asyncio.gather(
-                swarm.start(),
-                channels.start_all(),
-            )
-            console.print("[green]✅ All services started successfully![/green]")
-            console.print(f"[dim]Gateway running at http://localhost:{port}[/dim]")
-            console.print("[dim]Press Ctrl+C to stop[/dim]")
-        except KeyboardInterrupt:
-            console.print("\nShutting down...")
-        finally:
-            await swarm.stop()
-            await channels.stop_all()
-            console.print("[green]✅ Gateway stopped[/green]")
+        import asyncio
+        import signal
+        import subprocess
+        import sys
 
+        shutdown_event = asyncio.Event()
+        webui_proc: subprocess.Popen | None = None
+        db = None
+
+        # ====================== 修复 WebUI 启动（日志可见 + 强制参数） ======================
+        webui_cmd = [
+            sys.executable,
+            "-m",
+            "nanocats",
+            "webui",
+            "--port",
+            "15651",          # 强制固定端口
+            "--host",
+            "0.0.0.0",        # 明确绑定所有网卡
+        ]
+
+        webui_proc = subprocess.Popen(
+            webui_cmd,
+            stdout=None,      # ← 关键：显示启动日志（和手动运行完全一样）
+            stderr=None,
+            start_new_session=True,
+        )
+        console.print(f"[dim]Web API 已启动 → http://localhost:15651[/dim]")
+        console.print(f"[dim]WebUI 进程 PID: {webui_proc.pid}[/dim]")
+
+        # ====================== 信号处理（二次 Ctrl+C 强制退出） ======================
+        def signal_handler(signum, frame):
+            nonlocal shutdown_event
+            if shutdown_event.is_set():
+                console.print("\n[red]第二次 Ctrl+C → 强制退出！[/red]")
+                sys.exit(130)
+            console.print("\nReceived signal, shutting down...")
+            shutdown_event.set()
+
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, lambda s=sig: signal_handler(s, None))
+
+        # ====================== 初始化数据库 ======================
+        from nanocats.db import Database
+        db = await Database.get_instance()
+        console.print("[green]✓[/green] Database initialized")
+
+        # ====================== 服务任务 ======================
+        swarm_task = asyncio.create_task(swarm.start(), name="swarm")
+        channels_task = asyncio.create_task(channels.start_all(), name="channels")
+        server_tasks = [swarm_task, channels_task]
+
+        try:
+            await shutdown_event.wait()
+            console.print("[yellow]正在优雅关闭所有服务...[/yellow]")
+
+            # 取消任务
+            for task in server_tasks:
+                if not task.done():
+                    task.cancel()
+
+            # 等待停止（最多 8 秒）
+            await asyncio.wait(server_tasks, timeout=8.0)
+
+            # 杀掉 WebUI 子进程
+            if webui_proc:
+                try:
+                    webui_proc.terminate()
+                    await asyncio.wait_for(
+                        asyncio.get_running_loop().run_in_executor(None, webui_proc.wait),
+                        timeout=3.0,
+                    )
+                except asyncio.TimeoutError:
+                    webui_proc.kill()
+                    console.print("[yellow]WebUI 已强制 kill[/yellow]")
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            # ====================== 最终清理（带超时保护） ======================
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(
+                        swarm.stop(),
+                        channels.stop_all(),
+                        db.close() if db is not None else asyncio.sleep(0),
+                        return_exceptions=True,
+                    ),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                console.print("[red]清理超时，部分资源可能未释放[/red]")
+            except Exception as e:
+                console.print(f"[red]清理异常: {e}[/red]")
+
+            console.print("[green]✅ Gateway 已完全停止[/green]")
+            sys.stdout.flush()
+
+    # ====================== 启动主循环 ======================
     asyncio.run(run())
 
 
@@ -1458,5 +1540,77 @@ def _login_github_copilot() -> None:
         raise typer.Exit(1)
 
 
+@app.command()
+def webui(
+    port: int | None = typer.Option(None, "--port", "-p", help="WebUI server port"),
+    host: str | None = typer.Option(None, "--host", help="WebUI server host"),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
+    config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
+):
+    """Start the nanocats WebUI API server."""
+    from nanocats.config.schema import Config
+    from nanocats.config.loader import load_config
+
+    config = _load_runtime_config(config, workspace)
+
+    web_config = config.web
+    bind_port = port if port is not None else web_config.port
+    bind_host = host if host is not None else web_config.host
+
+    console.print(f"{__logo__} Starting nanocats WebUI API on {bind_host}:{bind_port}...")
+
+    import uvicorn
+
+    from nanocats.webui.app import app as webui_app
+
+    uvicorn.run(webui_app, host=bind_host, port=bind_port)
+
+
 if __name__ == "__main__":
     app()
+
+
+@app.command()
+def user_create(
+    user_id: str = typer.Argument(..., help="User ID"),
+    password: str = typer.Argument(..., help="Password"),
+    name: str = typer.Option(..., "--name", "-n", help="Display name"),
+):
+    """Create a new WebUI user."""
+    from nanocats.webui.auth import create_user
+    from nanocats.webui.models import UserCreate
+
+    try:
+        user_data = UserCreate(user_id=user_id, password=password, name=name or user_id)
+        new_user = create_user(user_data)
+        console.print(
+            f"[green]User created successfully:[/green] {new_user['user_id']} ({new_user['name']})"
+        )
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def user_list():
+    """List all WebUI users."""
+    from nanocats.webui.auth import list_users
+
+    users = list_users()
+    if not users:
+        console.print("[yellow]No users found[/yellow]")
+        return
+
+    table = Table(title="WebUI Users")
+    table.add_column("User ID", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Created", style="blue")
+
+    for user in users:
+        table.add_row(
+            user["user_id"],
+            user["name"],
+            user.get("created_at", "N/A")[:10] if user.get("created_at") else "N/A",
+        )
+
+    console.print(table)
