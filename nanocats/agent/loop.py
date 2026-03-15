@@ -25,6 +25,7 @@ from nanocats.agent.tools.spawn import SpawnTool
 from nanocats.agent.tools.web import WebFetchTool, WebSearchTool
 from nanocats.bus.events import InboundMessage, OutboundMessage
 from nanocats.bus.queue import MessageBus
+from nanocats.db import record_log
 from nanocats.providers.base import LLMProvider
 from nanocats.session.manager import Session, SessionManager
 
@@ -64,6 +65,8 @@ class AgentLoop:
             self.agent_config = agent_config
             resolved_workspace: Path = agent_config.workspace
             resolved_model = model or agent_config.model
+            if hasattr(provider, "agent_id"):
+                provider.agent_id = agent_config.id
         else:
             self.agent_config = None
             resolved_workspace = workspace if workspace else Path.home() / ".nanocats" / "workspace"
@@ -224,6 +227,14 @@ class AgentLoop:
                     tools_used.append(tool_call.name)
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     logger.info("Tool call: {}({})", tool_call.name, args_str[:200])
+                    record_log(
+                        level="DEBUG",
+                        log_type="tool",
+                        message=f"Tool call: {tool_call.name}({args_str[:200]})",
+                        agent_id=self.agent_config.id if self.agent_config else "",
+                        tool_name=tool_call.name,
+                        metadata={"arguments": tool_call.arguments},
+                    )
                     result = await self.tools.execute(tool_call.name, tool_call.arguments)
                     messages = self.context.add_tool_result(
                         messages, tool_call.id, tool_call.name, result
@@ -259,6 +270,12 @@ class AgentLoop:
         self._running = True
         await self._connect_mcp()
         logger.info("Agent loop started")
+        record_log(
+            level="INFO",
+            log_type="agent",
+            message=f"Agent loop started: {self.agent_config.id if self.agent_config else 'unknown'}",
+            agent_id=self.agent_config.id if self.agent_config else "",
+        )
 
         while self._running:
             try:
@@ -362,6 +379,12 @@ class AgentLoop:
         """Stop the agent loop."""
         self._running = False
         logger.info("Agent loop stopping")
+        record_log(
+            level="INFO",
+            log_type="agent",
+            message="Agent loop stopping",
+            agent_id=self.agent_config.id if self.agent_config else "",
+        )
 
     async def _process_message(
         self,
@@ -402,6 +425,15 @@ class AgentLoop:
 
         key = session_key or msg.session_key
         session = self.sessions.get_or_create(key)
+
+        record_log(
+            level="INFO",
+            log_type="agent",
+            message=f"User: {preview}",
+            agent_id=self.agent_config.id if self.agent_config else "",
+            session_key=key,
+            channel=msg.channel,
+        )
 
         # Slash commands
         cmd = msg.content.strip().lower()
@@ -486,6 +518,14 @@ class AgentLoop:
 
         preview = final_content[:120] + "..." if len(final_content) > 120 else final_content
         logger.info("Response to {}:{}: {}", msg.channel, msg.sender_id, preview)
+        record_log(
+            level="INFO",
+            log_type="agent",
+            message=f"Assistant: {preview}",
+            agent_id=self.agent_config.id if self.agent_config else "",
+            session_key=session.key,
+            channel=msg.channel,
+        )
         return OutboundMessage(
             channel=msg.channel,
             chat_id=msg.chat_id,

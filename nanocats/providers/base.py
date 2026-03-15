@@ -8,10 +8,13 @@ from typing import Any
 
 from loguru import logger
 
+from nanocats.db import record_log
+
 
 @dataclass
 class ToolCallRequest:
     """A tool call request from the LLM."""
+
     id: str
     name: str
     arguments: dict[str, Any]
@@ -31,20 +34,23 @@ class ToolCallRequest:
         if self.provider_specific_fields:
             tool_call["provider_specific_fields"] = self.provider_specific_fields
         if self.function_provider_specific_fields:
-            tool_call["function"]["provider_specific_fields"] = self.function_provider_specific_fields
+            tool_call["function"]["provider_specific_fields"] = (
+                self.function_provider_specific_fields
+            )
         return tool_call
 
 
 @dataclass
 class LLMResponse:
     """Response from an LLM provider."""
+
     content: str | None
     tool_calls: list[ToolCallRequest] = field(default_factory=list)
     finish_reason: str = "stop"
     usage: dict[str, int] = field(default_factory=dict)
     reasoning_content: str | None = None  # Kimi, DeepSeek-R1 etc.
     thinking_blocks: list[dict] | None = None  # Anthropic extended thinking
-    
+
     @property
     def has_tool_calls(self) -> bool:
         """Check if response contains tool calls."""
@@ -69,7 +75,7 @@ class GenerationSettings:
 class LLMProvider(ABC):
     """
     Abstract base class for LLM providers.
-    
+
     Implementations should handle the specifics of each provider's API
     while maintaining a consistent interface.
     """
@@ -92,9 +98,12 @@ class LLMProvider(ABC):
 
     _SENTINEL = object()
 
-    def __init__(self, api_key: str | None = None, api_base: str | None = None):
+    def __init__(
+        self, api_key: str | None = None, api_base: str | None = None, agent_id: str | None = None
+    ):
         self.api_key = api_key
         self.api_base = api_base
+        self.agent_id = agent_id
         self.generation: GenerationSettings = GenerationSettings()
 
     @staticmethod
@@ -110,13 +119,18 @@ class LLMProvider(ABC):
 
             if isinstance(content, str) and not content:
                 clean = dict(msg)
-                clean["content"] = None if (msg.get("role") == "assistant" and msg.get("tool_calls")) else "(empty)"
+                clean["content"] = (
+                    None
+                    if (msg.get("role") == "assistant" and msg.get("tool_calls"))
+                    else "(empty)"
+                )
                 result.append(clean)
                 continue
 
             if isinstance(content, list):
                 filtered = [
-                    item for item in content
+                    item
+                    for item in content
                     if not (
                         isinstance(item, dict)
                         and item.get("type") in ("text", "input_text", "output_text")
@@ -170,7 +184,7 @@ class LLMProvider(ABC):
     ) -> LLMResponse:
         """
         Send a chat completion request.
-        
+
         Args:
             messages: List of message dicts with 'role' and 'content'.
             tools: Optional list of tool definitions.
@@ -178,7 +192,7 @@ class LLMProvider(ABC):
             max_tokens: Maximum tokens in response.
             temperature: Sampling temperature.
             tool_choice: Tool selection strategy ("auto", "required", or specific tool dict).
-        
+
         Returns:
             LLMResponse with content and/or tool calls.
         """
@@ -225,6 +239,37 @@ class LLMProvider(ABC):
                 )
                 # Log the usage
                 logger.debug("🧠: LLM usage: {}", response.usage)
+
+                # Record token usage to database
+                if self.agent_id and response.usage:
+                    try:
+                        from nanocats.db import record_token
+
+                        record_token(
+                            agent_id=self.agent_id,
+                            model=model or "unknown",
+                            provider=self.__class__.__name__.replace("Provider", "").lower(),
+                            input_tokens=response.usage.get("prompt_tokens", 0),
+                            output_tokens=response.usage.get("completion_tokens", 0),
+                            cache_hit=response.usage.get("cache_hit_tokens", 0),
+                        )
+
+                        record_log(
+                            level="INFO",
+                            log_type="provider",
+                            message=f"LLM tokens: input={response.usage.get('prompt_tokens', 0)}, output={response.usage.get('completion_tokens', 0)}",
+                            agent_id=self.agent_id,
+                            metadata={
+                                "model": model or "unknown",
+                                "provider": self.__class__.__name__.replace("Provider", "").lower(),
+                                "input_tokens": response.usage.get("prompt_tokens", 0),
+                                "output_tokens": response.usage.get("completion_tokens", 0),
+                                "total_tokens": response.usage.get("total_tokens", 0),
+                                "cache_hit": response.usage.get("cache_hit_tokens", 0),
+                            },
+                        )
+                    except Exception:
+                        pass
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

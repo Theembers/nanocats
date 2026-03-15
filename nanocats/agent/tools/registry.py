@@ -3,6 +3,7 @@
 from typing import Any
 
 from nanocats.agent.tools.base import Tool
+from nanocats.db import record_log
 
 
 class ToolRegistry:
@@ -44,18 +45,41 @@ class ToolRegistry:
             return f"Error: Tool '{name}' not found. Available: {', '.join(self.tool_names)}"
 
         try:
-            # Attempt to cast parameters to match schema types
             params = tool.cast_params(params)
-            
-            # Validate parameters
+
             errors = tool.validate_params(params)
             if errors:
                 return f"Error: Invalid parameters for tool '{name}': " + "; ".join(errors) + _HINT
+
+            import time
+
+            start_time = time.time()
             result = await tool.execute(**params)
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            record_log(
+                level="DEBUG",
+                log_type="tool",
+                message=f"Tool executed: {name}",
+                tool_name=name,
+                metadata={
+                    "params": params,
+                    "result_length": len(result) if isinstance(result, str) else 0,
+                    "duration_ms": duration_ms,
+                },
+            )
+
             if isinstance(result, str) and result.startswith("Error"):
                 return result + _HINT
             return result
         except Exception as e:
+            record_log(
+                level="ERROR",
+                log_type="tool",
+                message=f"Tool execution error: {name}: {str(e)}",
+                tool_name=name,
+                metadata={"params": params, "error": str(e)},
+            )
             return f"Error executing {name}: {str(e)}" + _HINT
 
     @property
