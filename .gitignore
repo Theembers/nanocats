@@ -25,3 +25,4 @@ nano.*.save
 workspaces/
 .vibe/
 .vibe-think/
+frontend/node_modules

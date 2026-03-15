@@ -1405,7 +1405,7 @@ def safe_read_file(path: Path, workspace: Path) -> str:
       "allowFrom": ["*"],
       "ui": {
         "enabled": true,
-        "port": 15852
+        "port": 15651
       }
     }
   },
