@@ -34,7 +34,7 @@ WORKDIR /app
 RUN mkdir -p /root/.nanocats
 
 # Gateway default port
-EXPOSE 18790
+EXPOSE 15851
 
 ENTRYPOINT ["nanocats"]
 CMD ["status"]
