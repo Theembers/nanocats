@@ -57,6 +57,9 @@ class ChannelManager:
                     if ch_config.enabled:
                         if ch_name not in enabled_channels:
                             enabled_channels[ch_name] = {}
+                        else:
+                            base_cfg = enabled_channels[ch_name].copy()
+                            enabled_channels[ch_name] = base_cfg
                         if isinstance(ch_config.extra, dict):
                             enabled_channels[ch_name].update(ch_config.extra)
                         if ch_config.allow_from:

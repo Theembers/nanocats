@@ -10,6 +10,7 @@ from loguru import logger
 
 from nanocats.bus.events import InboundMessage, OutboundMessage
 from nanocats.bus.queue import MessageBus
+from nanocats.db import record_log
 
 if TYPE_CHECKING:
     from nanocats.agent.registry import AgentRegistry
@@ -99,14 +100,25 @@ class BaseChannel(ABC):
             )
             return
 
+        msg_metadata = metadata or {}
+        agent_id = msg_metadata.pop("agent_id", None)
+
         msg = InboundMessage(
             channel=self.name,
             sender_id=str(sender_id),
             chat_id=str(chat_id),
             content=content,
             media=media or [],
-            metadata=metadata or {},
+            metadata=msg_metadata,
             session_key_override=session_key,
+            agent_id=agent_id,
+        )
+
+        record_log(
+            level="INFO",
+            log_type="channel",
+            message=f"Message received from {sender_id}",
+            channel=self.name,
         )
 
         if self.agent_registry:
