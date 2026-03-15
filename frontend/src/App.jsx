@@ -3,9 +3,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
-import Analytics from './pages/Analytics';
+import Config from './pages/Config';
+import Stats from './pages/Stats';
 import Logs from './pages/Logs';
 
 function ProtectedRoute({ children }) {
@@ -28,10 +28,11 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
+        <Route index element={<Navigate to="/chat" replace />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="chat/:agentId" element={<Chat />} />
-        <Route path="analytics" element={<Analytics />} />
+        <Route path="config/:agentId" element={<Config />} />
+        <Route path="stats" element={<Stats />} />
         <Route path="logs" element={<Logs />} />
       </Route>
     </Routes>

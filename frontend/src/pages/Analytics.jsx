@@ -16,6 +16,8 @@ import { format, subDays } from 'date-fns';
 import { getTokenAnalytics } from '../api/analytics';
 import LoadingSpinner from '../components/LoadingSpinner';
 
+const CHART_COLORS = ['#C4956A', '#7B8FA1', '#5E9E6E', '#4F6478', '#A3714A'];
+
 function Analytics() {
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -41,9 +43,10 @@ function Analytics() {
     if (!data || !data.by_model) {
       return [];
     }
-    return Object.entries(data.by_model).map(([model, tokens]) => ({
+    return Object.entries(data.by_model).map(([model, tokens], index) => ({
       model,
       tokens,
+      fill: CHART_COLORS[index % CHART_COLORS.length],
     }));
   };
 
@@ -113,13 +116,19 @@ function Analytics() {
         <div className="chart-container">
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={formatChartData()}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E2D9" />
+              <XAxis dataKey="date" stroke="#7A6F67" fontSize={12} />
+              <YAxis stroke="#7A6F67" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  background: '#FEFCF8', 
+                  border: '1px solid #E8E2D9',
+                  borderRadius: '8px'
+                }}
+              />
               <Legend />
-              <Line type="monotone" dataKey="inputTokens" stroke="#6366f1" name="Input" />
-              <Line type="monotone" dataKey="outputTokens" stroke="#22c55e" name="Output" />
+              <Line type="monotone" dataKey="inputTokens" stroke="#7B8FA1" name="Input" strokeWidth={2} dot={{ fill: '#7B8FA1' }} />
+              <Line type="monotone" dataKey="outputTokens" stroke="#C4956A" name="Output" strokeWidth={2} dot={{ fill: '#C4956A' }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -130,11 +139,17 @@ function Analytics() {
         <div className="chart-container">
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={formatModelData()}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="model" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="tokens" fill="#6366f1" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E2D9" />
+              <XAxis dataKey="model" stroke="#7A6F67" fontSize={12} />
+              <YAxis stroke="#7A6F67" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  background: '#FEFCF8', 
+                  border: '1px solid #E8E2D9',
+                  borderRadius: '8px'
+                }}
+              />
+              <Bar dataKey="tokens" />
             </BarChart>
           </ResponsiveContainer>
         </div>

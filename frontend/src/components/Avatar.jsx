@@ -1,7 +1,5 @@
 import React from 'react';
 
-const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/bottts/svg?seed=nanocats';
-
 function Avatar({ name, size = 'medium' }) {
   const getSize = () => {
     switch (size) {
@@ -18,20 +16,24 @@ function Avatar({ name, size = 'medium' }) {
 
   const sizeValue = getSize();
   const initials = name ? name.substring(0, 2).toUpperCase() : 'NA';
-  const avatarUrl = name
-    ? `https://api.dicebear.com/7.x/initials/svg?seed=${initials}&backgroundColor=6366f1`
-    : DEFAULT_AVATAR;
-
+  
   return (
     <div
       className={`avatar avatar-${size}`}
-      style={{ width: sizeValue, height: sizeValue }}
+      style={{ 
+        width: sizeValue, 
+        height: sizeValue,
+        background: 'var(--color-accent)',
+        color: 'var(--text-inverse)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 600,
+        fontSize: sizeValue * 0.4,
+        borderRadius: '50%'
+      }}
     >
-      <img
-        src={avatarUrl}
-        alt={name || 'Avatar'}
-        style={{ width: '100%', height: '100%', borderRadius: '50%' }}
-      />
+      {initials}
     </div>
   );
 }
