@@ -81,7 +81,5 @@ class AgentConfigLoader:
             provider=data.get("provider", "anthropic"),
             ttl=data.get("ttl"),
             auto_start=data.get("autoStart", True),
-            bound_user_key=data.get("boundUserKey"),
-            token=data.get("token"),
             routing=data.get("routing", {}),
         )

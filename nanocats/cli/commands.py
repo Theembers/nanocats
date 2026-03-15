@@ -508,7 +508,7 @@ def onboard():
             json.dump(agent_data, f, indent=2, ensure_ascii=False)
 
         console.print(f"\n[green]✓[/green] Created agent: [bold]{agent_id}[/bold]\n")
-        
+
     else:
         console.print(f"\n[dim]Skipped agent creation[/dim]\n")
 
@@ -531,7 +531,6 @@ def onboard():
         console.print(f"\n[bold]Master Agent:[/bold]")
         console.print(f"  [dim]ID:[/dim] [cyan]{agent_id}[/cyan]")
         console.print(f"  [dim]Name:[/dim] [cyan]{agent_name}[/cyan]")
-
 
     console.print(f"\n[bold green]✓ Setup complete![/bold green]\n")
     console.print("[dim]Next steps:[/dim]")
@@ -1013,7 +1012,6 @@ def _create_agent_config(
     name: str,
     agent_type: str,
     model: str | None = None,
-    bound_user_key: str | None = None,
 ) -> dict:
     """Create agent config dict using defaults from config.json."""
     from nanocats.config.loader import load_config
@@ -1050,8 +1048,7 @@ def _create_agent_config(
         "channels": {"enabled": ["web"]},
     }
 
-    if bound_user_key:
-        agent_data["boundUserKey"] = bound_user_key
+    return agent_data
 
     return agent_data
 
@@ -1118,9 +1115,6 @@ def swarm_create(
     agent_type: str = typer.Option(
         "user", "--type", "-t", help="Agent type (admin, user, specialized, task)"
     ),
-    bound_user_key: str = typer.Option(
-        "", "--bound-user", "-b", help="User binding key (for user agent only)"
-    ),
     model: str = typer.Option(
         "", "--model", "-m", help="Model to use (e.g., minimax/MiniMax-M2.5)"
     ),
@@ -1135,12 +1129,7 @@ def swarm_create(
         console.print(f"Valid types: {', '.join(valid_types)}")
         raise typer.Exit(1)
 
-    if agent_type == "user" and not bound_user_key:
-        console.print(
-            "[yellow]Warning:[/yellow] user agent should have --bound-user key for 1:1 binding"
-        )
-
-    agent_data = _create_agent_config(agent_id, name, agent_type, model, bound_user_key)
+    agent_data = _create_agent_config(agent_id, name, agent_type, model)
 
     agents_dir = Path.home() / ".nanocats" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
@@ -1153,8 +1142,6 @@ def swarm_create(
     console.print(f"  Type: {agent_type}")
     console.print(f"  Model: {agent_data['model']}")
     console.print(f"  Provider: {agent_data['provider']}")
-    if bound_user_key:
-        console.print(f"  Bound user: {bound_user_key}")
     console.print("Edit the file to configure channels, MCP, skills, etc.")
 
 

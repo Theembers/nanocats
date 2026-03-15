@@ -10,78 +10,54 @@
   </p>
 </div>
 
-> 🙏 **Based on [nanobot](https://github.com/HKUDS/nanobot)** — nanocats is built upon the excellent foundation of nanobot, extending it with Agent Swarm capabilities and multi-agent orchestration.
+> 🙏 **Based on [nanobot](https://github.com/HKUDS/nanobot)** — nanocats is built upon the excellent foundation of nanobot, extending it with multi-agent support and enhanced tool capabilities.
 
 ## ⚠️ Development Status
 
 > **This project is currently in active development. Features may change, bugs may occur, and functionality is NOT guaranteed to be stable or complete. Use at your own risk.**
 
-## 📢 News
-
-- **2026-03-12** 🔥 Major Refactor: Unified OpenAIProvider replacing LiteLLMProvider
-  - Better provider compatibility (MiniMax, etc.)
-  - Support for prompt_tokens_details.cached_tokens cache statistics
-  - Reduced dependency complexity
-- **2026-03-12** 🎨 Added frontend Markdown rendering (react-markdown, remark-gfm)
-- **2026-03-12** 🌐 Added Web interface with agent management, chat UI, token statistics, and logs viewer
-
 ## Key Features
 
-🤖 **Agent Swarm**: Hierarchical multi-agent system (Supervisor → User Agent → Task Agent)
+⚡️ **Ultra-Lightweight**: Minimal footprint, fast startup, low resource usage
 
-🏢 **Independent Workspaces**: Each agent has its own isolated workspace
+💬 **Multi-Channel Support**: Connect to Telegram, Discord, Feishu, Slack, WhatsApp, DingTalk, QQ, Email, and more
 
-🔧 **Per-Agent MCP Configuration**: MCP servers installed centrally but configured per-agent
+🤖 **Multi-Agent System**: Support for multiple agent types (Admin, User, Specialized, Task) with independent configurations
 
-📱 **Per-Agent Channel Binding**: Each user agent can have independent channel configurations
+🔧 **Flexible Tools**: Built-in tools for file operations, shell execution, web search, and MCP integration
 
-🌐 **Web Interface**: Built-in web UI for agent management, chat, configuration, and monitoring
+🧠 **Memory System**: Persistent memory with automatic consolidation
 
-📊 **Token Analytics**: Track token usage, cache hits, and costs by agent/model/time
+📦 **Skills**: Extensible skill system for adding new capabilities
 
-📝 **Activity Logs**: View model calls, MCP executions, skill usage, and tool invocations
-
-⚡️ **Lightning Fast**: Minimal footprint means faster startup, lower resource usage, and quicker iterations
-
-💎 **Easy-to-Use**: One-click to deploy and you're ready to go
+⏰ **Scheduled Tasks**: Cron-based task scheduling
 
 ## Table of Contents
 
-- [News](#-news)
-- [Key Features](#key-features)
-- [Install](#-install)
-- [Quick Start](#-quick-start)
-- [Web Interface](#-web-interface)
-- [Chat Apps](#-chat-apps)
-- [Configuration](#️-configuration)
-- [CLI Reference](#-cli-reference)
-- [Project Structure](#-project-structure)
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [Chat Channels](#chat-channels)
+- [Configuration](#configuration)
+- [CLI Reference](#cli-reference)
+- [Project Structure](#project-structure)
 
-## 📦 Install
-
-**Install from source** (latest features, recommended for development)
+## Install
 
 ```bash
 git clone https://github.com/Theembers/nanocats.git
 cd nanocats
-pip install -e ".[web]" --break-system-packages
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
 > [!NOTE]
-> Use `--break-system-packages` for Homebrew Python on macOS. For other systems or virtual environments, you can omit this flag.
+> **On macOS with Homebrew Python**: Always activate the virtual environment before running nanocats commands:
+> ```bash
+> source .venv/bin/activate
+> ```
 
-**Build Web Interface** (required for first time or after frontend changes)
-
-```bash
-cd nanocats/web/frontend
-npm install && npm run build
-```
-
-## 🚀 Quick Start
-
-> [!TIP]
-> Set your API key in `~/.nanocats/config.json`.
-> Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global)
+## Quick Start
 
 **1. Initialize**
 
@@ -89,22 +65,17 @@ npm install && npm run build
 nanocats onboard
 ```
 
-**2. Configure** (`~/.nanocats/config.json`)
+**2. Configure**
 
-*Set your API key*:
+Edit `~/.nanocats/config.json`:
+
 ```json
 {
   "providers": {
     "openrouter": {
       "apiKey": "sk-or-v1-xxx"
     }
-  }
-}
-```
-
-*Set your model*:
-```json
-{
+  },
   "agents": {
     "defaults": {
       "model": "anthropic/claude-opus-4-5",
@@ -114,67 +85,43 @@ nanocats onboard
 }
 ```
 
-**3. Chat**
+**3. Start chatting**
 
 ```bash
+# Interactive mode
 nanocats agent
+
+# Single message
+nanocat s agent -m "Hello"
 ```
 
-## 🌐 Web Interface
-
-nanocats includes a built-in web interface for managing agents, chatting, and monitoring usage.
-
-**Start the web server:**
+**4. Connect to chat channels**
 
 ```bash
-nanocats web
+nanocats gateway
 ```
 
-**Access the interface:**
+## Chat Channels
 
-- 📱 Web UI: http://localhost:8080
-- 📚 API Docs: http://localhost:8080/docs
+Connect nanocats to your favorite messaging platforms.
 
-**Features:**
-
-| Feature | Description |
-|---------|-------------|
-| **Agent Login** | Login with your agent ID and token |
-| **Chat Interface** | Chat with your agent in real-time |
-| **Agent Config** | Configure personality, model, provider settings |
-| **MCP/Skill Management** | Install and manage MCP servers and skills |
-| **Token Statistics** | View token usage charts and tables by time/model/agent |
-| **Activity Logs** | Monitor model calls, MCP, skill, and tool executions |
-
-**Login:**
-
-1. Agent ID: Your agent configuration ID (e.g., `test_agent`)
-2. Token: Use `admin` for testing, or configure custom tokens in agent config
-
-## 💬 Chat Apps
-
-Connect the system to your favorite chat platform.
-
-| Channel | What you need |
+| Channel | Setup Required |
 |---------|---------------|
 | **Telegram** | Bot token from @BotFather |
 | **Discord** | Bot token + Message Content intent |
 | **Feishu** | App ID + App Secret |
 | **DingTalk** | App Key + App Secret |
 | **Slack** | Bot token + App-Level token |
-| **Email** | IMAP/SMTP credentials |
 | **WhatsApp** | QR code scan |
 | **QQ** | App ID + App Secret |
+| **Email** | IMAP/SMTP credentials |
+| **Web** | WebSocket connection |
 
-<details>
-<summary><b>Telegram</b> (Recommended)</summary>
+### Telegram Setup
 
-**1. Create a bot**
-- Open Telegram, search `@BotFather`
-- Send `/newbot`, follow prompts
-- Copy the token
-
-**2. Configure**
+1. Create a bot via @BotFather
+2. Copy the bot token
+3. Configure in `~/.nanocats/config.json`:
 
 ```json
 {
@@ -188,26 +135,11 @@ Connect the system to your favorite chat platform.
 }
 ```
 
-**3. Run**
+### Discord Setup
 
-```bash
-nanocats gateway
-```
-
-</details>
-
-<details>
-<summary><b>Discord</b></summary>
-
-**1. Create a bot**
-- Go to https://discord.com/developers/applications
-- Create an application → Bot → Add Bot
-- Copy the bot token
-
-**2. Enable intents**
-- In the Bot settings, enable **MESSAGE CONTENT INTENT**
-
-**3. Configure**
+1. Create an application at https://discord.com/developers/applications
+2. Add a Bot and enable **MESSAGE CONTENT INTENT**
+3. Copy the bot token and configure:
 
 ```json
 {
@@ -215,149 +147,132 @@ nanocats gateway
     "discord": {
       "enabled": true,
       "token": "YOUR_BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"],
-      "groupPolicy": "mention"
+      "allowFrom": ["YOUR_USER_ID"]
     }
   }
 }
 ```
 
-**4. Run**
+### Web Channel
 
-```bash
-nanocats gateway
-```
-
-</details>
-
-<details>
-<summary><b>Feishu</b></summary>
-
-Uses **WebSocket** long connection — no public IP required.
-
-**1. Create a Feishu bot**
-- Visit [Feishu Open Platform](https://open.feishu.cn/app)
-- Create a new app → Enable **Bot** capability
-- **Permissions**: Add `im:message` (send) and `im:message.p2p_msg:readonly` (receive)
-- **Events**: Add `im.message.receive_v1` (receive messages)
-  - Select **Long Connection** mode
-- Get **App ID** and **App Secret** from "Credentials & Basic Info"
-- Publish the app
-
-**2. Configure**
+The Web channel provides a WebSocket interface for browser-based chat:
 
 ```json
 {
   "channels": {
-    "feishu": {
+    "web": {
       "enabled": true,
-      "appId": "cli_xxx",
-      "appSecret": "xxx",
-      "allowFrom": ["ou_YOUR_OPEN_ID"]
+      "host": "0.0.0.0",
+      "port": 15751,
+      "allowFrom": ["*"]
     }
   }
 }
 ```
 
-**3. Run**
+Connect via WebSocket to `ws://localhost:15751/ws` with initial message containing `user_id`.
 
-```bash
-nanocats gateway
-```
-
-</details>
-
-<details>
-<summary><b>DingTalk</b></summary>
-
-Uses **Stream Mode** — no public IP required.
-
-**1. Create a DingTalk bot**
-- Visit [DingTalk Open Platform](https://open-dev.dingtalk.com/)
-- Create a new app -> Add **Robot** capability
-- **Configuration**: Toggle **Stream Mode** ON
-- **Permissions**: Add necessary permissions for sending messages
-- Get **AppKey** and **AppSecret** from "Credentials"
-- Publish the app
-
-**2. Configure**
-
-```json
-{
-  "channels": {
-    "dingtalk": {
-      "enabled": true,
-      "clientId": "YOUR_APP_KEY",
-      "clientSecret": "YOUR_APP_SECRET",
-      "allowFrom": ["YOUR_STAFF_ID"]
-    }
-  }
-}
-```
-
-**3. Run**
-
-```bash
-nanocats gateway
-```
-
-</details>
-
-<details>
-<summary><b>Slack</b></summary>
-
-Uses **Socket Mode** — no public URL required.
-
-**1. Create a Slack app**
-- Go to [Slack API](https://api.slack.com/apps) → **Create New App** → "From scratch"
-- Pick a name and select your workspace
-
-**2. Configure the app**
-- **Socket Mode**: Toggle ON → Generate an **App-Level Token** with `connections:write` scope
-- **OAuth & Permissions**: Add bot scopes: `chat:write`, `app_mentions:read`
-- **Event Subscriptions**: Toggle ON → Subscribe to bot events: `message.im`, `message.channels`, `app_mention`
-- **Install App**: Click **Install to Workspace** → Copy the **Bot Token** (`xoxb-...`)
-
-**3. Configure**
-
-```json
-{
-  "channels": {
-    "slack": {
-      "enabled": true,
-      "botToken": "xoxb-...",
-      "appToken": "xapp-...",
-      "allowFrom": ["YOUR_SLACK_USER_ID"],
-      "groupPolicy": "mention"
-    }
-  }
-}
-```
-
-**4. Run**
-
-```bash
-nanocats gateway
-```
-
-</details>
-
-## ⚙️ Configuration
-
-Config file: `~/.nanocats/config.json`
+## Configuration
 
 ### Providers
 
-| Provider | Purpose | Get API Key |
-|----------|---------|-------------|
-| `custom` | Any OpenAI-compatible endpoint | — |
-| `openrouter` | LLM (recommended, access to all models) | [openrouter.ai](https://openrouter.ai) |
-| `anthropic` | LLM (Claude direct) | [console.anthropic.com](https://console.anthropic.com) |
-| `openai` | LLM (GPT direct) | [platform.openai.com](https://platform.openai.com) |
-| `deepseek` | LLM (DeepSeek direct) | [platform.deepseek.com](https://platform.deepseek.com) |
-| `ollama` | LLM (local, Ollama) | — |
+Supported LLM providers:
 
-### MCP (Model Context Protocol)
+| Provider | Description |
+|----------|-------------|
+| `openrouter` | Access to multiple models (recommended) |
+| `anthropic` | Claude models |
+| `openai` | GPT models |
+| `deepseek` | DeepSeek models |
+| `azure_openai` | Azure OpenAI |
+| `ollama` | Local Ollama models |
+| `custom` | Any OpenAI-compatible endpoint |
+| `gemini` | Google Gemini models |
+| `groq` | Groq models |
+| `zhipu` | Zhipu AI (智谱 AI) |
+| `dashscope` | Alibaba DashScope (通义千问) |
+| `moonshot` | Moonshot AI (月之暗面) |
+| `minimax` | MiniMax models |
+| `vllm` | vLLM local deployment |
+| `aihubmix` | AiHubMix API gateway |
+| `siliconflow` | SiliconFlow (硅基流动) |
+| `volcengine` | VolcEngine (火山引擎) |
+| `volcengine_coding_plan` | VolcEngine Coding Plan |
+| `byteplus` | BytePlus (火山引擎国际版) |
+| `byteplus_coding_plan` | BytePlus Coding Plan |
+| `openai_codex` | OpenAI Codex (OAuth) |
+| `github_copilot` | GitHub Copilot (OAuth) |
+
+### Agent Types
+
+nanocats supports multiple agent types:
+
+- **Admin**: Global session, single instance (session key: `global`)
+- **User**: Per-user sessions with group support (session key: `user:{group_id}`)
+- **Specialized**: Agent-specific sessions (session key: `agent:{agent_id}`)
+- **Task**: Task-specific sessions (session key: `task:{agent_id}`)
+
+#### User Agent Session Groups
+
+For User type agents, you can configure session groups to group multiple chat IDs together:
+
+```json
+{
+  "id": "myagent",
+  "name": "My Agent",
+  "type": "user",
+  "channels": {
+    "session_groups": [
+      {
+        "group_id": "work",
+        "chat_ids": {
+          "telegram": "123456789",
+          "discord": "channel_111"
+        }
+      },
+      {
+        "group_id": "personal",
+        "chat_ids": {
+          "telegram": "987654321",
+          "discord": "channel_222"
+        }
+      }
+    ]
+  }
+}
+```
+
+With this config:
+- Messages from `telegram:123456789` and `discord:channel_111` share the same session (work group)
+- Messages from `telegram:987654321` and `discord:channel_222` share the same session (personal group)
+
+### Tools
+
+Built-in tools available to agents:
+
+- **Filesystem**: Read, write, edit files; list directories
+- **Shell**: Execute shell commands with timeout protection
+- **Web Search**: Search the web using Brave, DuckDuckGo, or SearXNG
+- **Web Fetch**: Fetch web page content
+- **Message**: Send messages to chat channels
+- **Cron**: Schedule and manage recurring tasks
+- **Spawn**: Spawn background sub-agents for parallel task execution
+- **MCP**: Integration with Model Context Protocol servers
+
+### Skills
+
+Skills extend agent capabilities. Built-in skills include:
+
+- GitHub operations
+- Cron job management
+- Tmux session management
+- Memory management
+- Weather information
+- Text summarization
+
+### MCP Servers
+
+Configure MCP servers in your agent config:
 
 ```json
 {
@@ -372,59 +287,46 @@ Config file: `~/.nanocats/config.json`
 }
 ```
 
-### Agent Swarm Configuration
-
-```json
-{
-  "agents": {
-    "swarm": {
-      "enabled": true,
-      "max_agents": 20,
-      "default_agent_ttl": 3600
-    }
-  }
-}
-```
-
-## 💻 CLI Reference
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `nanocats onboard` | Initialize config & workspace |
-| `nanocats agent -m "..."` | Chat with the agent |
-| `nanocats agent` | Interactive chat mode |
-| `nanocats gateway` | Start the gateway |
-| `nanocats web` | Start the web interface |
-| `nanocats web --port 3000` | Start web on custom port |
-| `nanocats status` | Show status |
-| `nanocats swarm status` | Show swarm status |
-| `nanocats swarm list` | List all agents |
+| `nanocats onboard` | Initialize configuration and workspace |
+| `nanocats agent` | Chat with the agent (interactive mode) |
+| `nanocats agent -m "..."` | Send a single message |
+| `nanocats gateway` | Start the gateway with all enabled channels |
+| `nanocats status` | Show system status |
+| `nanocats swarm status` | Show agent swarm status |
 | `nanocats swarm create <id>` | Create a new agent |
+| `nanocats channels status` | Show channel status |
+| `nanocats channels login` | QR login for WhatsApp |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 nanocats/
-├── agent/          # 🧠 Core agent logic
-│   ├── loop.py     #    Agent loop
-│   ├── context.py  #    Prompt builder
-│   ├── memory.py   #    Persistent memory
-│   ├── skills.py   #    Skills loader
-│   └── tools/      #    Built-in tools
-├── swarm/          # 🤖 Agent Swarm
-│   ├── manager.py  #    Swarm manager
-│   ├── instance.py #    Agent instance
-│   ├── router.py   #    Message router
-│   └── mcp_registry.py # MCP registry
-├── web/            # 🌐 Web Interface
-│   ├── backend/    #    FastAPI backend
-│   └── frontend/   #    React frontend
-├── skills/         # 🎯 Bundled skills
-├── channels/       # 📱 Chat channel integrations
-├── bus/            # 🚌 Message routing
-├── cron/           # ⏰ Scheduled tasks
-├── providers/      # 🤖 LLM providers
-├── session/        # 💬 Conversation sessions
-├── config/         # ⚙️ Configuration
-└── cli/            # 🖥️ Commands
+├── agent/              # Core agent logic
+│   ├── loop.py        # Main agent loop
+│   ├── context.py     # Context building
+│   ├── memory.py      # Persistent memory
+│   └── tools/         # Built-in tools
+├── channels/          # Chat channel integrations
+│   ├── telegram.py
+│   ├── discord.py
+│   ├── feishu.py
+│   └── ...
+├── providers/         # LLM provider integrations
+│   ├── litellm_provider.py
+│   ├── custom_provider.py
+│   └── ...
+├── swarm/             # Multi-agent orchestration
+├── bus/               # Message routing
+├── cron/              # Scheduled tasks
+├── session/           # Conversation sessions
+├── config/            # Configuration management
+└── cli/               # CLI commands
 ```
+
+## License
+
+MIT
