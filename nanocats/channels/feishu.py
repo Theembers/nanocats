@@ -274,7 +274,8 @@ class FeishuChannel(BaseChannel):
         self._client: Any = None
         self._ws_client: Any = None
         self._ws_thread: threading.Thread | None = None
-        self._processed_message_ids: OrderedDict[str, None] = OrderedDict()  # Ordered dedup cache
+        self._processed_message_ids: OrderedDict[str, None] = OrderedDict()
+        self._message_reactions: dict[str, str] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
 
     @staticmethod
@@ -399,8 +400,7 @@ class FeishuChannel(BaseChannel):
             return True
         return self._is_bot_mentioned(message)
 
-    def _add_reaction_sync(self, message_id: str, emoji_type: str) -> None:
-        """Sync helper for adding reaction (runs in thread pool)."""
+    def _add_reaction_sync(self, message_id: str, emoji_type: str) -> str | None:
         from lark_oapi.api.im.v1 import (
             CreateMessageReactionRequest,
             CreateMessageReactionRequestBody,
@@ -425,22 +425,54 @@ class FeishuChannel(BaseChannel):
                 logger.warning(
                     "Failed to add reaction: code={}, msg={}", response.code, response.msg
                 )
-            else:
-                logger.debug("Added {} reaction to message {}", emoji_type, message_id)
+                return None
+            reaction_id = response.data.reaction_id
+            logger.debug(
+                "Added {} reaction to message {}, reaction_id={}",
+                emoji_type,
+                message_id,
+                reaction_id,
+            )
+            return reaction_id
         except Exception as e:
             logger.warning("Error adding reaction: {}", e)
+            return None
 
-    async def _add_reaction(self, message_id: str, emoji_type: str = "Typing") -> None:
-        """
-        Add a reaction emoji to a message (non-blocking).
-
-        Common emoji types: Typing, OK, EYES, DONE, OnIt, HEART
-        """
+    async def _add_reaction(self, message_id: str, emoji_type: str = "Typing") -> str | None:
         if not self._client:
-            return
+            return None
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._add_reaction_sync, message_id, emoji_type)
+        return await loop.run_in_executor(None, self._add_reaction_sync, message_id, emoji_type)
+
+    def _remove_reaction_sync(self, message_id: str, reaction_id: str) -> bool:
+        from lark_oapi.api.im.v1 import DeleteMessageReactionRequest
+
+        try:
+            request = (
+                DeleteMessageReactionRequest.builder()
+                .message_id(message_id)
+                .reaction_id(reaction_id)
+                .build()
+            )
+            response = self._client.im.v1.message_reaction.delete(request)
+            if not response.success():
+                logger.warning(
+                    "Failed to remove reaction: code={}, msg={}", response.code, response.msg
+                )
+                return False
+            logger.debug("Removed reaction {} from message {}", reaction_id, message_id)
+            return True
+        except Exception as e:
+            logger.warning("Error removing reaction: {}", e)
+            return False
+
+    async def _remove_reaction(self, message_id: str, reaction_id: str) -> bool:
+        if not self._client:
+            return False
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._remove_reaction_sync, message_id, reaction_id)
 
     # Regex to match markdown tables (header + separator + data rows)
     _TABLE_RE = re.compile(
@@ -939,6 +971,11 @@ class FeishuChannel(BaseChannel):
                             media_type,
                             json.dumps({"file_key": key}, ensure_ascii=False),
                         )
+            
+            inbound_message_id = msg.metadata.get("message_id")
+            if inbound_message_id and inbound_message_id in self._message_reactions:
+                reaction_id = self._message_reactions.pop(inbound_message_id)
+                await self._remove_reaction(inbound_message_id, reaction_id)
 
             if msg.content and msg.content.strip():
                 fmt = self._detect_msg_format(msg.content)
@@ -1033,8 +1070,9 @@ class FeishuChannel(BaseChannel):
                 logger.info("Feishu: skipping group message (not mentioned), chat_id={}", chat_id)
                 return
 
-            # Add reaction
-            await self._add_reaction(message_id, self.config.react_emoji)
+            reaction_id = await self._add_reaction(message_id, self.config.react_emoji)
+            if reaction_id:
+                self._message_reactions[message_id] = reaction_id
 
             # Parse content
             content_parts = []
