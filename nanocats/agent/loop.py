@@ -269,13 +269,6 @@ class AgentLoop:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
         self._running = True
         await self._connect_mcp()
-        logger.info("Agent loop started")
-        record_log(
-            level="INFO",
-            log_type="agent",
-            message=f"Agent loop started: {self.agent_config.id if self.agent_config else 'unknown'}",
-            agent_id=self.agent_config.id if self.agent_config else "",
-        )
 
         while self._running:
             try:
@@ -378,13 +371,6 @@ class AgentLoop:
     def stop(self) -> None:
         """Stop the agent loop."""
         self._running = False
-        logger.info("Agent loop stopping")
-        record_log(
-            level="INFO",
-            log_type="agent",
-            message="Agent loop stopping",
-            agent_id=self.agent_config.id if self.agent_config else "",
-        )
 
     async def _process_message(
         self,

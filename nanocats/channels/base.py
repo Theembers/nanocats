@@ -126,12 +126,6 @@ class BaseChannel(ABC):
             chat_id,
             repr(content_preview),
         )
-        record_log(
-            level="INFO",
-            log_type="channel",
-            message=f"MARK Message received from {sender_id}",
-            channel=self.name,
-        )
 
         if self.agent_registry:
             await self._resolve_agent_info(msg)

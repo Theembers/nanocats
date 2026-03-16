@@ -11,17 +11,18 @@ security = HTTPBearer(auto_error=False)
 
 def is_admin_user(user: User) -> bool:
     from nanocats.agent.config import AgentConfigLoader
+    from nanocats.config.schema import AgentType
 
-    admin_config = AgentConfigLoader.load("admin")
-    if not admin_config:
-        return True
+    all_agents = AgentConfigLoader.load_all()
+    for agent_config in all_agents.values():
+        if agent_config.type == AgentType.ADMIN:
+            for ch_config in agent_config.channels.configs.values():
+                if ch_config.enabled and (
+                    user.user_id in ch_config.allow_from or "*" in ch_config.allow_from
+                ):
+                    return True
 
-    for ch_config in admin_config.channels.configs.values():
-        if ch_config.enabled and (
-            user.user_id in ch_config.allow_from or "*" in ch_config.allow_from
-        ):
-            return True
-    return False
+    return True
 
 
 async def get_current_user(request: Request) -> User:

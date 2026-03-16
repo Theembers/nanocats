@@ -20,6 +20,7 @@ from nanocats.bus.events import InboundMessage, OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
 from nanocats.config.schema import ChannelInstanceConfig, FrontendConfig
+from nanocats.db import record_log
 
 
 class WebChannelConfig(ChannelInstanceConfig):
