@@ -19,14 +19,11 @@ from uvicorn import Server, Config
 from nanocats.bus.events import InboundMessage, OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base, FrontendConfig
-from nanocats.db import record_log
+from nanocats.config.schema import ChannelInstanceConfig, FrontendConfig
 
 
-class WebChannelConfig(Base):
-    """Web channel configuration."""
-
-    enabled: bool = False
+class WebChannelConfig(ChannelInstanceConfig):
+    type: str = "web"
     host: str = "0.0.0.0"
     port: int = 15751
     allow_from: list[str] = Field(default_factory=lambda: ["*"])

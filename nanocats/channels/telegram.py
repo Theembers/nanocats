@@ -18,7 +18,7 @@ from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
 from nanocats.config.paths import get_media_dir
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 from nanocats.utils.helpers import split_message
 
 TELEGRAM_MAX_MESSAGE_LEN = 4000  # Telegram message character limit
@@ -154,12 +154,9 @@ def _markdown_to_telegram_html(text: str) -> str:
     return text
 
 
-class TelegramConfig(Base):
-    """Telegram channel configuration."""
-
-    enabled: bool = False
+class TelegramConfig(ChannelInstanceConfig):
+    type: str = "telegram"
     token: str = ""
-    allow_from: list[str] = Field(default_factory=list)
     proxy: str | None = None
     reply_to_message: bool = False
     group_policy: Literal["open", "mention"] = "mention"

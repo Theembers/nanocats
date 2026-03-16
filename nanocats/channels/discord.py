@@ -14,7 +14,7 @@ from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
 from nanocats.config.paths import get_media_dir
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 from nanocats.utils.helpers import split_message
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
@@ -22,12 +22,9 @@ MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 20MB
 MAX_MESSAGE_LEN = 2000  # Discord message character limit
 
 
-class DiscordConfig(Base):
-    """Discord channel configuration."""
-
-    enabled: bool = False
+class DiscordConfig(ChannelInstanceConfig):
+    type: str = "discord"
     token: str = ""
-    allow_from: list[str] = Field(default_factory=list)
     gateway_url: str = "wss://gateway.discord.gg/?v=10&encoding=json"
     intents: int = 37377
     group_policy: Literal["mention", "open"] = "mention"

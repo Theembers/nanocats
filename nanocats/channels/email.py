@@ -20,13 +20,11 @@ from pydantic import Field
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 
 
-class EmailConfig(Base):
-    """Email channel configuration (IMAP inbound + SMTP outbound)."""
-
-    enabled: bool = False
+class EmailConfig(ChannelInstanceConfig):
+    type: str = "email"
     consent_granted: bool = False
 
     imap_host: str = ""
@@ -49,7 +47,6 @@ class EmailConfig(Base):
     mark_seen: bool = True
     max_body_chars: int = 12000
     subject_prefix: str = "Re: "
-    allow_from: list[str] = Field(default_factory=list)
 
 
 class EmailChannel(BaseChannel):

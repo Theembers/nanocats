@@ -16,21 +16,17 @@ from nanocats.bus.queue import MessageBus
 from pydantic import Field
 
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 
 
-class SlackDMConfig(Base):
-    """Slack DM policy configuration."""
-
+class SlackDMConfig(ChannelInstanceConfig):
     enabled: bool = True
     policy: str = "open"
     allow_from: list[str] = Field(default_factory=list)
 
 
-class SlackConfig(Base):
-    """Slack channel configuration."""
-
-    enabled: bool = False
+class SlackConfig(ChannelInstanceConfig):
+    type: str = "slack"
     mode: str = "socket"
     webhook_path: str = "/slack/events"
     bot_token: str = ""
@@ -38,7 +34,6 @@ class SlackConfig(Base):
     user_token_read_only: bool = True
     reply_in_thread: bool = True
     react_emoji: str = "eyes"
-    allow_from: list[str] = Field(default_factory=list)
     group_policy: str = "mention"
     group_allow_from: list[str] = Field(default_factory=list)
     dm: SlackDMConfig = Field(default_factory=SlackDMConfig)

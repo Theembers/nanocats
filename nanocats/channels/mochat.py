@@ -16,7 +16,7 @@ from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
 from nanocats.config.paths import get_runtime_subdir
-from nanocats.config.schema import Base
+from nanocats.config.schema import Base, ChannelInstanceConfig
 from pydantic import Field
 
 try:
@@ -231,21 +231,15 @@ def parse_timestamp(value: Any) -> int | None:
 
 
 class MochatMentionConfig(Base):
-    """Mochat mention behavior configuration."""
-
     require_in_groups: bool = False
 
 
 class MochatGroupRule(Base):
-    """Mochat per-group mention requirement."""
-
     require_mention: bool = False
 
 
-class MochatConfig(Base):
-    """Mochat channel configuration."""
-
-    enabled: bool = False
+class MochatConfig(ChannelInstanceConfig):
+    type: str = "mochat"
     base_url: str = "https://mochat.io"
     socket_url: str = ""
     socket_path: str = "/socket.io"
@@ -262,7 +256,6 @@ class MochatConfig(Base):
     agent_user_id: str = ""
     sessions: list[str] = Field(default_factory=list)
     panels: list[str] = Field(default_factory=list)
-    allow_from: list[str] = Field(default_factory=list)
     mention: MochatMentionConfig = Field(default_factory=MochatMentionConfig)
     groups: dict[str, MochatGroupRule] = Field(default_factory=dict)
     reply_delay_mode: str = "non-mention"

@@ -31,44 +31,40 @@ class ChannelManager:
         from nanocats.channels.registry import discover_all
 
         groq_key = self.config.providers.groq.api_key
-        all_channels = discover_all()
+        channel_classes = discover_all()
 
-        enabled_channels: dict[str, dict] = {}
+        config_dict = self.config.channels.model_dump()
+        config_dict.pop("send_progress", None)
+        config_dict.pop("send_tool_hints", None)
 
-        for name, cls in all_channels.items():
-            section = getattr(self.config.channels, name, None)
-            if section is None:
+        for instance_id, instance_config in config_dict.items():
+            if not isinstance(instance_config, dict):
                 continue
 
-            channel_config = {}
-            if isinstance(section, dict):
-                channel_config = dict(section)
-                enabled = section.get("enabled", False)
-            else:
-                channel_config = section.model_dump() if hasattr(section, "model_dump") else {}
-                enabled = getattr(section, "enabled", False)
-
-            if enabled:
-                enabled_channels[name] = channel_config
-
-        for name, channel_config in enabled_channels.items():
-            cls = all_channels.get(name)
-            if not cls:
-                continue
-
-            enabled = (
-                channel_config.get("enabled", False) if isinstance(channel_config, dict) else False
-            )
+            enabled = instance_config.get("enabled", False)
             if not enabled:
                 continue
 
+            channel_type = instance_config.get("type", "")
+            if not channel_type:
+                logger.warning("Channel {} has no 'type' field, skipping", instance_id)
+                continue
+
+            cls = channel_classes.get(channel_type)
+            if not cls:
+                logger.warning(
+                    "Unknown channel type '{}' for instance {}", channel_type, instance_id
+                )
+                continue
+
             try:
-                channel = cls(channel_config, self.bus, self.agent_registry)
+                instance_config["instance_id"] = instance_id
+                channel = cls(instance_config, self.bus, self.agent_registry)
                 channel.transcription_api_key = groq_key
-                self.channels[name] = channel
-                logger.info("{} channel enabled", cls.display_name)
+                self.channels[instance_id] = channel
+                logger.info("{} channel enabled: {}", cls.display_name, instance_id)
             except Exception as e:
-                logger.warning("{} channel not available: {}", name, e)
+                logger.warning("{} channel not available: {}", instance_id, e)
 
     async def _start_channel(self, name: str, channel: BaseChannel) -> None:
         """Start a channel and log any exceptions."""

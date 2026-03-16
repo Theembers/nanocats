@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 class BaseChannel(ABC):
     name: str = "base"
     display_name: str = "Base"
+    instance_id: str = ""
     transcription_api_key: str = ""
 
     def __init__(
@@ -31,6 +32,9 @@ class BaseChannel(ABC):
         self.bus = bus
         self.agent_registry = agent_registry
         self._running = False
+        self.instance_id = (
+            getattr(config, "instance_id", "") or getattr(config, "type", "") or self.name
+        )
 
     async def transcribe_audio(self, file_path: str | Path) -> str:
         """Transcribe an audio file via Groq Whisper. Returns empty string on failure."""
@@ -99,14 +103,14 @@ class BaseChannel(ABC):
         content_preview = content[:200] + "..." if len(content) > 200 else content
         logger.info(
             "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",
-            self.name,
+            self.instance_id or self.name,
             sender_id,
             chat_id,
             repr(content_preview),
         )
 
         msg = InboundMessage(
-            channel=self.name,
+            channel=self.instance_id or self.name,
             sender_id=str(sender_id),
             chat_id=str(chat_id),
             content=content,
@@ -117,7 +121,7 @@ class BaseChannel(ABC):
         )
         logger.info(
             "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",
-            self.name,
+            self.instance_id or self.name,
             sender_id,
             chat_id,
             repr(content_preview),

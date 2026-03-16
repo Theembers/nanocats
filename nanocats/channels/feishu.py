@@ -15,7 +15,7 @@ from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
 from nanocats.config.paths import get_media_dir
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 from pydantic import Field
 
 import importlib.util
@@ -234,15 +234,12 @@ def _extract_post_text(content_json: dict) -> str:
     return text
 
 
-class FeishuConfig(Base):
-    """Feishu/Lark channel configuration using WebSocket long connection."""
-
-    enabled: bool = False
+class FeishuConfig(ChannelInstanceConfig):
+    type: str = "feishu"
     app_id: str = ""
     app_secret: str = ""
     encrypt_key: str = ""
     verification_token: str = ""
-    allow_from: list[str] = Field(default_factory=list)
     react_emoji: str = "Typing"
     group_policy: Literal["open", "mention"] = "mention"
 
@@ -971,7 +968,7 @@ class FeishuChannel(BaseChannel):
                             media_type,
                             json.dumps({"file_key": key}, ensure_ascii=False),
                         )
-            
+
             inbound_message_id = msg.metadata.get("message_id")
             if inbound_message_id and inbound_message_id in self._message_reactions:
                 reaction_id = self._message_reactions.pop(inbound_message_id)

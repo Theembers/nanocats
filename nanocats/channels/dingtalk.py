@@ -16,7 +16,7 @@ from pydantic import Field
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 
 try:
     from dingtalk_stream import (
@@ -104,13 +104,10 @@ class NanobotDingTalkHandler(CallbackHandler):
             return AckMessage.STATUS_OK, "Error"
 
 
-class DingTalkConfig(Base):
-    """DingTalk channel configuration using Stream mode."""
-
-    enabled: bool = False
+class DingTalkConfig(ChannelInstanceConfig):
+    type: str = "dingtalk"
     client_id: str = ""
     client_secret: str = ""
-    allow_from: list[str] = Field(default_factory=list)
 
 
 class DingTalkChannel(BaseChannel):

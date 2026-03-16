@@ -9,7 +9,7 @@ from loguru import logger
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 from pydantic import Field
 
 try:
@@ -51,13 +51,10 @@ def _make_bot_class(channel: "QQChannel") -> "type[botpy.Client]":
     return _Bot
 
 
-class QQConfig(Base):
-    """QQ channel configuration using botpy SDK."""
-
-    enabled: bool = False
+class QQConfig(ChannelInstanceConfig):
+    type: str = "qq"
     app_id: str = ""
     secret: str = ""
-    allow_from: list[str] = Field(default_factory=list)
     msg_format: Literal["plain", "markdown"] = "plain"
 
 

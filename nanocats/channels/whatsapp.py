@@ -13,16 +13,13 @@ from pydantic import Field
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
-from nanocats.config.schema import Base
+from nanocats.config.schema import ChannelInstanceConfig
 
 
-class WhatsAppConfig(Base):
-    """WhatsApp channel configuration."""
-
-    enabled: bool = False
+class WhatsAppConfig(ChannelInstanceConfig):
+    type: str = "whatsapp"
     bridge_url: str = "ws://localhost:3001"
     bridge_token: str = ""
-    allow_from: list[str] = Field(default_factory=list)
 
 
 class WhatsAppChannel(BaseChannel):

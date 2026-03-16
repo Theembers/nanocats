@@ -72,6 +72,22 @@ class Base(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class ChannelInstanceConfig(Base):
+    """Base configuration for a channel instance.
+
+    All channel configs should inherit from this class.
+    - type: the channel type (feishu, telegram, discord, etc.)
+    - enabled: whether this instance is active
+    - instance_id: the instance identifier (set at runtime)
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str = ""  # channel type: feishu, telegram, discord, etc.
+    enabled: bool = False
+    instance_id: str = ""  # runtime instance identifier
+
+
 class ChannelsConfig(Base):
     """Configuration for chat channels.
 
