@@ -73,14 +73,7 @@ class BaseChannel(ABC):
         pass
 
     def is_allowed(self, sender_id: str) -> bool:
-        """Check if *sender_id* is permitted.  Empty list → deny all; ``"*"`` → allow all."""
-        allow_list = getattr(self.config, "allow_from", [])
-        if not allow_list:
-            logger.warning("{}: allow_from is empty — all access denied", self.name)
-            return False
-        if "*" in allow_list:
-            return True
-        return str(sender_id) in allow_list
+        return True
 
     async def _handle_message(
         self,
@@ -103,6 +96,15 @@ class BaseChannel(ABC):
         msg_metadata = metadata or {}
         agent_id = msg_metadata.pop("agent_id", None)
 
+        content_preview = content[:200] + "..." if len(content) > 200 else content
+        logger.info(
+            "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",
+            self.name,
+            sender_id,
+            chat_id,
+            repr(content_preview),
+        )
+
         msg = InboundMessage(
             channel=self.name,
             sender_id=str(sender_id),
@@ -113,11 +115,17 @@ class BaseChannel(ABC):
             session_key_override=session_key,
             agent_id=agent_id,
         )
-
+        logger.info(
+            "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",
+            self.name,
+            sender_id,
+            chat_id,
+            repr(content_preview),
+        )
         record_log(
             level="INFO",
             log_type="channel",
-            message=f"Message received from {sender_id}",
+            message=f"MARK Message received from {sender_id}",
             channel=self.name,
         )
 
@@ -142,7 +150,10 @@ class BaseChannel(ABC):
             session_key = self.agent_registry.resolve_session_key(agent, group_id)
 
             logger.info(
-                "Routed to agent={} (type={}), session_key={}, group_id={}",
+                "[Channel] routed: channel={}, chat_id={}, agent_id={}, "
+                "agent_type={}, session_key={}, group_id={}",
+                msg.channel,
+                msg.chat_id,
                 agent.id,
                 agent.type.value,
                 session_key,

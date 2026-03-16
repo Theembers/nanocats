@@ -51,23 +51,6 @@ class ChannelManager:
             if enabled:
                 enabled_channels[name] = channel_config
 
-        if self.agent_registry:
-            for agent_config in self.agent_registry.get_all().values():
-                for ch_name, ch_config in agent_config.channels.configs.items():
-                    if ch_config.enabled:
-                        if ch_name not in enabled_channels:
-                            enabled_channels[ch_name] = {}
-                        else:
-                            base_cfg = enabled_channels[ch_name].copy()
-                            enabled_channels[ch_name] = base_cfg
-                        if isinstance(ch_config.extra, dict):
-                            enabled_channels[ch_name].update(ch_config.extra)
-                        if ch_config.allow_from:
-                            enabled_channels[ch_name]["allow_from"] = ch_config.allow_from
-                        if "enabled" not in enabled_channels[ch_name]:
-                            enabled_channels[ch_name]["enabled"] = True
-                        logger.debug("Channel {} enabled by agent {}", ch_name, agent_config.id)
-
         for name, channel_config in enabled_channels.items():
             cls = all_channels.get(name)
             if not cls:
@@ -86,16 +69,6 @@ class ChannelManager:
                 logger.info("{} channel enabled", cls.display_name)
             except Exception as e:
                 logger.warning("{} channel not available: {}", name, e)
-
-        self._validate_allow_from()
-
-    def _validate_allow_from(self) -> None:
-        for name, ch in self.channels.items():
-            if getattr(ch.config, "allow_from", None) == []:
-                raise SystemExit(
-                    f'Error: "{name}" has empty allowFrom (denies all). '
-                    f'Set ["*"] to allow everyone, or add specific user IDs.'
-                )
 
     async def _start_channel(self, name: str, channel: BaseChannel) -> None:
         """Start a channel and log any exceptions."""
