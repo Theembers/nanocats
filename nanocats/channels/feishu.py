@@ -1011,6 +1011,7 @@ class FeishuChannel(BaseChannel):
 
             # Skip bot messages
             if sender.sender_type == "bot":
+                logger.info("Feishu: skipping bot message, sender_type={}", sender.sender_type)
                 return
 
             sender_id = sender.sender_id.open_id if sender.sender_id else "unknown"
@@ -1018,8 +1019,18 @@ class FeishuChannel(BaseChannel):
             chat_type = message.chat_type
             msg_type = message.message_type
 
+            logger.info(
+                "Feishu: message received - message_id={}, sender_id={}, chat_id={}, "
+                "chat_type={}, msg_type={}",
+                message_id,
+                sender_id,
+                chat_id,
+                chat_type,
+                msg_type,
+            )
+
             if chat_type == "group" and not self._is_group_message_for_bot(message):
-                logger.debug("Feishu: skipping group message (not mentioned)")
+                logger.info("Feishu: skipping group message (not mentioned), chat_id={}", chat_id)
                 return
 
             # Add reaction

@@ -31,7 +31,7 @@ class AgentRegistry:
     def find_by_channel(self, channel: str, chat_id: str) -> tuple[AgentConfig, str | None] | None:
         """Find agent by channel and chat_id."""
         for agent in self._agents.values():
-            logger.debug(
+            logger.info(
                 "Checking agent {} for channel={}, chat_id={}",
                 agent.id,
                 channel,
@@ -40,11 +40,11 @@ class AgentRegistry:
 
             channel_cfg = agent.channels.configs.get(channel)
             if not channel_cfg or not channel_cfg.enabled:
-                logger.debug("Agent {}: channel {} not enabled", agent.id, channel)
+                logger.info("Agent {}: channel {} not enabled", agent.id, channel)
                 continue
 
             if not self._is_chat_allowed(channel_cfg, chat_id):
-                logger.debug(
+                logger.info(
                     "Agent {}: chat_id {} not in allow_from {}",
                     agent.id,
                     chat_id,

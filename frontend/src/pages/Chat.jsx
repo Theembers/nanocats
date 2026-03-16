@@ -11,6 +11,33 @@ import ToolCallContent from '../components/ToolCallContent';
 import { Send, MessageSquare } from 'lucide-react';
 import './Chat.css';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('[Chat Error]', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="chat-page-container">
+          <div className="error-message">
+            <h3>Error in Chat</h3>
+            <pre>{this.state.error?.message}</pre>
+            <pre>{this.state.error?.stack}</pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const CHANNEL_ICONS = {
   web: '🌐',
   telegram: '✈️',
@@ -25,12 +52,29 @@ const CHANNEL_ICONS = {
 };
 
 function Chat() {
+  return (
+    <ErrorBoundary>
+      <ChatInner />
+    </ErrorBoundary>
+  );
+}
+
+function ChatInner() {
   const { agentId } = useParams();
   const navigate = useNavigate();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
+
+  const {
+    messages: realtimeMessages,
+    isConnected,
+    connect,
+    disconnect,
+    sendMessage,
+    clearMessages,
+  } = useChatStore();
 
   const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
     queryKey: ['agents'],
@@ -88,16 +132,6 @@ function Chat() {
     );
   }
 
-  const {
-    messages: realtimeMessages,
-    isConnected,
-    connect,
-    disconnect,
-    sendMessage,
-    addMessage,
-    clearMessages,
-  } = useChatStore();
-
   useEffect(() => {
     if (currentAgentId) {
       connect(currentAgentId);
@@ -146,7 +180,7 @@ function Chat() {
   const sessions = useMemo(() => {
     if (agent?.sessions && agent.sessions.length > 0) {
       return agent.sessions.map(s => ({
-        key: s.key,
+        key: s.key || '',
         type: s.type,
         created_at: s.created_at,
         updated_at: s.updated_at,
