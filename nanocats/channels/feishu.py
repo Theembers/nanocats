@@ -2,10 +2,13 @@
 
 import asyncio
 import json
+import multiprocessing as mp
 import os
 import re
 import threading
+import time
 from collections import OrderedDict
+from multiprocessing import Event, Queue as MPQueue
 from pathlib import Path
 from typing import Any, Literal
 
@@ -19,6 +22,7 @@ from nanocats.config.schema import ChannelInstanceConfig
 from pydantic import Field
 
 import importlib.util
+
 
 FEISHU_AVAILABLE = importlib.util.find_spec("lark_oapi") is not None
 
@@ -244,6 +248,70 @@ class FeishuConfig(ChannelInstanceConfig):
     group_policy: Literal["open", "mention"] = "mention"
 
 
+class FeishuReceiverProcess(mp.Process):
+    """每个 Feishu 账号一个独立进程（彻底解决 loop 冲突）
+    只负责接收消息，通过 Queue 转发给主进程处理（发送/下载/反应都在主进程）
+    """
+
+    def __init__(self, config: FeishuConfig, name: str, message_queue: MPQueue):
+        super().__init__(daemon=True, name=f"FeishuReceiver-{name}")
+        self.config = config
+        self.name = name
+        self._message_queue = message_queue  # 子进程 → 主进程
+        self._shutdown = Event()
+
+    def run(self):
+        import lark_oapi as lark
+
+        logger.info(f"Feishu receiver process [{self.name}] 已启动")
+
+        # 只注册必要的事件（其他忽略）
+        builder = lark.EventDispatcherHandler.builder(
+            self.config.encrypt_key or "",
+            self.config.verification_token or "",
+        ).register_p2_im_message_receive_v1(self._queue_message)
+
+        event_handler = builder.build()
+
+        while not self._shutdown.is_set():
+            try:
+                ws_client = lark.ws.Client(
+                    self.config.app_id,
+                    self.config.app_secret,
+                    event_handler=event_handler,
+                    log_level=lark.LogLevel.INFO,
+                )
+                logger.info(f"Feishu [{self.name}] WebSocket connecting...")
+                ws_client.start()  # 官方写法，进程隔离后不再报 loop 错误
+            except Exception as e:
+                if not self._shutdown.is_set():
+                    logger.warning(f"Feishu [{self.name}] WebSocket error: {e}")
+                    time.sleep(5)
+
+        logger.info(f"Feishu receiver process [{self.name}] 正在优雅退出")
+
+    def _queue_message(self, data: Any) -> None:
+        """把原始事件转成可 picklable 的 dict，转发给主进程"""
+        try:
+            event = data.event
+            message = event.message
+            sender = event.sender
+
+            payload = {
+                "message_id": message.message_id,
+                "sender_id": getattr(sender.sender_id, "open_id", "unknown")
+                if sender.sender_id
+                else "unknown",
+                "chat_id": message.chat_id,
+                "chat_type": message.chat_type,
+                "msg_type": message.message_type,
+                "content": message.content or "{}",
+            }
+            self._message_queue.put(payload)
+        except Exception as e:
+            logger.error(f"Feishu [{self.name}] 消息入队失败: {e}")
+
+
 class FeishuChannel(BaseChannel):
     """
     Feishu/Lark channel using WebSocket long connection.
@@ -269,20 +337,17 @@ class FeishuChannel(BaseChannel):
         super().__init__(config, bus, agent_registry)
         self.config: FeishuConfig = config
         self._client: Any = None
-        self._ws_client: Any = None
-        self._ws_thread: threading.Thread | None = None
         self._processed_message_ids: OrderedDict[str, None] = OrderedDict()
         self._message_reactions: dict[str, str] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
 
-    @staticmethod
-    def _register_optional_event(builder: Any, method_name: str, handler: Any) -> Any:
-        """Register an event handler only when the SDK supports it."""
-        method = getattr(builder, method_name, None)
-        return method(handler) if callable(method) else builder
+        self._receiver_process: FeishuReceiverProcess | None = None
+        self._message_queue: MPQueue = MPQueue()
+        self._listener_thread: threading.Thread | None = None
+        self._running = False
 
     async def start(self) -> None:
-        """Start the Feishu bot with WebSocket long connection."""
+        """Start the Feishu bot with dedicated receiver process."""
         if not FEISHU_AVAILABLE:
             logger.error("Feishu SDK not installed. Run: pip install lark-oapi")
             return
@@ -296,7 +361,6 @@ class FeishuChannel(BaseChannel):
         self._running = True
         self._loop = asyncio.get_running_loop()
 
-        # Create Lark client for sending messages
         self._client = (
             lark.Client.builder()
             .app_id(self.config.app_id)
@@ -304,82 +368,142 @@ class FeishuChannel(BaseChannel):
             .log_level(lark.LogLevel.INFO)
             .build()
         )
-        builder = lark.EventDispatcherHandler.builder(
-            self.config.encrypt_key or "",
-            self.config.verification_token or "",
-        ).register_p2_im_message_receive_v1(self._on_message_sync)
-        builder = self._register_optional_event(
-            builder, "register_p2_im_message_reaction_created_v1", self._on_reaction_created
-        )
-        builder = self._register_optional_event(
-            builder, "register_p2_im_message_message_read_v1", self._on_message_read
-        )
-        builder = self._register_optional_event(
-            builder,
-            "register_p2_im_chat_access_event_bot_p2p_chat_entered_v1",
-            self._on_bot_p2p_chat_entered,
-        )
-        event_handler = builder.build()
 
-        # Create WebSocket client for long connection
-        self._ws_client = lark.ws.Client(
-            self.config.app_id,
-            self.config.app_secret,
-            event_handler=event_handler,
-            log_level=lark.LogLevel.INFO,
-        )
+        self._receiver_process = FeishuReceiverProcess(self.config, self.name, self._message_queue)
+        self._receiver_process.start()
 
-        def run_ws():
-            import time
-            import asyncio
-            import asyncio as asyncio_module
-            import lark_oapi.ws.client as _lark_ws_client
-
-            original_get_loop = asyncio_module.get_event_loop
-            asyncio_module.get_event_loop = lambda: asyncio.new_event_loop()
-            _lark_ws_client.loop = None
-
-            ws_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(ws_loop)
-
-            try:
-                while self._running:
-                    try:
-                        ws_client = lark.ws.Client(
-                            self.config.app_id,
-                            self.config.app_secret,
-                            event_handler=event_handler,
-                            log_level=lark.LogLevel.INFO,
+        def queue_listener():
+            while self._running:
+                try:
+                    payload = self._message_queue.get(timeout=1)
+                    if self._loop:
+                        asyncio.run_coroutine_threadsafe(
+                            self._process_queued_message(payload), self._loop
                         )
-                        ws_client.start()
-                    except Exception as e:
-                        logger.warning("Feishu WebSocket error: {}", e)
-                    if self._running:
-                        time.sleep(5)
-            finally:
-                ws_loop.close()
-                asyncio_module.get_event_loop = original_get_loop
+                except Exception:
+                    continue
 
-        self._ws_thread = threading.Thread(target=run_ws, daemon=True)
-        self._ws_thread.start()
+        self._listener_thread = threading.Thread(target=queue_listener, daemon=True)
+        self._listener_thread.start()
 
-        logger.info("Feishu bot started with WebSocket long connection")
-        logger.info("No public IP required - using WebSocket to receive events")
-
-        # Keep running until stopped
+        logger.info(f"Feishu bot '{self.name}' 已启动（独立进程模式）")
         while self._running:
             await asyncio.sleep(1)
 
     async def stop(self) -> None:
-        """
-        Stop the Feishu bot.
-
-        Notice: lark.ws.Client does not expose stop method， simply exiting the program will close the client.
-
-        Reference: https://github.com/larksuite/oapi-sdk-python/blob/v2_main/lark_oapi/ws/client.py#L86
-        """
+        """优雅退出：先通知子进程，等待 10 秒，再强制 terminate"""
         self._running = False
-        logger.info("Feishu bot stopped")
+
+        if self._receiver_process and self._receiver_process.is_alive():
+            self._receiver_process._shutdown.set()
+            self._receiver_process.join(timeout=10)
+            if self._receiver_process.is_alive():
+                logger.warning(f"Feishu [{self.name}] 强制终止进程")
+                self._receiver_process.terminate()
+                self._receiver_process.join(timeout=2)
+
+        logger.info(f"Feishu bot '{self.name}' 已优雅停止")
+
+    async def _process_queued_message(self, payload: dict) -> None:
+        """Process messages from the receiver process queue."""
+        try:
+            message_id = payload["message_id"]
+            if message_id in self._processed_message_ids:
+                return
+            self._processed_message_ids[message_id] = None
+            while len(self._processed_message_ids) > 1000:
+                self._processed_message_ids.popitem(last=False)
+
+            sender_id = payload["sender_id"]
+            chat_id = payload["chat_id"]
+            chat_type = payload["chat_type"]
+            msg_type = payload["msg_type"]
+
+            logger.info(f"Feishu: message received from queue - {message_id}")
+
+            if chat_type == "group":
+                fake_message = type("obj", (object,), {"content": payload.get("content", "{}")})()
+                if not self._is_group_message_for_bot(fake_message):
+                    return
+
+            reaction_id = await self._add_reaction(message_id, self.config.react_emoji)
+            if reaction_id:
+                self._message_reactions[message_id] = reaction_id
+
+            content_parts = []
+            media_paths = []
+
+            try:
+                content_json = json.loads(payload.get("content", "{}"))
+            except json.JSONDecodeError:
+                content_json = {}
+
+            if msg_type == "text":
+                text = content_json.get("text", "")
+                if text:
+                    content_parts.append(text)
+
+            elif msg_type == "post":
+                text, image_keys = _extract_post_content(content_json)
+                if text:
+                    content_parts.append(text)
+                for img_key in image_keys:
+                    file_path, content_text = await self._download_and_save_media(
+                        "image", {"image_key": img_key}, message_id
+                    )
+                    if file_path:
+                        media_paths.append(file_path)
+                    content_parts.append(content_text)
+
+            elif msg_type in ("image", "audio", "file", "media"):
+                file_path, content_text = await self._download_and_save_media(
+                    msg_type, content_json, message_id
+                )
+                if file_path:
+                    media_paths.append(file_path)
+
+                if msg_type == "audio" and file_path:
+                    transcription = await self.transcribe_audio(file_path)
+                    if transcription:
+                        content_text = f"[transcription: {transcription}]"
+
+                content_parts.append(content_text)
+
+            elif msg_type in (
+                "share_chat",
+                "share_user",
+                "interactive",
+                "share_calendar_event",
+                "system",
+                "merge_forward",
+            ):
+                text = _extract_share_card_content(content_json, msg_type)
+                if text:
+                    content_parts.append(text)
+
+            else:
+                content_parts.append(MSG_TYPE_MAP.get(msg_type, f"[{msg_type}]"))
+
+            content = "\n".join(content_parts) if content_parts else ""
+
+            if not content and not media_paths:
+                return
+
+            reply_to = chat_id if chat_type == "group" else sender_id
+            await self._handle_message(
+                sender_id=sender_id,
+                chat_id=reply_to,
+                content=content,
+                media=media_paths,
+                metadata={
+                    "message_id": message_id,
+                    "chat_type": chat_type,
+                    "msg_type": msg_type,
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing queued Feishu message: {e}")
 
     def _is_bot_mentioned(self, message: Any) -> bool:
         """Check if the bot is @mentioned in the message."""
@@ -1025,14 +1149,6 @@ class FeishuChannel(BaseChannel):
         except Exception as e:
             logger.error("Error sending Feishu message: {}", e)
 
-    def _on_message_sync(self, data: Any) -> None:
-        """
-        Sync handler for incoming messages (called from WebSocket thread).
-        Schedules async handling in the main event loop.
-        """
-        if self._loop and self._loop.is_running():
-            asyncio.run_coroutine_threadsafe(self._on_message(data), self._loop)
-
     async def _on_message(self, data: Any) -> None:
         """Handle incoming message from Feishu."""
         try:
@@ -1155,17 +1271,4 @@ class FeishuChannel(BaseChannel):
             )
 
         except Exception as e:
-            logger.error("Error processing Feishu message: {}", e)
-
-    def _on_reaction_created(self, data: Any) -> None:
-        """Ignore reaction events so they do not generate SDK noise."""
-        pass
-
-    def _on_message_read(self, data: Any) -> None:
-        """Ignore read events so they do not generate SDK noise."""
-        pass
-
-    def _on_bot_p2p_chat_entered(self, data: Any) -> None:
-        """Ignore p2p-enter events when a user opens a bot chat."""
-        logger.debug("Bot entered p2p chat (user opened chat window)")
-        pass
+            logger.error("Error processing queued Feishu message: {}", e)

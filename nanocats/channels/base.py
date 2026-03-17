@@ -130,6 +130,15 @@ class BaseChannel(ABC):
         if self.agent_registry:
             await self._resolve_agent_info(msg)
 
+        if not msg.agent_id:
+            logger.warning(
+                "Message blocked: no agent found for channel={}, chat_id={}. "
+                "Add chat_id to allowFrom list in agent config.",
+                msg.channel,
+                msg.chat_id,
+            )
+            return
+
         await self.bus.publish_inbound(msg)
 
     async def _resolve_agent_info(self, msg: InboundMessage) -> None:
