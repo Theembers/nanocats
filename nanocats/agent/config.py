@@ -52,23 +52,26 @@ class AgentConfigLoader:
         channels_data = data.get("channels", {})
         configs = {}
         for name, ch_data in channels_data.get("configs", {}).items():
-            standard_fields = {"enabled", "allowFrom"}
+            standard_fields = {"enabled", "allow_from", "allowFrom"}
             extra = {k: v for k, v in ch_data.items() if k not in standard_fields}
             configs[name] = ChannelConfig(
                 enabled=ch_data.get("enabled", False),
-                allow_from=ch_data.get("allowFrom", []),
+                allow_from=ch_data.get("allow_from") or ch_data.get("allowFrom", []),
                 extra=extra,
             )
 
         session_groups = [
-            SessionGroup(group_id=sg["groupId"], chat_ids=sg["chatIds"])
-            for sg in channels_data.get("sessionGroups", [])
+            SessionGroup(
+                group_id=sg.get("group_id") or sg.get("groupId", ""),
+                chat_ids=sg.get("chat_ids") or sg.get("chatIds", {}),
+            )
+            for sg in channels_data.get("session_groups") or channels_data.get("sessionGroups", [])
         ]
 
         channels = AgentChannelsConfig(
             configs=configs,
             session_groups=session_groups,
-            allow_agents=channels_data.get("allowAgents", []),
+            allow_agents=channels_data.get("allow_agents") or channels_data.get("allowAgents", []),
         )
 
         return AgentConfig(
@@ -76,10 +79,10 @@ class AgentConfigLoader:
             name=data.get("name", agent_id),
             type=AgentType(data.get("type", "user")),
             channels=channels,
-            session_policy=data.get("sessionPolicy", "per_user"),
+            session_policy=data.get("session_policy") or data.get("sessionPolicy", "per_user"),
             model=data.get("model", "anthropic/claude-opus-4-5"),
             provider=data.get("provider", "anthropic"),
             ttl=data.get("ttl"),
-            auto_start=data.get("autoStart", True),
+            auto_start=data.get("auto_start") if "auto_start" in data else data.get("autoStart", True),
             routing=data.get("routing", {}),
         )

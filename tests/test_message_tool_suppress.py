@@ -12,11 +12,21 @@ from nanocats.bus.queue import MessageBus
 from nanocats.providers.base import LLMResponse, ToolCallRequest
 
 
+def _make_mock_agent_config(workspace: Path) -> MagicMock:
+    """Create a mock AgentConfig for testing."""
+    agent_config = MagicMock()
+    agent_config.id = "test-agent"
+    agent_config.model = "test-model"
+    agent_config.workspace = workspace
+    return agent_config
+
+
 def _make_loop(tmp_path: Path) -> AgentLoop:
     bus = MessageBus()
     provider = MagicMock()
     provider.get_default_model.return_value = "test-model"
-    return AgentLoop(bus=bus, provider=provider, workspace=tmp_path, model="test-model")
+    agent_config = _make_mock_agent_config(tmp_path)
+    return AgentLoop(bus=bus, provider=provider, agent_config=agent_config, model="test-model")
 
 
 class TestMessageToolSuppressLogic:

@@ -17,6 +17,8 @@ from telegram.request import HTTPXRequest
 from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.base import BaseChannel
+from pathlib import Path
+
 from nanocats.config.paths import get_media_dir
 from nanocats.config.schema import ChannelInstanceConfig
 from nanocats.utils.helpers import split_message
@@ -517,7 +519,7 @@ class TelegramChannel(BaseChannel):
         return f"[Reply to: {text}]" if text else None
 
     async def _download_message_media(
-        self, msg, *, add_failure_content: bool = False
+        self, msg, *, add_failure_content: bool = False, agent_workspace: Path | None = None
     ) -> tuple[list[str], list[str]]:
         """Download media from a message (current or reply). Returns (media_paths, content_parts)."""
         media_file = None
@@ -552,7 +554,7 @@ class TelegramChannel(BaseChannel):
                 getattr(media_file, "mime_type", None),
                 getattr(media_file, "file_name", None),
             )
-            media_dir = get_media_dir("telegram")
+            media_dir = get_media_dir("telegram", agent_workspace=agent_workspace)
             file_path = media_dir / f"{media_file.file_id[:16]}{ext}"
             await file.download_to_drive(str(file_path))
             path_str = str(file_path)
@@ -679,6 +681,15 @@ class TelegramChannel(BaseChannel):
         content_parts = []
         media_paths = []
 
+        # Resolve agent workspace for media storage isolation
+        agent_workspace = None
+        if self.agent_registry:
+            result = self.agent_registry.find_by_channel(
+                self.instance_id or self.name, str(chat_id)
+            )
+            if result:
+                agent_workspace = result[0].workspace
+
         # Text content
         if message.text:
             content_parts.append(message.text)
@@ -687,7 +698,7 @@ class TelegramChannel(BaseChannel):
 
         # Download current message media
         current_media_paths, current_media_parts = await self._download_message_media(
-            message, add_failure_content=True
+            message, add_failure_content=True, agent_workspace=agent_workspace
         )
         media_paths.extend(current_media_paths)
         content_parts.extend(current_media_parts)
@@ -698,7 +709,9 @@ class TelegramChannel(BaseChannel):
         reply = getattr(message, "reply_to_message", None)
         if reply is not None:
             reply_ctx = self._extract_reply_context(message)
-            reply_media, reply_media_parts = await self._download_message_media(reply)
+            reply_media, reply_media_parts = await self._download_message_media(
+                reply, agent_workspace=agent_workspace
+            )
             if reply_media:
                 media_paths = reply_media + media_paths
                 logger.debug("Attached replied-to media: {}", reply_media[0])

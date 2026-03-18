@@ -1,0 +1,249 @@
+.message {
+  display: flex;
+  gap: 12px;
+  max-width: 80%;
+  animation: messageIn 0.2s ease;
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message-assistant {
+  align-self: flex-start;
+}
+
+.message-avatar {
+  margin-top: 4px;
+}
+
+.message-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.message-user .message-header {
+  flex-direction: row-reverse;
+}
+
+.message-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.message-channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-base);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.message-bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-xl);
+  position: relative;
+}
+
+.message-user .message-bubble {
+  background: var(--color-accent);
+  color: var(--text-inverse);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.message-assistant .message-bubble {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.message-user .message-footer {
+  justify-content: flex-end;
+}
+
+.message-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Thinking content styles */
+.thinking-container {
+  margin-top: 10px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.thinking-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.thinking-header:hover {
+  opacity: 0.8;
+  background: var(--bg-hover, var(--bg-base));
+}
+
+.thinking-emoji {
+  font-size: 14px;
+}
+
+.thinking-header span:nth-child(3) {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.thinking-toggle {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.thinking-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.thinking-content.expanded {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.thinking-content pre {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Attachments styles */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.attachment-item {
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.attachment-item:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.attachment-image {
+  position: relative;
+  max-width: 200px;
+  max-height: 150px;
+}
+
+.attachment-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+
+.attachment-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: var(--transition);
+  color: white;
+}
+
+.attachment-image:hover .attachment-overlay {
+  opacity: 1;
+}
+
+.attachment-file {
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  padding: 8px 12px;
+}
+
+.attachment-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.attachment-filename {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

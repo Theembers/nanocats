@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,21 +11,31 @@ import pytest
 from nanocats.bus.events import InboundMessage
 
 
-def _make_loop():
+def _make_mock_agent_config(workspace: Path) -> MagicMock:
+    """Create a mock AgentConfig for testing."""
+    agent_config = MagicMock()
+    agent_config.id = "test-agent"
+    agent_config.model = "test-model"
+    agent_config.workspace = workspace
+    return agent_config
+
+
+def _make_loop(tmp_path: Path | None = None):
     """Create a minimal AgentLoop with mocked dependencies."""
     from nanocats.agent.loop import AgentLoop
     from nanocats.bus.queue import MessageBus
 
     bus = MessageBus()
+    bus.register_agent("default")  # Register default agent for per-agent routing
     provider = MagicMock()
     provider.get_default_model.return_value = "test-model"
-    workspace = MagicMock()
-    workspace.__truediv__ = MagicMock(return_value=MagicMock())
+    workspace = tmp_path or Path("/tmp/test-workspace")
+    agent_config = _make_mock_agent_config(workspace)
 
     with patch("nanocats.agent.loop.ContextBuilder"), \
          patch("nanocats.agent.loop.SessionManager"), \
          patch("nanocats.agent.loop.SubagentManager"):
-        loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
+        loop = AgentLoop(bus=bus, provider=provider, agent_config=agent_config)
     return loop, bus
 
 
@@ -47,7 +58,10 @@ class TestRestartCommand:
     async def test_restart_intercepted_in_run_loop(self):
         """Verify /restart is handled at the run-loop level, not inside _dispatch."""
         loop, bus = _make_loop()
-        msg = InboundMessage(channel="telegram", sender_id="u1", chat_id="c1", content="/restart")
+        msg = InboundMessage(
+            channel="telegram", sender_id="u1", chat_id="c1",
+            content="/restart", agent_id="default"
+        )
 
         with patch.object(loop, "_handle_restart") as mock_handle:
             mock_handle.return_value = None

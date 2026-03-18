@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getAgent, getMessages, listAgents } from '../api/agents';
 import { useChatStore } from '../stores/chatStore';
 import LoadingSpinner from '../components/LoadingSpinner';
-import ChannelsSidebar from '../components/ChannelsSidebar';
-import SessionList from '../components/SessionList';
+import SessionTree from '../components/SessionTree';
+import Message from '../components/Message';
 import DateSeparator from '../components/DateSeparator';
-import ToolCallContent from '../components/ToolCallContent';
-import { Send, MessageSquare } from 'lucide-react';
+import PreviewModal from '../components/PreviewModal';
+import { Send, Square, Plus, MessageSquare, Clock } from 'lucide-react';
 import './Chat.css';
 
 class ErrorBoundary extends React.Component {
@@ -64,15 +64,22 @@ function ChatInner() {
   const navigate = useNavigate();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [selectedChatId, setSelectedChatId] = useState(null);
   const [inputValue, setInputValue] = useState('');
+  const [previewItem, setPreviewItem] = useState(null);
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
   const messagesEndRef = useRef(null);
 
   const {
     messages: realtimeMessages,
+    messageQueue,
     isConnected,
+    isAgentResponding,
     connect,
     disconnect,
     sendMessage,
+    sendStopCommand,
+    sendNewSessionCommand,
     clearMessages,
   } = useChatStore();
 
@@ -89,10 +96,11 @@ function ChatInner() {
     enabled: !!currentAgentId,
   });
 
-  const { data: messagesData, isLoading: messagesLoading, error: messagesError } = useQuery({
-    queryKey: ['messages', currentAgentId, selectedChannel, selectedSession],
+  const { data: messagesData, isLoading: messagesLoading } = useQuery({
+    queryKey: ['messages', currentAgentId, selectedChannel, selectedSession, selectedChatId],
     queryFn: () => getMessages(currentAgentId, {
       channel: selectedChannel,
+      chat_id: selectedChatId,
       session_key: selectedSession,
       limit: 100,
     }),
@@ -155,6 +163,27 @@ function ChatInner() {
     setInputValue('');
   };
 
+  const handleStopClick = () => {
+    if (currentAgentId) {
+      sendStopCommand(currentAgentId);
+    }
+  };
+
+  const handleNewSession = () => {
+    setShowNewConfirm(true);
+  };
+
+  const confirmNewSession = () => {
+    if (currentAgentId) {
+      sendNewSessionCommand(currentAgentId);
+      setShowNewConfirm(false);
+    }
+  };
+
+  const handlePreview = (item) => {
+    setPreviewItem(item);
+  };
+
   const messages = useMemo(() => {
     const historical = messagesData?.messages || [];
     const combined = [...historical, ...realtimeMessages];
@@ -165,7 +194,10 @@ function ChatInner() {
     const groups = [];
     let currentDate = null;
 
-    messages.forEach((msg) => {
+    // Filter out tool role messages (tool results are folded into tool_calls)
+    const filteredMessages = messages.filter(msg => msg.role !== 'tool');
+
+    filteredMessages.forEach((msg) => {
       const msgDate = new Date(msg.timestamp).toDateString();
       if (msgDate !== currentDate) {
         currentDate = msgDate;
@@ -176,19 +208,6 @@ function ChatInner() {
 
     return groups;
   }, [messages]);
-
-  const sessions = useMemo(() => {
-    if (agent?.sessions && agent.sessions.length > 0) {
-      return agent.sessions.map(s => ({
-        key: s.key || '',
-        type: s.type,
-        created_at: s.created_at,
-        updated_at: s.updated_at,
-        group_id: s.group_id,
-      }));
-    }
-    return [];
-  }, [agent?.sessions]);
 
   if (agentLoading) {
     return (
@@ -208,17 +227,13 @@ function ChatInner() {
 
   return (
     <div className="chat-page-container">
-      <ChannelsSidebar
+      <SessionTree
         agentId={currentAgentId}
-        selectedChannel={selectedChannel}
-        onChannelSelect={setSelectedChannel}
-      />
-
-      <SessionList
-        sessions={sessions}
         selectedSession={selectedSession}
+        selectedChannel={selectedChannel}
         onSessionSelect={setSelectedSession}
-        loading={messagesLoading}
+        onChannelSelect={setSelectedChannel}
+        onChatIdSelect={setSelectedChatId}
       />
 
       <div className="chat-main">
@@ -234,6 +249,14 @@ function ChatInner() {
               </span>
             </div>
           </div>
+          {selectedSession && (
+            <div className="chat-header-filter">
+              <span className="filter-badge">
+                Session: {formatSessionDisplay(selectedSession)}
+                {selectedChannel && ` / ${selectedChannel}`}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="chat-messages">
@@ -249,53 +272,93 @@ function ChatInner() {
                 return <DateSeparator key={`date-${item.date}`} date={item.date} />;
               }
               const msg = item.message;
-              const isUser = msg.role === 'user';
               return (
-                <div
+                <Message
                   key={msg.id || index}
-                  className={`message ${isUser ? 'message-user' : 'message-assistant'}`}
-                >
-                  <div className="message-bubble">
-                    {msg.channel && (
-                      <div className="message-channel">
-                        <span>{CHANNEL_ICONS[msg.channel] || '📨'}</span>
-                        <span>{msg.channel}</span>
-                      </div>
-                    )}
-                    <div className="message-content">{msg.content}</div>
-                    {msg.tool_calls && (
-                      <ToolCallContent toolCalls={msg.tool_calls} />
-                    )}
-                    <div className="message-timestamp">
-                      {new Date(msg.timestamp).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
-                    </div>
-                  </div>
-                </div>
+                  message={msg}
+                  agentName={agent?.name}
+                  onPreview={handlePreview}
+                />
               );
             })
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="chat-input-form">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a message..."
-            className="chat-input"
-          />
-          <button type="submit" className="btn-primary chat-send-btn">
-            <Send size={18} />
-          </button>
-        </form>
+        <div className="chat-input-area">
+          {/* Message queue indicator */}
+          {messageQueue.length > 0 && (
+            <div className="message-queue-indicator">
+              <Clock size={14} />
+              <span>{messageQueue.length} message{messageQueue.length > 1 ? 's' : ''} queued</span>
+            </div>
+          )}
+
+          {/* New session confirmation */}
+          {showNewConfirm && (
+            <div className="new-session-confirm">
+              <span>Start a new session?</span>
+              <button className="btn-confirm" onClick={confirmNewSession}>Yes</button>
+              <button className="btn-cancel" onClick={() => setShowNewConfirm(false)}>No</button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="chat-input-form">
+            <button
+              type="button"
+              className="chat-action-btn new-session-btn"
+              onClick={handleNewSession}
+              title="New Session"
+            >
+              <Plus size={18} />
+            </button>
+
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder={isAgentResponding ? "Agent is responding..." : "Type a message..."}
+              className="chat-input"
+            />
+
+            {isAgentResponding ? (
+              <button
+                type="button"
+                className="btn-stop chat-send-btn"
+                onClick={handleStopClick}
+                title="Stop"
+              >
+                <Square size={16} />
+              </button>
+            ) : (
+              <button 
+                type="submit" 
+                className="btn-primary chat-send-btn"
+                disabled={!inputValue.trim()}
+              >
+                <Send size={18} />
+              </button>
+            )}
+          </form>
+        </div>
       </div>
+
+      <PreviewModal
+        isOpen={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        item={previewItem}
+      />
     </div>
   );
+}
+
+function formatSessionDisplay(key) {
+  if (!key) return '';
+  const parts = key.split(':');
+  if (parts.length > 1) {
+    return parts.slice(1).join(':');
+  }
+  return key;
 }
 
 export default Chat;

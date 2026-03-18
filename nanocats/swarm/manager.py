@@ -9,7 +9,9 @@ from nanocats.agent.loop import AgentLoop
 from nanocats.agent.registry import AgentRegistry
 from nanocats.bus.queue import MessageBus
 from nanocats.config.schema import AgentConfig
+from nanocats.cron.service import CronService
 from nanocats.providers.base import LLMProvider
+from nanocats.utils.helpers import sync_workspace_templates
 
 
 class SwarmManager:
@@ -47,10 +49,21 @@ class SwarmManager:
             config.workspace,
         )
 
+        # Register agent queue before creating loop
+        self.bus.register_agent(config.id)
+
+        # Sync workspace templates (SOUL.md, USER.md, AGENTS.md, TOOLS.md, memory/)
+        sync_workspace_templates(config.workspace, agent_type=config.type, silent=True)
+
+        # Create per-agent CronService with isolated storage
+        cron_store = config.workspace / "cron" / "jobs.json"
+        cron = CronService(cron_store)
+
         agent = AgentLoop(
             bus=self.bus,
             agent_config=config,
             provider=self.provider,
+            cron_service=cron,
         )
 
         self.agents[config.id] = agent

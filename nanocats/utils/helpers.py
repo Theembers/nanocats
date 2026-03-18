@@ -1,10 +1,15 @@
 """Utility functions for nanocats."""
 
+from __future__ import annotations
+
 import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from nanocats.config.schema import AgentType
 
 import tiktoken
 
@@ -170,8 +175,31 @@ def estimate_prompt_tokens_chain(
     return 0, "none"
 
 
-def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
-    """Sync bundled templates to workspace. Only creates missing files."""
+# Mapping from AgentType value to template files needed
+_SYNC_FILES: dict[str, set[str]] = {
+    "admin": {"AGENTS.md", "BOOTSTRAP.md", "SOUL.md"},
+    "user": {"AGENTS.md", "BOOTSTRAP.md", "SOUL.md", "USER.md", "TOOLS.md", "HEARTBEAT.md"},
+    "specialized": {"AGENTS.md", "IDENTITY.md"},
+    "task": set(),  # task agents get no templates
+}
+
+
+def sync_workspace_templates(
+    workspace: Path,
+    agent_type: AgentType | None = None,
+    silent: bool = False,
+) -> list[str]:
+    """Sync bundled templates to workspace. Only creates missing files.
+
+    Args:
+        workspace: Target workspace directory.
+        agent_type: If provided, only sync files needed for this agent type.
+                    If None, sync all templates (backward compatible for onboard).
+        silent: If True, suppress console output.
+
+    Returns:
+        List of created file paths relative to workspace.
+    """
     from importlib.resources import files as pkg_files
     try:
         tpl = pkg_files("nanocats") / "templates"
@@ -189,11 +217,28 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
         dest.write_text(src.read_text(encoding="utf-8") if src else "", encoding="utf-8")
         added.append(str(dest.relative_to(workspace)))
 
+    # Determine allowed files based on agent_type
+    allowed_files: set[str] | None = None
+    if agent_type is not None:
+        type_value = agent_type.value if hasattr(agent_type, "value") else str(agent_type)
+        allowed_files = _SYNC_FILES.get(type_value)
+
+    # Sync .md template files
     for item in tpl.iterdir():
         if item.name.endswith(".md") and not item.name.startswith("."):
+            if allowed_files is not None and item.name not in allowed_files:
+                continue
             _write(item, workspace / item.name)
-    _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
-    _write(None, workspace / "memory" / "HISTORY.md")
+
+    # memory/MEMORY.md and memory/HISTORY.md only for non-task agents
+    is_task_agent = agent_type is not None and (
+        agent_type.value if hasattr(agent_type, "value") else str(agent_type)
+    ) == "task"
+    if not is_task_agent:
+        _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
+        _write(None, workspace / "memory" / "HISTORY.md")
+
+    # Always create skills directory
     (workspace / "skills").mkdir(exist_ok=True)
 
     if added and not silent:

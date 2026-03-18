@@ -41,8 +41,7 @@ class AgentLoop:
         self,
         bus: MessageBus,
         provider: LLMProvider,
-        workspace: Path | None = None,
-        agent_config: "AgentConfig | None" = None,
+        agent_config: "AgentConfig",
         model: str | None = None,
         max_iterations: int = 40,
         context_window_tokens: int = 65_536,
@@ -61,16 +60,11 @@ class AgentLoop:
         self.channels_config = channels_config
         self.provider = provider
 
-        if agent_config:
-            self.agent_config = agent_config
-            resolved_workspace: Path = agent_config.workspace
-            resolved_model = model or agent_config.model
-            if hasattr(provider, "agent_id"):
-                provider.agent_id = agent_config.id
-        else:
-            self.agent_config = None
-            resolved_workspace = workspace if workspace else Path.home() / ".nanocats" / "workspace"
-            resolved_model = model or provider.get_default_model()
+        self.agent_config = agent_config
+        resolved_workspace: Path = agent_config.workspace
+        resolved_model = model or agent_config.model
+        if hasattr(provider, "agent_id"):
+            provider.agent_id = agent_config.id
 
         self.workspace = resolved_workspace
         self.model = resolved_model
@@ -83,7 +77,7 @@ class AgentLoop:
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
 
-        self.context = ContextBuilder(resolved_workspace)
+        self.context = ContextBuilder(agent_config)
         self.sessions = session_manager or SessionManager(resolved_workspace)
         self.tools = ToolRegistry()
         self.subagents = SubagentManager(
@@ -95,6 +89,7 @@ class AgentLoop:
             web_proxy=web_proxy,
             exec_config=self.exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            parent_agent_id=agent_config.id,
         )
 
         self._running = False
@@ -231,7 +226,7 @@ class AgentLoop:
                         level="DEBUG",
                         log_type="tool",
                         message=f"Tool call: {tool_call.name}({args_str[:200]})",
-                        agent_id=self.agent_config.id if self.agent_config else "",
+                        agent_id=self.agent_config.id,
                         tool_name=tool_call.name,
                         metadata={"arguments": tool_call.arguments},
                     )
@@ -270,9 +265,13 @@ class AgentLoop:
         self._running = True
         await self._connect_mcp()
 
+        agent_id = self.agent_config.id
+
         while self._running:
             try:
-                msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
+                msg = await asyncio.wait_for(
+                    self.bus.consume_inbound(agent_id), timeout=1.0
+                )
             except asyncio.TimeoutError:
                 continue
 
@@ -395,6 +394,7 @@ class AgentLoop:
                 current_message=msg.content,
                 channel=channel,
                 chat_id=chat_id,
+                session_key=key,
             )
             final_content, _, all_msgs = await self._run_agent_loop(messages)
             self._save_turn(session, all_msgs, 1 + len(history))
@@ -416,7 +416,7 @@ class AgentLoop:
             level="INFO",
             log_type="agent",
             message=f"User: {preview}",
-            agent_id=self.agent_config.id if self.agent_config else "",
+            agent_id=self.agent_config.id,
             session_key=key,
             channel=msg.channel,
         )
@@ -472,6 +472,7 @@ class AgentLoop:
             media=msg.media if msg.media else None,
             channel=msg.channel,
             chat_id=msg.chat_id,
+            session_key=key,
         )
 
         async def _bus_progress(content: str, *, tool_hint: bool = False) -> None:
@@ -508,7 +509,7 @@ class AgentLoop:
             level="INFO",
             log_type="agent",
             message=f"Assistant: {preview}",
-            agent_id=self.agent_config.id if self.agent_config else "",
+            agent_id=self.agent_config.id,
             session_key=session.key,
             channel=msg.channel,
         )

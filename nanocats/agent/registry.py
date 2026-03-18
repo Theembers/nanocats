@@ -84,7 +84,7 @@ class AgentRegistry:
         if agent.type == AgentType.ADMIN:
             return "global"
         elif agent.type == AgentType.USER:
-            return f"user:{group_id or 'default'}"
+            return f"user:{agent.id}:{group_id or 'default'}"
         elif agent.type == AgentType.SPECIALIZED:
             return f"agent:{agent.id}"
         elif agent.type == AgentType.TASK:

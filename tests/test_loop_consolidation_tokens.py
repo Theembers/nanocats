@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,16 +9,26 @@ from nanocats.bus.queue import MessageBus
 from nanocats.providers.base import LLMResponse
 
 
+def _make_mock_agent_config(workspace: Path) -> MagicMock:
+    """Create a mock AgentConfig for testing."""
+    agent_config = MagicMock()
+    agent_config.id = "test-agent"
+    agent_config.model = "test-model"
+    agent_config.workspace = workspace
+    return agent_config
+
+
 def _make_loop(tmp_path, *, estimated_tokens: int, context_window_tokens: int) -> AgentLoop:
     provider = MagicMock()
     provider.get_default_model.return_value = "test-model"
     provider.estimate_prompt_tokens.return_value = (estimated_tokens, "test-counter")
     provider.chat_with_retry = AsyncMock(return_value=LLMResponse(content="ok", tool_calls=[]))
 
+    agent_config = _make_mock_agent_config(tmp_path)
     loop = AgentLoop(
         bus=MessageBus(),
         provider=provider,
-        workspace=tmp_path,
+        agent_config=agent_config,
         model="test-model",
         context_window_tokens=context_window_tokens,
     )

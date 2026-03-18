@@ -4,6 +4,7 @@ import asyncio
 import importlib.util
 import os
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -221,6 +222,15 @@ class WecomChannel(BaseChannel):
             chat_type = body.get("chattype", "single")
             chat_id = body.get("chatid", sender_id)
 
+            # Resolve agent workspace for media storage isolation
+            agent_workspace = None
+            if self.agent_registry:
+                result = self.agent_registry.find_by_channel(
+                    self.instance_id or self.name, chat_id
+                )
+                if result:
+                    agent_workspace = result[0].workspace
+
             content_parts = []
 
             if msg_type == "text":
@@ -234,7 +244,9 @@ class WecomChannel(BaseChannel):
                 aes_key = image_info.get("aeskey", "")
 
                 if file_url and aes_key:
-                    file_path = await self._download_and_save_media(file_url, aes_key, "image")
+                    file_path = await self._download_and_save_media(
+                        file_url, aes_key, "image", agent_workspace=agent_workspace
+                    )
                     if file_path:
                         filename = os.path.basename(file_path)
                         content_parts.append(f"[image: {filename}]\n[Image: source: {file_path}]")
@@ -260,7 +272,7 @@ class WecomChannel(BaseChannel):
 
                 if file_url and aes_key:
                     file_path = await self._download_and_save_media(
-                        file_url, aes_key, "file", file_name
+                        file_url, aes_key, "file", file_name, agent_workspace=agent_workspace
                     )
                     if file_path:
                         content_parts.append(f"[file: {file_name}]\n[File: source: {file_path}]")
@@ -315,6 +327,7 @@ class WecomChannel(BaseChannel):
         aes_key: str,
         media_type: str,
         filename: str | None = None,
+        agent_workspace: Path | None = None,
     ) -> str | None:
         """
         Download and decrypt media from WeCom.
@@ -329,7 +342,7 @@ class WecomChannel(BaseChannel):
                 logger.warning("Failed to download media from WeCom")
                 return None
 
-            media_dir = get_media_dir("wecom")
+            media_dir = get_media_dir("wecom", agent_workspace=agent_workspace)
             if not filename:
                 filename = fname or f"{media_type}_{hash(file_url) % 100000}"
             filename = os.path.basename(filename)

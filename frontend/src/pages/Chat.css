@@ -41,6 +41,20 @@
   margin: 0;
 }
 
+.chat-header-filter {
+  display: flex;
+  align-items: center;
+}
+
+.filter-badge {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -76,12 +90,90 @@
   opacity: 0.7;
 }
 
+/* Input area */
+.chat-input-area {
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-card);
+}
+
+.message-queue-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.new-session-confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.btn-confirm {
+  padding: 6px 16px;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.btn-confirm:hover {
+  opacity: 0.9;
+}
+
+.btn-cancel {
+  padding: 6px 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition);
+}
+
+.btn-cancel:hover {
+  background: var(--bg-base);
+}
+
 .chat-input-form {
   display: flex;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid var(--border-soft);
   background: var(--bg-card);
+}
+
+.chat-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.chat-action-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-main);
 }
 
 .chat-input {
@@ -106,68 +198,29 @@
 
 .chat-send-btn {
   padding: 12px 20px;
+  flex-shrink: 0;
 }
 
-/* Message styles */
-.message {
-  display: flex;
-  max-width: 70%;
+.chat-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.message-user {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-
-.message-assistant {
-  align-self: flex-start;
-}
-
-.message-bubble {
-  padding: 12px 16px;
-  border-radius: var(--radius-xl);
-  position: relative;
-}
-
-.message-user .message-bubble {
-  background: var(--color-accent);
-  color: var(--text-inverse);
-  border-bottom-right-radius: var(--radius-sm);
-}
-
-.message-assistant .message-bubble {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  border: 1px solid var(--border-soft);
-  border-bottom-left-radius: var(--radius-sm);
-}
-
-.message-channel {
+.btn-stop {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 0.6;
-  margin-bottom: 6px;
+  justify-content: center;
+  padding: 12px 20px;
+  background: var(--color-error);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.message-content {
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.message-timestamp {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 6px;
-}
-
-.message-user .message-timestamp {
-  text-align: right;
-  color: rgba(255, 255, 255, 0.6);
+.btn-stop:hover {
+  opacity: 0.9;
 }
 
 /* Connection status */
@@ -203,4 +256,17 @@
 
 .connection-status.disconnected::before {
   background: var(--color-error);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .chat-page-container {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 140px);
+  }
+
+  .chat-main {
+    min-height: 400px;
+  }
 }

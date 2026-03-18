@@ -433,6 +433,16 @@ class FeishuChannel(BaseChannel):
             content_parts = []
             media_paths = []
 
+            # Resolve agent workspace for media storage isolation
+            reply_to = chat_id if chat_type == "group" else sender_id
+            agent_workspace = None
+            if self.agent_registry:
+                result = self.agent_registry.find_by_channel(
+                    self.instance_id or self.name, reply_to
+                )
+                if result:
+                    agent_workspace = result[0].workspace
+
             try:
                 content_json = json.loads(payload.get("content", "{}"))
             except json.JSONDecodeError:
@@ -449,7 +459,7 @@ class FeishuChannel(BaseChannel):
                     content_parts.append(text)
                 for img_key in image_keys:
                     file_path, content_text = await self._download_and_save_media(
-                        "image", {"image_key": img_key}, message_id
+                        "image", {"image_key": img_key}, message_id, agent_workspace
                     )
                     if file_path:
                         media_paths.append(file_path)
@@ -457,7 +467,7 @@ class FeishuChannel(BaseChannel):
 
             elif msg_type in ("image", "audio", "file", "media"):
                 file_path, content_text = await self._download_and_save_media(
-                    msg_type, content_json, message_id
+                    msg_type, content_json, message_id, agent_workspace
                 )
                 if file_path:
                     media_paths.append(file_path)
@@ -489,7 +499,6 @@ class FeishuChannel(BaseChannel):
             if not content and not media_paths:
                 return
 
-            reply_to = chat_id if chat_type == "group" else sender_id
             await self._handle_message(
                 sender_id=sender_id,
                 chat_id=reply_to,
@@ -980,7 +989,11 @@ class FeishuChannel(BaseChannel):
             return None, None
 
     async def _download_and_save_media(
-        self, msg_type: str, content_json: dict, message_id: str | None = None
+        self,
+        msg_type: str,
+        content_json: dict,
+        message_id: str | None = None,
+        agent_workspace: Path | None = None,
     ) -> tuple[str | None, str]:
         """
         Download media from Feishu and save to local disk.
@@ -989,7 +1002,7 @@ class FeishuChannel(BaseChannel):
             (file_path, content_text) - file_path is None if download failed
         """
         loop = asyncio.get_running_loop()
-        media_dir = get_media_dir("feishu")
+        media_dir = get_media_dir("feishu", agent_workspace=agent_workspace)
 
         data, filename = None, None
 
@@ -1198,6 +1211,16 @@ class FeishuChannel(BaseChannel):
             content_parts = []
             media_paths = []
 
+            # Resolve agent workspace for media storage isolation
+            reply_to = chat_id if chat_type == "group" else sender_id
+            agent_workspace = None
+            if self.agent_registry:
+                result = self.agent_registry.find_by_channel(
+                    self.instance_id or self.name, reply_to
+                )
+                if result:
+                    agent_workspace = result[0].workspace
+
             try:
                 content_json = json.loads(message.content) if message.content else {}
             except json.JSONDecodeError:
@@ -1215,7 +1238,7 @@ class FeishuChannel(BaseChannel):
                 # Download images embedded in post
                 for img_key in image_keys:
                     file_path, content_text = await self._download_and_save_media(
-                        "image", {"image_key": img_key}, message_id
+                        "image", {"image_key": img_key}, message_id, agent_workspace
                     )
                     if file_path:
                         media_paths.append(file_path)
@@ -1223,7 +1246,7 @@ class FeishuChannel(BaseChannel):
 
             elif msg_type in ("image", "audio", "file", "media"):
                 file_path, content_text = await self._download_and_save_media(
-                    msg_type, content_json, message_id
+                    msg_type, content_json, message_id, agent_workspace
                 )
                 if file_path:
                     media_paths.append(file_path)
@@ -1257,7 +1280,6 @@ class FeishuChannel(BaseChannel):
                 return
 
             # Forward to message bus
-            reply_to = chat_id if chat_type == "group" else sender_id
             await self._handle_message(
                 sender_id=sender_id,
                 chat_id=reply_to,

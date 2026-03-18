@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -6,6 +7,19 @@ from nanocats.bus.events import OutboundMessage
 from nanocats.bus.queue import MessageBus
 from nanocats.channels.qq import QQChannel
 from nanocats.channels.qq import QQConfig
+from nanocats.config.schema import AgentConfig, AgentType
+
+
+def _make_mock_agent_registry(agent_id: str = "test_agent"):
+    """Create a mock agent registry that returns a test agent."""
+    mock_agent = MagicMock(spec=AgentConfig)
+    mock_agent.id = agent_id
+    mock_agent.type = AgentType.USER
+
+    mock_registry = MagicMock()
+    mock_registry.find_by_channel.return_value = (mock_agent, None)
+    mock_registry.resolve_session_key.return_value = f"test:{agent_id}"
+    return mock_registry
 
 
 class _FakeApi:
@@ -27,7 +41,14 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_on_group_message_routes_to_group_chat_id() -> None:
-    channel = QQChannel(QQConfig(app_id="app", secret="secret", allow_from=["user1"]), MessageBus())
+    bus = MessageBus()
+    bus.register_agent("test_agent")
+    mock_registry = _make_mock_agent_registry("test_agent")
+    channel = QQChannel(
+        QQConfig(app_id="app", secret="secret", allow_from=["user1"]),
+        bus,
+        agent_registry=mock_registry,
+    )
 
     data = SimpleNamespace(
         id="msg1",
@@ -38,7 +59,7 @@ async def test_on_group_message_routes_to_group_chat_id() -> None:
 
     await channel._on_message(data, is_group=True)
 
-    msg = await channel.bus.consume_inbound()
+    msg = await channel.bus.consume_inbound("test_agent")
     assert msg.sender_id == "user1"
     assert msg.chat_id == "group123"
 

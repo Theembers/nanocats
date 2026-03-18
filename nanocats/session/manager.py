@@ -116,10 +116,32 @@ class SessionManager:
         self._cache[key] = session
         return session
 
+    @staticmethod
+    def _legacy_session_key(key: str) -> str | None:
+        """Derive legacy session key format (without agent_id) for migration."""
+        # user:agent_id:group_id -> user:group_id
+        if key.startswith("user:") and key.count(":") == 2:
+            parts = key.split(":")
+            return f"user:{parts[2]}"
+        return None
+
     def _load(self, key: str) -> Session | None:
         """Load a session from disk."""
         path = self._get_session_path(key)
         if not path.exists():
+            # Try migrating from old session key format (user:group -> user:agent_id:group)
+            old_key = self._legacy_session_key(key)
+            if old_key:
+                old_path = self._get_session_path(old_key)
+                if old_path.exists():
+                    try:
+                        shutil.move(str(old_path), str(path))
+                        logger.info("Migrated session {} -> {}", old_key, key)
+                    except Exception as e:
+                        logger.warning("Failed to migrate session {}: {}", old_key, e)
+
+        if not path.exists():
+            # Try migrating from legacy global path
             legacy_path = self._get_legacy_session_path(key)
             if legacy_path.exists():
                 try:

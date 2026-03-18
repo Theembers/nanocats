@@ -16,3 +16,8 @@ export async function getMessages(agentId, params = {}) {
   });
   return response.data;
 }
+
+export async function getSessionTree(agentId) {
+  const response = await apiClient.get(`/agents/${agentId}/session-tree`);
+  return response.data;
+}

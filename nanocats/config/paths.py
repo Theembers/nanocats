@@ -18,9 +18,12 @@ def get_runtime_subdir(name: str) -> Path:
     return ensure_dir(get_data_dir() / name)
 
 
-def get_media_dir(channel: str | None = None) -> Path:
-    """Return the media directory, optionally namespaced per channel."""
-    base = get_runtime_subdir("media")
+def get_media_dir(channel: str | None = None, agent_workspace: Path | None = None) -> Path:
+    """Return the media directory, optionally namespaced per channel and per agent."""
+    if agent_workspace:
+        base = ensure_dir(agent_workspace / "media")
+    else:
+        base = get_runtime_subdir("media")
     return ensure_dir(base / channel) if channel else base
 
 
@@ -32,12 +35,6 @@ def get_cron_dir() -> Path:
 def get_logs_dir() -> Path:
     """Return the logs directory."""
     return get_runtime_subdir("logs")
-
-
-def get_workspace_path(workspace: str | None = None) -> Path:
-    """Resolve and ensure the agent workspace path."""
-    path = Path(workspace).expanduser() if workspace else Path.home() / ".nanocats" / "workspace"
-    return ensure_dir(path)
 
 
 def get_cli_history_path() -> Path:

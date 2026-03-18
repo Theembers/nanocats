@@ -304,7 +304,17 @@ class DiscordChannel(BaseChannel):
 
         content_parts = [content] if content else []
         media_paths: list[str] = []
-        media_dir = get_media_dir("discord")
+
+        # Resolve agent workspace for media storage isolation
+        agent_workspace = None
+        if self.agent_registry:
+            result = self.agent_registry.find_by_channel(
+                self.instance_id or self.name, channel_id
+            )
+            if result:
+                agent_workspace = result[0].workspace
+
+        media_dir = get_media_dir("discord", agent_workspace=agent_workspace)
 
         for attachment in payload.get("attachments") or []:
             url = attachment.get("url")

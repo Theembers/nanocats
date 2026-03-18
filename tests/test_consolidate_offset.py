@@ -484,6 +484,15 @@ class TestNewCommandArchival:
     """Test /new archival behavior with the simplified consolidation flow."""
 
     @staticmethod
+    def _make_mock_agent_config(workspace: Path):
+        from unittest.mock import MagicMock
+        agent_config = MagicMock()
+        agent_config.id = "test-agent"
+        agent_config.model = "test-model"
+        agent_config.workspace = workspace
+        return agent_config
+
+    @staticmethod
     def _make_loop(tmp_path: Path):
         from nanocats.agent.loop import AgentLoop
         from nanocats.bus.queue import MessageBus
@@ -493,10 +502,11 @@ class TestNewCommandArchival:
         provider = MagicMock()
         provider.get_default_model.return_value = "test-model"
         provider.estimate_prompt_tokens.return_value = (10_000, "test")
+        agent_config = TestNewCommandArchival._make_mock_agent_config(tmp_path)
         loop = AgentLoop(
             bus=bus,
             provider=provider,
-            workspace=tmp_path,
+            agent_config=agent_config,
             model="test-model",
             context_window_tokens=1,
         )

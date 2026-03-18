@@ -13,6 +13,7 @@ from nanocats.webui.api import (
     memory_routes,
     message_routes,
     queue_routes,
+    session_routes,
     skill_routes,
     workspace_routes,
 )
@@ -31,3 +32,4 @@ router.include_router(message_routes.router)
 router.include_router(queue_routes.router)
 router.include_router(analytics_routes.router)
 router.include_router(log_routes.router)
+router.include_router(session_routes.router)

@@ -42,13 +42,16 @@ async def list_messages(
             for line in f:
                 try:
                     msg = json.loads(line.strip())
-                    if channel and msg.get("channel") != channel:
+                    if msg.get("_type") == "metadata":
                         continue
-                    if chat_id and msg.get("chat_id") != chat_id:
+                    source = msg.get("_source", {})
+                    msg_channel = msg.get("channel") or source.get("channel")
+                    msg_chat_id = msg.get("chat_id") or source.get("chat_id")
+                    if channel and msg_channel != channel:
+                        continue
+                    if chat_id and msg_chat_id != chat_id:
                         continue
                     if before and msg.get("timestamp", "") >= before:
-                        continue
-                    if msg.get("_type") == "metadata":
                         continue
                     messages.append(
                         {
@@ -56,8 +59,8 @@ async def list_messages(
                             "role": msg.get("role", ""),
                             "content": msg.get("content", ""),
                             "timestamp": msg.get("timestamp"),
-                            "channel": msg.get("channel"),
-                            "chat_id": msg.get("chat_id"),
+                            "channel": msg_channel,
+                            "chat_id": msg_chat_id,
                             "tool_calls": msg.get("tool_calls"),
                         }
                     )

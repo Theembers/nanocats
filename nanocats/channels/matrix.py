@@ -586,8 +586,8 @@ class MatrixChannel(BaseChannel):
             return self._is_bot_mentioned(event)
         return False
 
-    def _media_dir(self) -> Path:
-        return get_media_dir("matrix")
+    def _media_dir(self, agent_workspace: Path | None = None) -> Path:
+        return get_media_dir("matrix", agent_workspace=agent_workspace)
 
     @staticmethod
     def _event_source_content(event: RoomMessage) -> dict[str, Any]:
@@ -661,7 +661,12 @@ class MatrixChannel(BaseChannel):
         return _DEFAULT_ATTACH_NAME if attachment_type == "file" else attachment_type
 
     def _build_attachment_path(
-        self, event: MatrixMediaEvent, attachment_type: str, filename: str, mime: str | None
+        self,
+        event: MatrixMediaEvent,
+        attachment_type: str,
+        filename: str,
+        mime: str | None,
+        agent_workspace: Path | None = None,
     ) -> Path:
         safe_name = safe_filename(Path(filename).name) or _DEFAULT_ATTACH_NAME
         suffix = Path(safe_name).suffix
@@ -672,7 +677,7 @@ class MatrixChannel(BaseChannel):
         suffix = suffix[:16]
         event_id = safe_filename(str(getattr(event, "event_id", "") or "evt").lstrip("$"))
         event_prefix = (event_id[:24] or "evt").strip("_")
-        return self._media_dir() / f"{event_prefix}_{stem}{suffix}"
+        return self._media_dir(agent_workspace) / f"{event_prefix}_{stem}{suffix}"
 
     async def _download_media_bytes(self, mxc_url: str) -> bytes | None:
         if not self.client:
@@ -715,6 +720,7 @@ class MatrixChannel(BaseChannel):
         self,
         room: MatrixRoom,
         event: MatrixMediaEvent,
+        agent_workspace: Path | None = None,
     ) -> tuple[dict[str, Any] | None, str]:
         """Download, decrypt if needed, and persist a Matrix attachment."""
         atype = self._event_attachment_type(event)
@@ -744,7 +750,7 @@ class MatrixChannel(BaseChannel):
         if len(data) > limit_bytes:
             return None, _ATTACH_TOO_LARGE.format(filename)
 
-        path = self._build_attachment_path(event, atype, filename, mime)
+        path = self._build_attachment_path(event, atype, filename, mime, agent_workspace)
         try:
             path.write_bytes(data)
         except OSError:
@@ -789,7 +795,17 @@ class MatrixChannel(BaseChannel):
     async def _on_media_message(self, room: MatrixRoom, event: MatrixMediaEvent) -> None:
         if event.sender == self.config.user_id or not self._should_process_message(room, event):
             return
-        attachment, marker = await self._fetch_media_attachment(room, event)
+
+        # Resolve agent workspace for media storage isolation
+        agent_workspace = None
+        if self.agent_registry:
+            result = self.agent_registry.find_by_channel(
+                self.instance_id or self.name, room.room_id
+            )
+            if result:
+                agent_workspace = result[0].workspace
+
+        attachment, marker = await self._fetch_media_attachment(room, event, agent_workspace)
         parts: list[str] = []
         if isinstance(body := getattr(event, "body", None), str) and body.strip():
             parts.append(body.strip())

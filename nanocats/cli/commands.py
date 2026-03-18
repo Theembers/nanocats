@@ -32,9 +32,7 @@ from rich.table import Table
 from rich.text import Text
 
 from nanocats import __logo__, __version__
-from nanocats.config.paths import get_workspace_path
 from nanocats.config.schema import Config
-from nanocats.utils.helpers import sync_workspace_templates
 
 app = typer.Typer(
     name="nanocats",
@@ -234,7 +232,6 @@ def _show_all_commands():
     console.print("[bold]Main Commands:[/bold]")
     console.print("  [green]onboard[/green]          Initialize config and workspace")
     console.print("  [green]gateway[/green]           Start Gateway service")
-    console.print("  [green]agent[/green]             Chat with agent")
     console.print("  [green]status[/green]            Show system status")
     console.print("  [green]help[/green] [command]   Show help information\n")
 
@@ -262,21 +259,11 @@ def _show_command_help(command: str):
             "usage": "nanocats gateway [OPTIONS]",
             "options": [
                 ("-p, --port", "Gateway port"),
-                ("-w, --workspace", "Workspace directory"),
                 ("-c, --config", "Config file path"),
                 ("-v, --verbose", "Enable debug logging"),
             ],
         },
-        "agent": {
-            "desc": "Chat with the agent",
-            "usage": "nanocats agent [OPTIONS]",
-            "options": [
-                ("-m, --message", "Message to send"),
-                ("-s, --session", "Session ID (default: cli:direct)"),
-                ("--markdown/--no-markdown", "Render output as Markdown"),
-                ("--logs/--no-logs", "Show runtime logs"),
-            ],
-        },
+
         "status": {
             "desc": "Show nanocats system status",
             "usage": "nanocats status",
@@ -338,7 +325,6 @@ def onboard():
     from nanocats.config.loader import get_config_path, load_config, save_config
     from nanocats.config.schema import AgentType, Config
     from nanocats.providers.registry import PROVIDERS
-    from nanocats.config.paths import get_workspace_path
 
     console.print(f"\n[bold cyan]{__logo__} Setup Wizard[/bold cyan]\n")
     console.print("[dim]This wizard will help you configure nanocats:\n[/dim]")
@@ -512,17 +498,9 @@ def onboard():
     else:
         console.print(f"\n[dim]Skipped agent creation[/dim]\n")
 
-    workspace = get_workspace_path()
-    if not workspace.exists():
-        workspace.mkdir(parents=True, exist_ok=True)
-        console.print(f"[green]✓[/green] Created workspace at {workspace}")
-
-    sync_workspace_templates(workspace)
-
     console.print(f"\n[bold cyan]━━━ Setup Complete ━━━[/bold cyan]\n")
     console.print(f"[bold]Configuration:[/bold]")
     console.print(f"  [dim]Config:[/dim] [cyan]{config_path}[/cyan]")
-    console.print(f"  [dim]Workspace:[/dim] [cyan]{workspace}[/cyan]")
     console.print(f"\n[bold]Provider:[/bold]")
     console.print(f"  [dim]Name:[/dim] [green]{provider_label or 'existing'}[/green]")
     console.print(f"  [dim]Model:[/dim] [green]{selected_model or 'existing'}[/green]")
@@ -677,8 +655,8 @@ def _make_provider(config: Config):
     return provider
 
 
-def _load_runtime_config(config: str | None = None, workspace: str | None = None) -> Config:
-    """Load config and optionally override the active workspace."""
+def _load_runtime_config(config: str | None = None) -> Config:
+    """Load config from file."""
     from nanocats.config.loader import load_config, set_config_path
 
     config_path = None
@@ -690,10 +668,7 @@ def _load_runtime_config(config: str | None = None, workspace: str | None = None
         set_config_path(config_path)
         console.print(f"[dim]Using config: {config_path}[/dim]")
 
-    loaded = load_config(config_path)
-    if workspace:
-        loaded.agents.defaults.workspace = workspace
-    return loaded
+    return load_config(config_path)
 
 
 def _print_deprecated_memory_window_notice(config: Config) -> None:
@@ -714,60 +689,30 @@ def _print_deprecated_memory_window_notice(config: Config) -> None:
 @app.command()
 def gateway(
     port: int | None = typer.Option(None, "--port", "-p", help="Gateway port"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
     """Start the nanocats swarm gateway."""
     from nanocats.bus.queue import MessageBus
     from nanocats.channels.manager import ChannelManager
-    from nanocats.config.paths import get_cron_dir
-    from nanocats.cron.service import CronService
-    from nanocats.heartbeat.service import HeartbeatService
     from nanocats.swarm.manager import SwarmManager
 
     if verbose:
         import logging
         logging.basicConfig(level=logging.DEBUG)
 
-    config = _load_runtime_config(config, workspace)
+    config = _load_runtime_config(config)
     _print_deprecated_memory_window_notice(config)
     port = port if port is not None else config.gateway.port
 
     console.print(f"{__logo__} Starting nanocats swarm gateway on port {port}...")
-    sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
 
     swarm = SwarmManager(bus=bus, provider=provider)
     channel_manager = ChannelManager(config, bus, agent_registry=swarm.registry)
 
-    cron_store_path = get_cron_dir() / "jobs.json"
-    cron = CronService(cron_store_path)
-    cron.on_job = None
-
     channels = channel_manager
-
-    def _pick_heartbeat_target() -> tuple[str, str]:
-        enabled = set(channels.enabled_channels)
-        return "cli", "direct"
-
-    async def on_heartbeat_execute(tasks: str) -> str:
-        return "Heartbeat not yet supported in swarm mode"
-
-    async def on_heartbeat_notify(response: str) -> None:
-        pass
-
-    hb_cfg = config.gateway.heartbeat
-    heartbeat = HeartbeatService(
-        workspace=config.workspace_path,
-        provider=provider,
-        model=config.agents.defaults.model,
-        on_execute=on_heartbeat_execute,
-        on_notify=on_heartbeat_notify,
-        interval_s=hb_cfg.interval_s,
-        enabled=False,
-    )
 
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
@@ -880,204 +825,6 @@ def gateway(
 
     # ====================== 启动主循环 ======================
     asyncio.run(run())
-
-
-# ============================================================================
-# Agent Commands
-# ============================================================================
-
-
-@app.command()
-def agent(
-    message: str = typer.Option(None, "--message", "-m", help="Message to send to the agent"),
-    session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
-    config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
-    markdown: bool = typer.Option(
-        True, "--markdown/--no-markdown", help="Render assistant output as Markdown"
-    ),
-    logs: bool = typer.Option(
-        False, "--logs/--no-logs", help="Show nanocats runtime logs during chat"
-    ),
-):
-    """Interact with the agent directly."""
-    from loguru import logger
-
-    from nanocats.agent.loop import AgentLoop
-    from nanocats.bus.queue import MessageBus
-    from nanocats.config.paths import get_cron_dir
-    from nanocats.cron.service import CronService
-
-    config = _load_runtime_config(config, workspace)
-    _print_deprecated_memory_window_notice(config)
-    sync_workspace_templates(config.workspace_path)
-
-    bus = MessageBus()
-    provider = _make_provider(config)
-
-    # Create cron service for tool usage (no callback needed for CLI unless running)
-    cron_store_path = get_cron_dir() / "jobs.json"
-    cron = CronService(cron_store_path)
-
-    if logs:
-        logger.enable("nanocats")
-    else:
-        logger.disable("nanocats")
-
-    agent_loop = AgentLoop(
-        bus=bus,
-        provider=provider,
-        workspace=config.workspace_path,
-        model=config.agents.defaults.model,
-        max_iterations=config.agents.defaults.max_tool_iterations,
-        context_window_tokens=config.agents.defaults.context_window_tokens,
-        web_search_config=config.tools.web.search,
-        web_proxy=config.tools.web.proxy or None,
-        exec_config=config.tools.exec,
-        cron_service=cron,
-        restrict_to_workspace=config.tools.restrict_to_workspace,
-        mcp_servers=config.tools.mcp_servers,
-        channels_config=config.channels,
-    )
-
-    # Show spinner when logs are off (no output to miss); skip when logs are on
-    def _thinking_ctx():
-        if logs:
-            from contextlib import nullcontext
-
-            return nullcontext()
-        # Animated spinner is safe to use with prompt_toolkit input handling
-        return console.status("[dim]nanocats is thinking...[/dim]", spinner="dots")
-
-    async def _cli_progress(content: str, *, tool_hint: bool = False) -> None:
-        ch = agent_loop.channels_config
-        if ch and tool_hint and not ch.send_tool_hints:
-            return
-        if ch and not tool_hint and not ch.send_progress:
-            return
-        console.print(f"  [dim]↳ {content}[/dim]")
-
-    if message:
-        # Single message mode — direct call, no bus needed
-        async def run_once():
-            with _thinking_ctx():
-                response = await agent_loop.process_direct(
-                    message, session_id, on_progress=_cli_progress
-                )
-            _print_agent_response(response, render_markdown=markdown)
-            await agent_loop.close_mcp()
-
-        asyncio.run(run_once())
-    else:
-        # Interactive mode — route through bus like other channels
-        from nanocats.bus.events import InboundMessage
-
-        _init_prompt_session()
-        console.print(
-            f"{__logo__} Interactive mode (type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit)\n"
-        )
-
-        if ":" in session_id:
-            cli_channel, cli_chat_id = session_id.split(":", 1)
-        else:
-            cli_channel, cli_chat_id = "cli", session_id
-
-        def _handle_signal(signum, frame):
-            sig_name = signal.Signals(signum).name
-            _restore_terminal()
-            console.print(f"\nReceived {sig_name}, goodbye!")
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, _handle_signal)
-        signal.signal(signal.SIGTERM, _handle_signal)
-        # SIGHUP is not available on Windows
-        if hasattr(signal, "SIGHUP"):
-            signal.signal(signal.SIGHUP, _handle_signal)
-        # Ignore SIGPIPE to prevent silent process termination when writing to closed pipes
-        # SIGPIPE is not available on Windows
-        if hasattr(signal, "SIGPIPE"):
-            signal.signal(signal.SIGPIPE, signal.SIG_IGN)
-
-        async def run_interactive():
-            bus_task = asyncio.create_task(agent_loop.run())
-            turn_done = asyncio.Event()
-            turn_done.set()
-            turn_response: list[str] = []
-
-            async def _consume_outbound():
-                while True:
-                    try:
-                        msg = await asyncio.wait_for(bus.consume_outbound(), timeout=1.0)
-                        if msg.metadata.get("_progress"):
-                            is_tool_hint = msg.metadata.get("_tool_hint", False)
-                            ch = agent_loop.channels_config
-                            if ch and is_tool_hint and not ch.send_tool_hints:
-                                pass
-                            elif ch and not is_tool_hint and not ch.send_progress:
-                                pass
-                            else:
-                                await _print_interactive_line(msg.content)
-
-                        elif not turn_done.is_set():
-                            if msg.content:
-                                turn_response.append(msg.content)
-                            turn_done.set()
-                        elif msg.content:
-                            await _print_interactive_response(msg.content, render_markdown=markdown)
-
-                    except asyncio.TimeoutError:
-                        continue
-                    except asyncio.CancelledError:
-                        break
-
-            outbound_task = asyncio.create_task(_consume_outbound())
-
-            try:
-                while True:
-                    try:
-                        _flush_pending_tty_input()
-                        user_input = await _read_interactive_input_async()
-                        command = user_input.strip()
-                        if not command:
-                            continue
-
-                        if _is_exit_command(command):
-                            _restore_terminal()
-                            console.print("\nGoodbye!")
-                            break
-
-                        turn_done.clear()
-                        turn_response.clear()
-
-                        await bus.publish_inbound(
-                            InboundMessage(
-                                channel=cli_channel,
-                                sender_id="user",
-                                chat_id=cli_chat_id,
-                                content=user_input,
-                            )
-                        )
-
-                        with _thinking_ctx():
-                            await turn_done.wait()
-
-                        if turn_response:
-                            _print_agent_response(turn_response[0], render_markdown=markdown)
-                    except KeyboardInterrupt:
-                        _restore_terminal()
-                        console.print("\nGoodbye!")
-                        break
-                    except EOFError:
-                        _restore_terminal()
-                        console.print("\nGoodbye!")
-                        break
-            finally:
-                agent_loop.stop()
-                outbound_task.cancel()
-                await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
-                await agent_loop.close_mcp()
-
-        asyncio.run(run_interactive())
 
 
 # ============================================================================
@@ -1410,15 +1157,11 @@ def status():
 
     config_path = get_config_path()
     config = load_config()
-    workspace = config.workspace_path
 
     console.print(f"{__logo__} nanocats Status\n")
 
     console.print(
         f"Config: {config_path} {'[green]✓[/green]' if config_path.exists() else '[red]✗[/red]'}"
-    )
-    console.print(
-        f"Workspace: {workspace} {'[green]✓[/green]' if workspace.exists() else '[red]✗[/red]'}"
     )
 
     if config_path.exists():
@@ -1544,14 +1287,13 @@ def _login_github_copilot() -> None:
 def webui(
     port: int | None = typer.Option(None, "--port", "-p", help="WebUI server port"),
     host: str | None = typer.Option(None, "--host", help="WebUI server host"),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
     """Start the nanocats WebUI API server."""
     from nanocats.config.schema import Config
     from nanocats.config.loader import load_config
 
-    config = _load_runtime_config(config, workspace)
+    config = _load_runtime_config(config)
 
     web_config = config.web
     bind_port = port if port is not None else web_config.port

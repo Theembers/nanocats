@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 
-def _make_loop():
+def _make_mock_agent_config(workspace: Path) -> MagicMock:
+    """Create a mock AgentConfig for testing."""
+    agent_config = MagicMock()
+    agent_config.id = "test-agent"
+    agent_config.model = "test-model"
+    agent_config.workspace = workspace
+    return agent_config
+
+
+def _make_loop(tmp_path: Path | None = None):
     """Create a minimal AgentLoop with mocked dependencies."""
     from nanocats.agent.loop import AgentLoop
     from nanocats.bus.queue import MessageBus
@@ -16,14 +26,14 @@ def _make_loop():
     bus = MessageBus()
     provider = MagicMock()
     provider.get_default_model.return_value = "test-model"
-    workspace = MagicMock()
-    workspace.__truediv__ = MagicMock(return_value=MagicMock())
+    workspace = tmp_path or Path("/tmp/test-workspace")
+    agent_config = _make_mock_agent_config(workspace)
 
     with patch("nanocats.agent.loop.ContextBuilder"), \
          patch("nanocats.agent.loop.SessionManager"), \
          patch("nanocats.agent.loop.SubagentManager") as MockSubMgr:
         MockSubMgr.return_value.cancel_by_session = AsyncMock(return_value=0)
-        loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
+        loop = AgentLoop(bus=bus, provider=provider, agent_config=agent_config)
     return loop, bus
 
 

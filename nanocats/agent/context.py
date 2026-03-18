@@ -1,38 +1,56 @@
 """Context builder for assembling agent prompts."""
 
+from __future__ import annotations
+
 import base64
 import mimetypes
 import platform
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nanocats.agent.memory import MemoryStore
 from nanocats.agent.skills import SkillsLoader
 from nanocats.utils.helpers import build_assistant_message, detect_image_mime
 
+if TYPE_CHECKING:
+    from nanocats.config.schema import AgentConfig
+
 
 class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
+    _TYPE_FILES: dict[str, list[str]] = {
+        "admin": ["AGENTS.md", "BOOTSTRAP.md", "SOUL.md"],
+        "user": ["AGENTS.md", "BOOTSTRAP.md", "SOUL.md", "USER.md", "TOOLS.md", "HEARTBEAT.md"],
+        "specialized": ["AGENTS.md", "IDENTITY.md"],
+        "task": [],
+    }
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 
-    def __init__(self, workspace: Path):
-        self.workspace = workspace
-        self.memory = MemoryStore(workspace)
-        self.skills = SkillsLoader(workspace)
+    def __init__(self, agent_config: "AgentConfig"):
+        self.workspace = agent_config.workspace
+        self.agent_type = agent_config.type
+        self.agent_config = agent_config
+        self.skills = SkillsLoader(self.workspace)
 
-    def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
+    def build_system_prompt(self, skill_names: list[str] | None = None, session_key: str | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
+        from nanocats.config.schema import AgentType
+
         parts = [self._get_identity()]
+
+        # Task agents: minimal prompt, no bootstrap files, memory, or skills
+        if self.agent_type == AgentType.TASK:
+            return parts[0]
 
         bootstrap = self._load_bootstrap_files()
         if bootstrap:
             parts.append(bootstrap)
 
-        memory = self.memory.get_memory_context()
+        memory_store = MemoryStore(self.workspace, session_key=session_key)
+        memory = memory_store.get_memory_context()
         if memory:
             parts.append(f"# Memory\n\n{memory}")
 
@@ -54,10 +72,26 @@ Skills with available="false" need dependencies installed first - you can try in
         return "\n\n---\n\n".join(parts)
 
     def _get_identity(self) -> str:
-        """Get the core identity section."""
+        """Get the core identity section based on agent type."""
+        from nanocats.config.schema import AgentType
+
         workspace_path = str(self.workspace.expanduser().resolve())
         system = platform.system()
         runtime = f"{'macOS' if system == 'Darwin' else system} {platform.machine()}, Python {platform.python_version()}"
+
+        # Task agent: minimal prompt
+        if self.agent_type == AgentType.TASK:
+            return f"""# nanocats 🐈
+
+You are a task agent. Follow the instructions from your upstream agent.
+
+## Runtime
+{runtime}
+
+## Guidelines
+- Execute the assigned task precisely.
+- Report results back when done.
+- If blocked, report the blocker clearly."""
 
         platform_policy = ""
         if system == "Windows":
@@ -72,6 +106,60 @@ Skills with available="false" need dependencies installed first - you can try in
 - Use file tools when they are simpler or more reliable than shell commands.
 """
 
+        # Specialized agent: simplified workspace, no memory paths, no profile files
+        if self.agent_type == AgentType.SPECIALIZED:
+            return f"""# nanocats 🐈
+
+You are nanocats, a specialized AI assistant.
+
+## Runtime
+{runtime}
+
+## Workspace
+Your workspace is at: {workspace_path}
+
+{platform_policy}
+
+## nanocats Guidelines
+- State intent before tool calls, but NEVER predict or claim results before receiving them.
+- Before modifying a file, read it first. Do not assume files or directories exist.
+- After writing or editing a file, re-read it if accuracy matters.
+- If a tool call fails, analyze the error before retrying with a different approach.
+- Ask for clarification when the request is ambiguous.
+
+Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
+
+        # Admin agent: only SOUL.md in profile files
+        if self.agent_type == AgentType.ADMIN:
+            return f"""# nanocats 🐈
+
+You are nanocats, a helpful AI assistant.
+
+## Runtime
+{runtime}
+
+## Workspace
+Your workspace is at: {workspace_path}
+- Long-term memory: {workspace_path}/memory/MEMORY.md (write important facts here)
+- History log: {workspace_path}/memory/HISTORY.md (grep-searchable). Each entry starts with [YYYY-MM-DD HH:MM].
+- Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
+
+## Self-Updating Profile Files
+You can autonomously update these workspace files. Read the file first before editing, then use the edit_file tool.
+- SOUL.md: **Your own** identity and personality. Update when the user asks you to change your name, personality, tone, or communication style.
+
+{platform_policy}
+
+## nanocats Guidelines
+- State intent before tool calls, but NEVER predict or claim results before receiving them.
+- Before modifying a file, read it first. Do not assume files or directories exist.
+- After writing or editing a file, re-read it if accuracy matters.
+- If a tool call fails, analyze the error before retrying with a different approach.
+- Ask for clarification when the request is ambiguous.
+
+Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
+
+        # User agent (default): full content with privacy reminder for group chats
         return f"""# nanocats 🐈
 
 You are nanocats, a helpful AI assistant.
@@ -84,6 +172,14 @@ Your workspace is at: {workspace_path}
 - Long-term memory: {workspace_path}/memory/MEMORY.md (write important facts here)
 - History log: {workspace_path}/memory/HISTORY.md (grep-searchable). Each entry starts with [YYYY-MM-DD HH:MM].
 - Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
+
+## Self-Updating Profile Files
+You can autonomously update these workspace files. Read the file first before editing, then use the edit_file tool.
+- USER.md: The **human user's** profile. Update when you learn the user's real name, nickname, timezone, language, or preferences. This is NOT your (the assistant's) profile.
+- SOUL.md: **Your own** identity and personality. Update when the user asks you to change your name, personality, tone, or communication style. For example, if the user says "rename yourself" or "change your name", modify SOUL.md.
+
+## Privacy in Group Chats
+In group chats or shared sessions, NEVER expose the user's personal information (name, timezone, preferences, etc.) from USER.md. Treat USER.md content as private — it is only for personalizing your behavior, not for sharing publicly.
 
 {platform_policy}
 
@@ -107,10 +203,11 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         return ContextBuilder._RUNTIME_CONTEXT_TAG + "\n" + "\n".join(lines)
 
     def _load_bootstrap_files(self) -> str:
-        """Load all bootstrap files from workspace."""
+        """Load bootstrap files from workspace based on agent type."""
+        files = self._TYPE_FILES.get(self.agent_type.value, [])
         parts = []
 
-        for filename in self.BOOTSTRAP_FILES:
+        for filename in files:
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
@@ -126,6 +223,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         media: list[str] | None = None,
         channel: str | None = None,
         chat_id: str | None = None,
+        session_key: str | None = None,
     ) -> list[dict[str, Any]]:
         """Build the complete message list for an LLM call."""
         runtime_ctx = self._build_runtime_context(channel, chat_id)
@@ -139,7 +237,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             merged = [{"type": "text", "text": runtime_ctx}] + user_content
 
         return [
-            {"role": "system", "content": self.build_system_prompt(skill_names)},
+            {"role": "system", "content": self.build_system_prompt(skill_names, session_key=session_key)},
             *history,
             {"role": "user", "content": merged},
         ]

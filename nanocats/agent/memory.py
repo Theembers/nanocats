@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from loguru import logger
 
-from nanocats.utils.helpers import ensure_dir, estimate_message_tokens, estimate_prompt_tokens_chain
+from nanocats.utils.helpers import ensure_dir, estimate_message_tokens, estimate_prompt_tokens_chain, safe_filename
 
 if TYPE_CHECKING:
     from nanocats.providers.base import LLMProvider
@@ -77,8 +77,11 @@ class MemoryStore:
 
     _MAX_FAILURES_BEFORE_RAW_ARCHIVE = 3
 
-    def __init__(self, workspace: Path):
-        self.memory_dir = ensure_dir(workspace / "memory")
+    def __init__(self, workspace: Path, session_key: str | None = None):
+        if session_key:
+            self.memory_dir = ensure_dir(workspace / "memory" / safe_filename(session_key))
+        else:
+            self.memory_dir = ensure_dir(workspace / "memory")
         self.memory_file = self.memory_dir / "MEMORY.md"
         self.history_file = self.memory_dir / "HISTORY.md"
         self._consecutive_failures = 0
@@ -234,7 +237,7 @@ class MemoryConsolidator:
         build_messages: Callable[..., list[dict[str, Any]]],
         get_tool_definitions: Callable[[], list[dict[str, Any]]],
     ):
-        self.store = MemoryStore(workspace)
+        self.workspace = workspace
         self.provider = provider
         self.model = model
         self.sessions = sessions
@@ -247,9 +250,14 @@ class MemoryConsolidator:
         """Return the shared consolidation lock for one session."""
         return self._locks.setdefault(session_key, asyncio.Lock())
 
-    async def consolidate_messages(self, messages: list[dict[str, object]]) -> bool:
+    def _get_store(self, session_key: str) -> MemoryStore:
+        """Get a MemoryStore for the given session."""
+        return MemoryStore(self.workspace, session_key=session_key)
+
+    async def consolidate_messages(self, messages: list[dict[str, object]], session_key: str) -> bool:
         """Archive a selected message chunk into persistent memory."""
-        return await self.store.consolidate(messages, self.provider, self.model)
+        store = self._get_store(session_key)
+        return await store.consolidate(messages, self.provider, self.model)
 
     def pick_consolidation_boundary(
         self,
@@ -282,6 +290,7 @@ class MemoryConsolidator:
             current_message="[token-probe]",
             channel=channel,
             chat_id=chat_id,
+            session_key=session.key,
         )
         return estimate_prompt_tokens_chain(
             self.provider,
@@ -297,7 +306,7 @@ class MemoryConsolidator:
             snapshot = session.messages[session.last_consolidated:]
             if not snapshot:
                 return True
-            return await self.consolidate_messages(snapshot)
+            return await self.consolidate_messages(snapshot, session.key)
 
     async def maybe_consolidate_by_tokens(self, session: Session) -> None:
         """Loop: archive old messages until prompt fits within half the context window."""
@@ -347,7 +356,7 @@ class MemoryConsolidator:
                     source,
                     len(chunk),
                 )
-                if not await self.consolidate_messages(chunk):
+                if not await self.consolidate_messages(chunk, session.key):
                     return
                 session.last_consolidated = end_idx
                 self.sessions.save(session)

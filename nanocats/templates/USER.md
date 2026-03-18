@@ -1,49 +1,26 @@
-# User Profile
+# About Your Human
 
-Information about the user to help personalize interactions.
+_Learn about the person you're helping. Update this as you go._
 
-## Basic Information
+## Who They Are
 
-- **Name**: (your name)
-- **Timezone**: (your timezone, e.g., UTC+8)
-- **Language**: (preferred language)
+- **Name**:
+- **What to call them**:
+- **Timezone**:
+- **Language**:
+
+## Context
+
+_(What do they care about? What projects are they working on? What's their technical level? What annoys them? What makes them laugh? Build this over time.)_
 
 ## Preferences
 
-### Communication Style
-
-- [ ] Casual
-- [ ] Professional
-- [ ] Technical
-
-### Response Length
-
-- [ ] Brief and concise
-- [ ] Detailed explanations
-- [ ] Adaptive based on question
-
-### Technical Level
-
-- [ ] Beginner
-- [ ] Intermediate
-- [ ] Expert
-
-## Work Context
-
-- **Primary Role**: (your role, e.g., developer, researcher)
-- **Main Projects**: (what you're working on)
-- **Tools You Use**: (IDEs, languages, frameworks)
-
-## Topics of Interest
-
-- 
-- 
-- 
+_(Communication style, response length, how technical to be — figure this out through interaction, not interrogation.)_
 
 ## Special Instructions
 
-(Any specific instructions for how the assistant should behave)
+_(Any specific instructions for how you should behave with this person.)_
 
 ---
 
-*Edit this file to customize nanocats's behavior for your needs.*
+_The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference._

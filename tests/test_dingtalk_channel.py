@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -7,6 +8,19 @@ from nanocats.bus.queue import MessageBus
 import nanocats.channels.dingtalk as dingtalk_module
 from nanocats.channels.dingtalk import DingTalkChannel, NanobotDingTalkHandler
 from nanocats.channels.dingtalk import DingTalkConfig
+from nanocats.config.schema import AgentConfig, AgentType
+
+
+def _make_mock_agent_registry(agent_id: str = "test_agent"):
+    """Create a mock agent registry that returns a test agent."""
+    mock_agent = MagicMock(spec=AgentConfig)
+    mock_agent.id = agent_id
+    mock_agent.type = AgentType.USER
+
+    mock_registry = MagicMock()
+    mock_registry.find_by_channel.return_value = (mock_agent, None)
+    mock_registry.resolve_session_key.return_value = f"test:{agent_id}"
+    return mock_registry
 
 
 class _FakeResponse:
@@ -32,7 +46,9 @@ class _FakeHttp:
 async def test_group_message_keeps_sender_id_and_routes_chat_id() -> None:
     config = DingTalkConfig(client_id="app", client_secret="secret", allow_from=["user1"])
     bus = MessageBus()
-    channel = DingTalkChannel(config, bus)
+    bus.register_agent("test_agent")
+    mock_registry = _make_mock_agent_registry("test_agent")
+    channel = DingTalkChannel(config, bus, agent_registry=mock_registry)
 
     await channel._on_message(
         "hello",
@@ -42,7 +58,7 @@ async def test_group_message_keeps_sender_id_and_routes_chat_id() -> None:
         conversation_id="conv123",
     )
 
-    msg = await bus.consume_inbound()
+    msg = await bus.consume_inbound("test_agent")
     assert msg.sender_id == "user1"
     assert msg.chat_id == "group:conv123"
     assert msg.metadata["conversation_type"] == "2"
@@ -71,9 +87,12 @@ async def test_group_send_uses_group_messages_api() -> None:
 @pytest.mark.asyncio
 async def test_handler_uses_voice_recognition_text_when_text_is_empty(monkeypatch) -> None:
     bus = MessageBus()
+    bus.register_agent("test_agent")
+    mock_registry = _make_mock_agent_registry("test_agent")
     channel = DingTalkChannel(
         DingTalkConfig(client_id="app", client_secret="secret", allow_from=["user1"]),
         bus,
+        agent_registry=mock_registry,
     )
     handler = NanobotDingTalkHandler(channel)
 
@@ -103,7 +122,7 @@ async def test_handler_uses_voice_recognition_text_when_text_is_empty(monkeypatc
     )
 
     await asyncio.gather(*list(channel._background_tasks))
-    msg = await bus.consume_inbound()
+    msg = await bus.consume_inbound("test_agent")
 
     assert (status, body) == ("OK", "OK")
     assert msg.content == "voice transcript"
