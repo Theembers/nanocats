@@ -78,7 +78,7 @@ webui = [
 ]
 
 [project.scripts]
-nanocats = "nanocats.cli.commands:app"
+nanocats = "nanocats.cli:app"
 
 [build-system]
 requires = ["hatchling"]
