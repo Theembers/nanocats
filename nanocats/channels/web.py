@@ -185,12 +185,6 @@ class WebChannel(BaseChannel):
                     self._session_to_agent[session_id] = agent_id
 
                 logger.info("Web client connected: user_id={}", user_id)
-                record_log(
-                    level="INFO",
-                    log_type="channel",
-                    message=f"Web client connected: user_id={user_id}",
-                    channel="web",
-                )
 
                 await websocket.send_json(
                     {
@@ -247,18 +241,12 @@ class WebChannel(BaseChannel):
 
             except WebSocketDisconnect:
                 logger.info("Web client disconnected: session_id={}", session_id)
-                record_log(
-                    level="INFO",
-                    log_type="channel",
-                    message=f"Web client disconnected: session_id={session_id}",
-                    channel="web",
-                )
             finally:
                 if session_id:
                     self._connections.pop(session_id, None)
-                self._ws_to_session.pop(websocket, None)
-                if session_id:
-                    self._session_to_agent.pop(session_id, None)
+                    self._ws_to_session.pop(websocket, None)
+                    if session_id:
+                        self._session_to_agent.pop(session_id, None)
 
         @self._app.websocket("/ws/{agent_id}")
         async def websocket_endpoint_with_agent(websocket: WebSocket, agent_id: str):
@@ -293,12 +281,6 @@ class WebChannel(BaseChannel):
                 self._session_to_agent[session_id] = agent_id
 
                 logger.info("Web client connected: user_id={}, agent_id={}", user_id, agent_id)
-                record_log(
-                    level="INFO",
-                    log_type="channel",
-                    message=f"Web client connected: user_id={user_id}, agent_id={agent_id}",
-                    channel="web",
-                )
 
                 await websocket.send_json(
                     {
@@ -313,7 +295,7 @@ class WebChannel(BaseChannel):
                 if content:
                     await self._handle_message(
                         sender_id=user_id,
-                        chat_id=user_id,
+                        chat_id=session_id,
                         content=content,
                         session_key=session_id,
                         metadata={"agent_id": agent_id},
@@ -345,7 +327,7 @@ class WebChannel(BaseChannel):
                             if content:
                                 await self._handle_message(
                                     sender_id=user_id,
-                                    chat_id=user_id,
+                                    chat_id=session_id,
                                     content=content,
                                     session_key=session_id,
                                     metadata={"agent_id": agent_id},
@@ -359,18 +341,12 @@ class WebChannel(BaseChannel):
 
             except WebSocketDisconnect:
                 logger.info("Web client disconnected: session_id={}", session_id)
-                record_log(
-                    level="INFO",
-                    log_type="channel",
-                    message=f"Web client disconnected: session_id={session_id}",
-                    channel="web",
-                )
             finally:
                 if session_id:
                     self._connections.pop(session_id, None)
-                self._ws_to_session.pop(websocket, None)
-                if session_id:
-                    self._session_to_agent.pop(session_id, None)
+                    self._ws_to_session.pop(websocket, None)
+                    if session_id:
+                        self._session_to_agent.pop(session_id, None)
 
         @self._app.get("/health")
         async def health():
@@ -410,17 +386,27 @@ class WebChannel(BaseChannel):
     async def send(self, msg: OutboundMessage) -> None:
         """Send a message to the appropriate WebSocket connection."""
         ws = self._connections.get(msg.chat_id)
-        if ws:
-            try:
-                await ws.send_json(
-                    {
-                        "type": "message",
-                        "content": msg.content,
-                        "metadata": msg.metadata,
-                    }
-                )
-            except Exception as e:
-                logger.warning("Failed to send message to web client: {}", e)
+        if not ws:
+            logger.warning(
+                "Web: no connection found for chat_id={}, available keys: {}",
+                msg.chat_id,
+                list(self._connections.keys()),
+            )
+            return
+        try:
+            await ws.send_json(
+                {
+                    "type": "message",
+                    "content": msg.content,
+                    "metadata": msg.metadata,
+                }
+            )
+        except Exception as e:
+            logger.warning("Failed to send message to web client: {}", e)
+            # 连接可能已断开，清理僵尸连接
+            self._connections.pop(msg.chat_id, None)
+            self._ws_to_session.pop(ws, None)
+            self._session_to_agent.pop(msg.chat_id, None)
 
     async def _handle_command(
         self,

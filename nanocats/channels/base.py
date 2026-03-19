@@ -100,6 +100,15 @@ class BaseChannel(ABC):
         msg_metadata = metadata or {}
         agent_id = msg_metadata.pop("agent_id", None)
 
+        # Build _source at channel entry point (proactive injection)
+        channel_name = self.instance_id or self.name
+        source_info = {
+            "channel": channel_name,
+            "chat_key": session_key or f"{channel_name}:{chat_id}",
+            "chat_id": chat_id,
+            "sender_id": sender_id,
+        }
+
         content_preview = content[:200] + "..." if len(content) > 200 else content
         logger.info(
             "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",
@@ -118,6 +127,7 @@ class BaseChannel(ABC):
             metadata=msg_metadata,
             session_key_override=session_key,
             agent_id=agent_id,
+            _source=source_info,
         )
         logger.info(
             "[Channel] inbound: channel={}, sender_id={}, chat_id={}, content={}",

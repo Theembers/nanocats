@@ -39,6 +39,27 @@
   border-color: var(--color-accent);
 }
 
+.logs-date-input {
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-main);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  transition: var(--transition);
+  min-width: 140px;
+}
+
+.logs-date-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.logs-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
 .logs-refresh-btn {
   display: flex;
   align-items: center;
@@ -62,7 +83,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
 .logs-stat-card {

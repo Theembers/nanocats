@@ -8,7 +8,8 @@ import SessionTree from '../components/SessionTree';
 import Message from '../components/Message';
 import DateSeparator from '../components/DateSeparator';
 import PreviewModal from '../components/PreviewModal';
-import { Send, Square, Plus, MessageSquare, Clock, Loader2 } from 'lucide-react';
+import AgentTabBar from '../components/AgentTabBar';
+import { Send, Square, MessageSquare, Clock, Loader2, PlusSquare } from 'lucide-react';
 import './Chat.css';
 
 class ErrorBoundary extends React.Component {
@@ -203,7 +204,9 @@ function ChatInner() {
   }, [messages]);
 
   return (
-    <div className="chat-page-container">
+    <>
+      <AgentTabBar />
+      <div className="chat-page-container">
       <SessionTree
         agentId={effectiveAgentId}
         selectedSession={selectedSession}
@@ -285,15 +288,6 @@ function ChatInner() {
           )}
 
           <form onSubmit={handleSubmit} className="chat-input-form">
-            <button
-              type="button"
-              className="chat-action-btn new-session-btn"
-              onClick={handleNewSession}
-              title="New Session"
-            >
-              <Plus size={18} />
-            </button>
-
             <input
               type="text"
               value={inputValue}
@@ -301,6 +295,15 @@ function ChatInner() {
               placeholder={isAgentResponding ? "Agent is responding..." : "Type a message..."}
               className="chat-input"
             />
+
+            <button
+              type="button"
+              className="chat-action-btn new-session-btn"
+              onClick={handleNewSession}
+              title="New Session"
+            >
+              <PlusSquare size={18} />
+            </button>
 
             {isAgentResponding ? (
               <button
@@ -330,6 +333,7 @@ function ChatInner() {
         item={previewItem}
       />
     </div>
+    </>
   );
 }
 

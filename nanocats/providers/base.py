@@ -251,7 +251,7 @@ class LLMProvider(ABC):
                             provider=self.__class__.__name__.replace("Provider", "").lower(),
                             input_tokens=response.usage.get("prompt_tokens", 0),
                             output_tokens=response.usage.get("completion_tokens", 0),
-                            cache_hit=response.usage.get("cache_hit_tokens", 0),
+                            cache_hit=response.usage.get("cached_tokens", 0),
                         )
 
                         record_log(
@@ -265,7 +265,7 @@ class LLMProvider(ABC):
                                 "input_tokens": response.usage.get("prompt_tokens", 0),
                                 "output_tokens": response.usage.get("completion_tokens", 0),
                                 "total_tokens": response.usage.get("total_tokens", 0),
-                                "cache_hit": response.usage.get("cache_hit_tokens", 0),
+                                "cache_hit": response.usage.get("cached_tokens", 0),
                             },
                         )
                     except Exception:

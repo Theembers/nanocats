@@ -60,9 +60,12 @@ def restart(
 
     if pid is None:
         console.print("[yellow]Gateway is not running. Starting gateway instead...[/yellow]\n")
-        from nanocats.cli.gateway import gateway as gateway_cmd
-
-        gateway_cmd.main(standalone_mode=False)
+        cmd = [sys.executable, "-m", "nanocats", "gateway"]
+        if port is not None:
+            cmd.extend(["--port", str(port)])
+        if config is not None:
+            cmd.extend(["--config", config])
+        os.execvp(sys.executable, cmd)
         return
 
     console.print(f"{__logo__} Restarting gateway (PID: {pid})...")
@@ -85,7 +88,7 @@ def restart(
     console.print("[dim]Waiting for gateway to stop...[/dim]")
     import time
 
-    for _ in range(20):
+    for _ in range(60):
         time.sleep(0.5)
         if not _is_gateway_running():
             break

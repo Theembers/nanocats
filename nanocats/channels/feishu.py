@@ -4,6 +4,8 @@ import asyncio
 import json
 import multiprocessing as mp
 import os
+import queue
+import random
 import re
 import threading
 import time
@@ -273,6 +275,7 @@ class FeishuReceiverProcess(mp.Process):
 
         event_handler = builder.build()
 
+        attempt = 0
         while not self._shutdown.is_set():
             try:
                 ws_client = lark.ws.Client(
@@ -282,11 +285,14 @@ class FeishuReceiverProcess(mp.Process):
                     log_level=lark.LogLevel.INFO,
                 )
                 logger.info(f"Feishu [{self.name}] WebSocket connecting...")
+                attempt = 0  # 连接成功，重置
                 ws_client.start()  # 官方写法，进程隔离后不再报 loop 错误
             except Exception as e:
                 if not self._shutdown.is_set():
-                    logger.warning(f"Feishu [{self.name}] WebSocket error: {e}")
-                    time.sleep(5)
+                    attempt += 1
+                    delay = min(300, (2 ** attempt) + random.uniform(0, 2))
+                    logger.warning(f"Feishu [{self.name}] WebSocket error (attempt {attempt}): {e}, retry in {delay:.1f}s")
+                    time.sleep(delay)
 
         logger.info(f"Feishu receiver process [{self.name}] 正在优雅退出")
 
@@ -345,6 +351,8 @@ class FeishuChannel(BaseChannel):
         self._message_queue: MPQueue = MPQueue()
         self._listener_thread: threading.Thread | None = None
         self._running = False
+        self._reconnect_attempts = 0
+        self._last_message_time: float | None = None
 
     async def start(self) -> None:
         """Start the Feishu bot with dedicated receiver process."""
@@ -369,26 +377,60 @@ class FeishuChannel(BaseChannel):
             .build()
         )
 
+        self._start_receiver_process()
+        self._start_queue_listener()
+
+        logger.info(f"Feishu bot '{self.name}' 已启动（独立进程模式）")
+        while self._running:
+            # 检查子进程存活
+            if self._receiver_process and not self._receiver_process.is_alive():
+                logger.warning(f"Feishu [{self.name}] receiver process died, restarting...")
+                self._reconnect_attempts += 1
+                self._start_receiver_process()
+            # 检查 queue_listener 线程存活
+            if self._listener_thread and not self._listener_thread.is_alive():
+                logger.warning(f"Feishu [{self.name}] queue listener died, restarting...")
+                self._start_queue_listener()
+            await asyncio.sleep(5)
+
+    def _start_receiver_process(self) -> None:
+        """Start or restart the receiver subprocess."""
+        if self._receiver_process and self._receiver_process.is_alive():
+            self._receiver_process._shutdown.set()
+            self._receiver_process.join(timeout=5)
+            if self._receiver_process.is_alive():
+                self._receiver_process.terminate()
         self._receiver_process = FeishuReceiverProcess(self.config, self.name, self._message_queue)
         self._receiver_process.start()
 
+    def _start_queue_listener(self) -> None:
+        """Start or restart the queue listener thread."""
         def queue_listener():
             while self._running:
                 try:
                     payload = self._message_queue.get(timeout=1)
-                    if self._loop:
-                        asyncio.run_coroutine_threadsafe(
-                            self._process_queued_message(payload), self._loop
-                        )
-                except Exception:
+                except queue.Empty:
                     continue
+                except Exception as e:
+                    logger.error(f"Feishu [{self.name}] queue error: {e}")
+                    continue
+
+                if self._loop:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._process_queued_message(payload), self._loop
+                    )
+                    # 关键：监听 Future 回调，捕获协程异常
+                    def _done_callback(f, name=self.name):
+                        try:
+                            f.result()
+                        except asyncio.CancelledError:
+                            pass
+                        except Exception as e:
+                            logger.error(f"Feishu [{name}] message processing failed: {e}")
+                    future.add_done_callback(_done_callback)
 
         self._listener_thread = threading.Thread(target=queue_listener, daemon=True)
         self._listener_thread.start()
-
-        logger.info(f"Feishu bot '{self.name}' 已启动（独立进程模式）")
-        while self._running:
-            await asyncio.sleep(1)
 
     async def stop(self) -> None:
         """优雅退出：先通知子进程，等待 10 秒，再强制 terminate"""
@@ -407,6 +449,7 @@ class FeishuChannel(BaseChannel):
     async def _process_queued_message(self, payload: dict) -> None:
         """Process messages from the receiver process queue."""
         try:
+            self._last_message_time = time.time()
             message_id = payload["message_id"]
             if message_id in self._processed_message_ids:
                 return
@@ -512,7 +555,17 @@ class FeishuChannel(BaseChannel):
             )
 
         except Exception as e:
-            logger.error(f"Error processing queued Feishu message: {e}")
+            logger.error(f"Feishu [{self.name}] error in _process_queued_message: {e}", exc_info=True)
+
+    def _get_connection_status(self) -> dict:
+        """Return connection status information for monitoring."""
+        return {
+            "receiver_process_alive": self._receiver_process.is_alive() if self._receiver_process else False,
+            "listener_thread_alive": self._listener_thread.is_alive() if self._listener_thread else False,
+            "reconnect_attempts": self._reconnect_attempts,
+            "last_message_time": self._last_message_time,
+            "running": self._running,
+        }
 
     def _is_bot_mentioned(self, message: Any) -> bool:
         """Check if the bot is @mentioned in the message."""
@@ -1118,6 +1171,9 @@ class FeishuChannel(BaseChannel):
                 reaction_id = self._message_reactions.pop(inbound_message_id)
                 await self._remove_reaction(inbound_message_id, reaction_id)
 
+            # Reaction 清理后，发送内容前
+            logger.debug(f"Feishu [{self.name}] sending content to {msg.chat_id}, len={len(msg.content or '')}")
+
             if msg.content and msg.content.strip():
                 fmt = self._detect_msg_format(msg.content)
 
@@ -1158,6 +1214,9 @@ class FeishuChannel(BaseChannel):
                             "interactive",
                             json.dumps(card, ensure_ascii=False),
                         )
+
+            # 发送成功后
+            logger.debug(f"Feishu [{self.name}] message sent successfully to {msg.chat_id}")
 
         except Exception as e:
             logger.error("Error sending Feishu message: {}", e)

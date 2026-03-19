@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Search, Users } from 'lucide-react';
 import { getSessionTree } from '../api/agents';
@@ -44,6 +44,7 @@ function SessionTree({
   const [expandedSessions, setExpandedSessions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   const { data: treeData, isLoading } = useQuery({
     queryKey: ['sessionTree', agentId],
@@ -52,6 +53,20 @@ function SessionTree({
   });
 
   const sessions = treeData?.sessions || [];
+
+  // Default: expand all sessions that have chat_keys
+  useEffect(() => {
+    if (!initialized && sessions.length > 0) {
+      const initialExpanded = {};
+      for (const session of sessions) {
+        if (session.chat_keys?.length > 0) {
+          initialExpanded[session.key] = true;
+        }
+      }
+      setExpandedSessions(initialExpanded);
+      setInitialized(true);
+    }
+  }, [sessions, initialized]);
 
   const filteredSessions = useMemo(() => {
     if (!searchQuery) return sessions;

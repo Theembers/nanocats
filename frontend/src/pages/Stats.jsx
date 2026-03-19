@@ -37,10 +37,10 @@ function Stats() {
   });
 
   const formatChartData = () => {
-    if (!data || !data.daily) {
+    if (!data || !data.by_date) {
       return [];
     }
-    return data.daily.map((item) => ({
+    return data.by_date.map((item) => ({
       date: item.date,
       prompt: item.input_tokens || 0,
       completion: item.output_tokens || 0,
@@ -52,16 +52,16 @@ function Stats() {
     if (!data || !data.by_model) {
       return [];
     }
-    return Object.entries(data.by_model).map(([name, value]) => ({
-      name: name.split('/').pop() || name,
-      value,
+    return data.by_model.map((item) => ({
+      name: item.model.split('/').pop() || item.model,
+      value: item.total_tokens,
     }));
   };
 
   const totalPrompt = data?.summary?.total_input_tokens || 0;
   const totalCompletion = data?.summary?.total_output_tokens || 0;
   const total = totalPrompt + totalCompletion;
-  const cacheHits = data?.summary?.total_cache_hits || 0;
+  const cacheHits = data?.summary?.total_cache_hit || 0;
 
   if (isLoading) {
     return (
@@ -197,27 +197,25 @@ function Stats() {
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Model</th>
-                <th>Prompt</th>
-                <th>Completion</th>
-                <th>Total</th>
-                <th>Cache Hits</th>
+                <th className="text-right">Prompt</th>
+                <th className="text-right">Completion</th>
+                <th className="text-right">Total</th>
+                <th className="text-right">Cache Hits</th>
               </tr>
             </thead>
             <tbody>
-              {data?.daily?.map((row, index) => (
+              {data?.by_date?.map((row, index) => (
                 <tr key={index}>
                   <td>{row.date}</td>
-                  <td>{row.model || '-'}</td>
                   <td className="text-right">{(row.input_tokens || 0).toLocaleString()}</td>
                   <td className="text-right">{(row.output_tokens || 0).toLocaleString()}</td>
-                  <td className="text-right font-medium">{(row.input_tokens + row.output_tokens || 0).toLocaleString()}</td>
-                  <td className="text-right">{(row.cache_hits || 0).toLocaleString()}</td>
+                  <td className="text-right font-medium">{(row.total_tokens || 0).toLocaleString()}</td>
+                  <td className="text-right">{(row.cache_hit || 0).toLocaleString()}</td>
                 </tr>
               ))}
-              {(!data?.daily || data.daily.length === 0) && (
+              {(!data?.by_date || data.by_date.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="text-center">No data available for the selected period</td>
+                  <td colSpan={5} className="text-center">No data available for the selected period</td>
                 </tr>
               )}
             </tbody>

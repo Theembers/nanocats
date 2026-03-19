@@ -21,6 +21,8 @@ class InboundMessage:
     session_group_id: str | None = None
     chat_key: str | None = None
 
+    # Source info injected at channel entry point
+    _source: dict[str, Any] | None = field(default=None, repr=False)
     _session_key: str | None = field(default=None, repr=False)
 
     def __post_init__(self):
@@ -34,20 +36,29 @@ class InboundMessage:
         return f"{self.channel}:{self.chat_id}"
 
     def to_session_message(self) -> dict:
-        chat_key = self.chat_key
-        if chat_key and ":" in chat_key:
-            source_channel = chat_key.split(":")[0]
+        # Prefer pre-injected _source from channel entry point
+        if self._source:
+            source_info = self._source.copy()
+            # Ensure chat_id and sender_id are included
+            source_info.setdefault("chat_id", self.chat_id)
+            source_info.setdefault("sender_id", self.sender_id)
         else:
-            source_channel = self.channel
-        return {
-            "role": "user",
-            "content": self.content,
-            "_source": {
+            # Fallback: derive from available fields
+            chat_key = self.chat_key
+            if chat_key and ":" in chat_key:
+                source_channel = chat_key.split(":")[0]
+            else:
+                source_channel = self.channel
+            source_info = {
                 "channel": source_channel,
                 "chat_id": self.chat_id,
                 "sender_id": self.sender_id,
                 "chat_key": chat_key,
-            },
+            }
+        return {
+            "role": "user",
+            "content": self.content,
+            "_source": source_info,
         }
 
 

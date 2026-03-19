@@ -95,7 +95,6 @@ class ChannelManager:
         """Stop all channels and the dispatcher."""
         logger.info("Stopping all channels...")
 
-        # Stop dispatcher
         if self._dispatch_task:
             self._dispatch_task.cancel()
             try:
@@ -103,13 +102,19 @@ class ChannelManager:
             except asyncio.CancelledError:
                 pass
 
-        # Stop all channels
+        tasks = []
         for name, channel in self.channels.items():
-            try:
-                await channel.stop()
-                logger.info("Stopped {} channel", name)
-            except Exception as e:
-                logger.error("Error stopping {}: {}", name, e)
+            tasks.append(self._stop_channel(name, channel))
+
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _stop_channel(self, name: str, channel) -> None:
+        """Stop a single channel."""
+        try:
+            await channel.stop()
+            logger.info("Stopped {} channel", name)
+        except Exception as e:
+            logger.error("Error stopping {}: {}", name, e)
 
     async def _dispatch_outbound(self) -> None:
         """Dispatch outbound messages to the appropriate channel."""

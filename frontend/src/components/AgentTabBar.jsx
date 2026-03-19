@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listAgents } from '../api/agents';
-import { Bot, Settings } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import './AgentTabBar.css';
 
 function AgentTabBar() {
@@ -14,17 +14,18 @@ function AgentTabBar() {
     queryFn: listAgents,
   });
 
-  const currentAgentId = location.pathname.startsWith('/chat/') 
+  const isChatRoute = location.pathname.startsWith('/chat');
+  const isConfigRoute = location.pathname.startsWith('/config');
+  
+  const currentAgentId = (isChatRoute || isConfigRoute) 
     ? location.pathname.split('/')[2]
     : null;
 
   const handleAgentClick = (agentId) => {
-    navigate(`/chat/${agentId}`);
-  };
-
-  const handleConfigClick = () => {
-    if (currentAgentId) {
-      navigate(`/config/${currentAgentId}`);
+    if (isChatRoute) {
+      navigate(`/chat/${agentId}`);
+    } else if (isConfigRoute) {
+      navigate(`/config/${agentId}`);
     }
   };
 
@@ -32,7 +33,7 @@ function AgentTabBar() {
     return null;
   }
 
-  if (!location.pathname.startsWith('/chat')) {
+  if (!isChatRoute && !isConfigRoute) {
     return null;
   }
 
@@ -57,13 +58,6 @@ function AgentTabBar() {
             <span>{agent.name || agent.id}</span>
           </button>
         ))}
-      </div>
-      <div className="agent-tab-actions">
-        {currentAgentId && (
-          <button className="agent-tab-config" onClick={handleConfigClick}>
-            <Settings size={16} />
-          </button>
-        )}
       </div>
     </div>
   );

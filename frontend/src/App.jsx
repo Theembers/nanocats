@@ -7,6 +7,7 @@ import Chat from './pages/Chat';
 import Config from './pages/Config';
 import Stats from './pages/Stats';
 import Logs from './pages/Logs';
+import AgentSelectionPage from './pages/AgentSelectionPage';
 
 function ProtectedRoute({ children }) {
   const token = useAuthStore((state) => state.token);
@@ -31,6 +32,7 @@ function App() {
         <Route index element={<Navigate to="/chat" replace />} />
         <Route path="chat" element={<Chat />} />
         <Route path="chat/:agentId" element={<Chat />} />
+        <Route path="agents" element={<AgentSelectionPage />} />
         <Route path="config/:agentId" element={<Config />} />
         <Route path="stats" element={<Stats />} />
         <Route path="logs" element={<Logs />} />

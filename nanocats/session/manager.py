@@ -44,8 +44,10 @@ class Session:
             **kwargs,
         }
 
+        # Priority: use pre-injected _source from channel entry point
         existing_source = msg.get("_source")
         if existing_source:
+            # Track message_sources from injected _source
             chat_key = existing_source.get("chat_key")
             if chat_key:
                 self.message_sources[chat_key] = existing_source
@@ -56,6 +58,7 @@ class Session:
                     existing_source.get("chat_id"),
                 )
         elif self.chat_key and role != "system":
+            # Fallback: derive _source from session's chat_key (for assistant/tool messages)
             msg["_source"] = self._derive_source()
 
         self.messages.append(msg)

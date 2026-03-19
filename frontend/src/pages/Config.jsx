@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAgent, listAgents } from '../api/agents';
+import { getAgent } from '../api/agents';
 import apiClient from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AgentTabBar from '../components/AgentTabBar';
 import { Bot, Settings, FileText, Save, Loader2, CheckCircle2, AlertCircle, ChevronRight, Wrench, BookOpen } from 'lucide-react';
 import './Config.css';
 
@@ -17,7 +18,6 @@ const WORKSPACE_FILES = [
 
 function Config() {
   const { agentId } = useParams();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('basic');
   const [message, setMessage] = useState('');
@@ -32,23 +32,10 @@ function Config() {
   const [fileStatus, setFileStatus] = useState({});
   const [dirty, setDirty] = useState({});
 
-  const { data: agents } = useQuery({
-    queryKey: ['agents'],
-    queryFn: listAgents,
-  });
-
-  const currentAgentId = agentId || (agents && agents.length > 0 ? agents[0].id : null);
-
-  useEffect(() => {
-    if (!agentId && currentAgentId) {
-      navigate(`/config/${currentAgentId}`, { replace: true });
-    }
-  }, [agentId, currentAgentId, navigate]);
-
   const { data: agent, isLoading } = useQuery({
-    queryKey: ['agent', currentAgentId],
-    queryFn: () => getAgent(currentAgentId),
-    enabled: !!currentAgentId,
+    queryKey: ['agent', agentId],
+    queryFn: () => getAgent(agentId),
+    enabled: !!agentId,
   });
 
   useEffect(() => {
@@ -60,10 +47,10 @@ function Config() {
   }, [agent]);
 
   const updateMutation = useMutation({
-    mutationFn: (updates) => apiClient.patch(`/agents/${currentAgentId}`, updates),
+    mutationFn: (updates) => apiClient.patch(`/agents/${agentId}`, updates),
     onSuccess: () => {
       setMessage('success:Configuration saved successfully');
-      queryClient.invalidateQueries(['agent', currentAgentId]);
+      queryClient.invalidateQueries(['agent', agentId]);
       setTimeout(() => setMessage(''), 3000);
     },
     onError: () => {
@@ -80,7 +67,7 @@ function Config() {
     if (contents[filename] !== undefined) return;
     setLoadingFile(filename);
     try {
-      const response = await apiClient.get(`/agents/${currentAgentId}/workspace/${filename}`);
+      const response = await apiClient.get(`/agents/${agentId}/workspace/${filename}`);
       setContents(prev => ({ ...prev, [filename]: response.data.content || '' }));
     } catch (err) {
       setContents(prev => ({ ...prev, [filename]: '' }));
@@ -90,7 +77,7 @@ function Config() {
 
   useEffect(() => {
     loadFile(activeFile);
-  }, [activeFile, currentAgentId]);
+  }, [activeFile, agentId]);
 
   const handleFileChange = (filename, value) => {
     setDirty(prev => ({ ...prev, [filename]: true }));
@@ -100,7 +87,7 @@ function Config() {
   const handleSaveFile = async (filename) => {
     setSavingFile(filename);
     try {
-      await apiClient.put(`/agents/${currentAgentId}/workspace/${filename}`, {
+      await apiClient.put(`/agents/${agentId}/workspace/${filename}`, {
         content: contents[filename],
       });
       setFileStatus(prev => ({ ...prev, [filename]: 'saved' }));
@@ -112,14 +99,6 @@ function Config() {
     setSavingFile(null);
   };
 
-  if (!currentAgentId) {
-    return (
-      <div className="page-container">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="page-container">
@@ -130,6 +109,7 @@ function Config() {
 
   return (
     <div className="config-page">
+      <AgentTabBar />
       <div className="config-header">
         <h1>Configuration</h1>
         <p>Manage your agent settings and workspace files</p>

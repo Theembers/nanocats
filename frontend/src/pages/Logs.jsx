@@ -4,21 +4,32 @@ import { getLogs } from '../api/logs';
 import LogTable from '../components/LogTable';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { RefreshCw, Cpu, Wrench, BookOpen, Terminal } from 'lucide-react';
+import './Logs.css';
 
-function Logs() {
-  const [filters, setFilters] = useState({
-    type: '',
-    agent_id: '',
-    channel: '',
+const getDefaultFilters = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 3);
+  return {
+    category: '',
     level: '',
+    start_time: start.toISOString().split('T')[0],
+    end_time: end.toISOString().split('T')[0],
     keyword: '',
     limit: 50,
-  });
+  };
+};
+
+function Logs() {
+  const [filters, setFilters] = useState(getDefaultFilters);
   const [page, setPage] = useState(1);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['logs', filters, page],
-    queryFn: () => getLogs({ ...filters, limit: filters.limit, offset: (page - 1) * filters.limit }),
+    queryFn: () => {
+      const { category, ...rest } = filters;
+      return getLogs({ ...rest, type: category, limit: filters.limit, offset: (page - 1) * filters.limit });
+    },
   });
 
   const handleFilterChange = (key, value) => {
@@ -26,13 +37,18 @@ function Logs() {
     setPage(1);
   };
 
+  const handleReset = () => {
+    setFilters(getDefaultFilters());
+    setPage(1);
+  };
+
   const totalPages = data ? Math.ceil(data.total / filters.limit) : 0;
 
   const stats = {
-    model: data?.logs?.filter(l => l.category === 'model').length || 0,
-    tool: data?.logs?.filter(l => l.category === 'tool').length || 0,
-    mcp: data?.logs?.filter(l => l.category === 'mcp').length || 0,
-    skill: data?.logs?.filter(l => l.category === 'skill').length || 0,
+    provider: data?.logs?.filter(l => l.type === 'provider').length || 0,
+    tool: data?.logs?.filter(l => l.type === 'tool').length || 0,
+    agent: data?.logs?.filter(l => l.type === 'agent').length || 0,
+    system: data?.logs?.filter(l => l.type === 'system').length || 0,
   };
 
   if (isLoading) {
@@ -55,21 +71,10 @@ function Logs() {
     <div className="page-container">
       <div className="logs-header">
         <h1>System Logs</h1>
-        <p>View model calls, MCP, skill, and tool usage logs</p>
+        <p>View provider, tool, agent, and system logs</p>
       </div>
 
       <div className="logs-filters">
-        <select
-          value={filters.category}
-          onChange={(e) => handleFilterChange('category', e.target.value)}
-        >
-          <option value="">All Categories</option>
-          <option value="chat">Chat</option>
-          <option value="model">Model</option>
-          <option value="tool">Tool</option>
-          <option value="mcp">MCP</option>
-          <option value="skill">Skill</option>
-        </select>
         <select
           value={filters.level}
           onChange={(e) => handleFilterChange('level', e.target.value)}
@@ -80,13 +85,35 @@ function Logs() {
           <option value="WARNING">Warning</option>
           <option value="ERROR">Error</option>
         </select>
-        <button className="logs-refresh-btn" onClick={() => refetch()}>
+        <select
+          value={filters.category}
+          onChange={(e) => handleFilterChange('category', e.target.value)}
+        >
+          <option value="">All Types</option>
+          <option value="provider">Provider</option>
+          <option value="tool">Tool</option>
+          <option value="agent">Agent</option>
+          <option value="system">System</option>
+        </select>
+        <input
+          type="date"
+          value={filters.start_time}
+          onChange={(e) => handleFilterChange('start_time', e.target.value)}
+          className="logs-date-input"
+          placeholder="Start date"
+        />
+        <input
+          type="date"
+          value={filters.end_time}
+          onChange={(e) => handleFilterChange('end_time', e.target.value)}
+          className="logs-date-input"
+          placeholder="End date"
+        />
+        <button className="logs-refresh-btn" onClick={handleReset}>
           <RefreshCw size={16} />
           Refresh
         </button>
       </div>
-
-      <LogTable logs={data?.logs || []} />
 
       <div className="logs-stats">
         <div className="logs-stat-card">
@@ -94,8 +121,8 @@ function Logs() {
             <Cpu size={18} />
           </div>
           <div className="logs-stat-content">
-            <span className="logs-stat-value">{stats.model}</span>
-            <span className="logs-stat-label">Model Calls</span>
+            <span className="logs-stat-value">{stats.provider}</span>
+            <span className="logs-stat-label">Provider</span>
           </div>
         </div>
         <div className="logs-stat-card">
@@ -103,8 +130,8 @@ function Logs() {
             <Wrench size={18} />
           </div>
           <div className="logs-stat-content">
-            <span className="logs-stat-value">{stats.mcp}</span>
-            <span className="logs-stat-label">MCP Tools</span>
+            <span className="logs-stat-value">{stats.tool}</span>
+            <span className="logs-stat-label">Tool</span>
           </div>
         </div>
         <div className="logs-stat-card">
@@ -112,8 +139,8 @@ function Logs() {
             <BookOpen size={18} />
           </div>
           <div className="logs-stat-content">
-            <span className="logs-stat-value">{stats.skill}</span>
-            <span className="logs-stat-label">Skills</span>
+            <span className="logs-stat-value">{stats.agent}</span>
+            <span className="logs-stat-label">Agent</span>
           </div>
         </div>
         <div className="logs-stat-card">
@@ -121,11 +148,13 @@ function Logs() {
             <Terminal size={18} />
           </div>
           <div className="logs-stat-content">
-            <span className="logs-stat-value">{stats.tool}</span>
-            <span className="logs-stat-label">Tools</span>
+            <span className="logs-stat-value">{stats.system}</span>
+            <span className="logs-stat-label">System</span>
           </div>
         </div>
       </div>
+
+      <LogTable logs={data?.logs || []} />
 
       {totalPages > 1 && (
         <div className="pagination">

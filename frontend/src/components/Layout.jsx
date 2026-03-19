@@ -1,8 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { MessageSquare, Settings, BarChart3, FileText, LogOut, Cat } from 'lucide-react';
-import AgentTabBar from './AgentTabBar';
+import { MessageSquare, Settings, BarChart3, FileText, LogOut, Cat, Bot } from 'lucide-react';
 import './Layout.css';
 
 function Layout() {
@@ -17,6 +16,7 @@ function Layout() {
 
   const navItems = [
     { path: '/chat', label: 'Chat', icon: MessageSquare },
+    { path: '/agents', label: 'Agents', icon: Bot },
     { path: '/stats', label: 'Stats', icon: BarChart3 },
     { path: '/logs', label: 'Logs', icon: FileText },
   ];
@@ -63,7 +63,6 @@ function Layout() {
             </div>
             <div className="user-details">
               <span className="user-name">{user?.name || user?.user_id}</span>
-              <span className="user-role">{user?.role}</span>
             </div>
           </div>
           <button onClick={handleLogout} className="btn-logout">
@@ -73,7 +72,6 @@ function Layout() {
         </div>
       </aside>
       <main className="main-content">
-        <AgentTabBar />
         <Outlet />
       </main>
     </div>
