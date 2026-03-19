@@ -16,12 +16,25 @@ from nanocats.utils.helpers import ensure_dir, safe_filename
 @dataclass
 class Session:
     key: str
+    chat_key: str | None = None
     messages: list[dict[str, Any]] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: dict[str, Any] = field(default_factory=dict)
     last_consolidated: int = 0
     message_sources: dict[str, dict] = field(default_factory=dict)
+
+    def _derive_source(self) -> dict:
+        if not self.chat_key:
+            return {}
+        if ":" in self.chat_key:
+            channel = self.chat_key.split(":")[0]
+        else:
+            channel = self.chat_key
+        return {
+            "channel": channel,
+            "chat_key": self.chat_key,
+        }
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
         msg = {
@@ -31,17 +44,19 @@ class Session:
             **kwargs,
         }
 
-        if "_source" in msg and msg["_source"]:
-            source = msg["_source"]
-            channel = source.get("channel", "")
-            if channel:
-                self.message_sources[channel] = source
+        existing_source = msg.get("_source")
+        if existing_source:
+            chat_key = existing_source.get("chat_key")
+            if chat_key:
+                self.message_sources[chat_key] = existing_source
                 logger.debug(
-                    "Session {}: tracked source channel={}, chat_id={}",
+                    "Session {}: tracked source chat_key={}, chat_id={}",
                     self.key,
-                    channel,
-                    source.get("chat_id"),
+                    chat_key,
+                    existing_source.get("chat_id"),
                 )
+        elif self.chat_key and role != "system":
+            msg["_source"] = self._derive_source()
 
         self.messages.append(msg)
         self.updated_at = datetime.now()
@@ -96,22 +111,26 @@ class SessionManager:
         safe_key = safe_filename(key.replace(":", "_"))
         return self.legacy_sessions_dir / f"{safe_key}.jsonl"
 
-    def get_or_create(self, key: str) -> Session:
+    def get_or_create(self, key: str, chat_key: str | None = None) -> Session:
         """
         Get an existing session or create a new one.
 
         Args:
-            key: Session key (usually channel:chat_id).
+            key: Session key.
+            chat_key: Chat key for deriving message source.
 
         Returns:
             The session.
         """
         if key in self._cache:
-            return self._cache[key]
+            session = self._cache[key]
+            if chat_key and not session.chat_key:
+                session.chat_key = chat_key
+            return session
 
         session = self._load(key)
         if session is None:
-            session = Session(key=key)
+            session = Session(key=key, chat_key=chat_key)
 
         self._cache[key] = session
         return session

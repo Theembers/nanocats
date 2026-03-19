@@ -28,8 +28,15 @@ class AgentRegistry:
     def get_auto_start_agents(self) -> list[AgentConfig]:
         return [a for a in self._agents.values() if a.auto_start]
 
-    def find_by_channel(self, channel: str, chat_id: str) -> tuple[AgentConfig, str | None] | None:
-        """Find agent by channel and chat_id."""
+    def find_by_channel(
+        self, channel: str, chat_id: str
+    ) -> tuple[AgentConfig, str | None, str | None] | None:
+        """Find agent by channel and chat_id.
+
+        Returns:
+            Tuple of (agent, groupId, chatKey) if found, None otherwise.
+            chatKey is the key in sessionGroups.chatKeys that maps to the chat_id.
+        """
         for agent in self._agents.values():
             logger.info(
                 "Checking agent {} for channel={}, chat_id={}",
@@ -52,15 +59,18 @@ class AgentRegistry:
                 )
                 continue
 
-            group_id = self._find_session_group(agent, channel, chat_id)
-            logger.info(
-                "Resolved agent {} for channel={}, chat_id={}, group_id={}",
-                agent.id,
-                channel,
-                chat_id,
-                group_id,
-            )
-            return agent, group_id
+            result = self._find_session_group(agent, channel, chat_id)
+            if result:
+                group_id, chat_key = result
+                logger.info(
+                    "Resolved agent {} for channel={}, chat_id={}, group_id={}, chat_key={}",
+                    agent.id,
+                    channel,
+                    chat_id,
+                    group_id,
+                    chat_key,
+                )
+                return agent, group_id, chat_key
 
         logger.warning("No agent found for channel={}, chat_id={}", channel, chat_id)
         return None
@@ -73,22 +83,33 @@ class AgentRegistry:
             return True
         return chat_id in allow_list
 
-    def _find_session_group(self, agent: AgentConfig, channel: str, chat_id: str) -> str | None:
+    def _find_session_group(
+        self, agent: AgentConfig, channel: str, chat_id: str
+    ) -> tuple[str | None, str | None] | None:
+        """Find session group and chatKey for a channel and chat_id.
+
+        Returns:
+            Tuple of (groupId, chatKey) if found, None otherwise.
+        """
         for sg in agent.channels.session_groups:
-            if channel in sg.chat_ids and sg.chat_ids[channel] == chat_id:
-                return sg.group_id
+            for chat_key, mapped_chat_id in sg.chat_keys.items():
+                if mapped_chat_id == chat_id:
+                    return sg.group_id, chat_key
         return None
 
     def resolve_session_key(self, agent: AgentConfig, group_id: str | None = None) -> str:
-        """Resolve session key based on agent type."""
+        """Resolve session key based on agent type.
+
+        Format: {agentType}-{agentId}-{groupId}
+        """
         if agent.type == AgentType.ADMIN:
             return "global"
         elif agent.type == AgentType.USER:
-            return f"user:{agent.id}:{group_id or 'default'}"
+            return f"user-{agent.id}-{group_id or 'default'}"
         elif agent.type == AgentType.SPECIALIZED:
-            return f"agent:{agent.id}"
+            return f"agent-{agent.id}"
         elif agent.type == AgentType.TASK:
-            return f"task:{agent.id}"
+            return f"task-{agent.id}"
         raise ValueError(f"Unknown agent type: {agent.type}")
 
     def can_communicate(self, from_agent_id: str, to_agent_id: str) -> bool:

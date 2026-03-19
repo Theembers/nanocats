@@ -30,7 +30,13 @@ def _get_static_sessions(agent_config: AgentConfig) -> list[dict]:
         group_ids.add("default")
 
         for group_id in sorted(group_ids):
-            sessions.append({"key": f"user:{group_id}", "type": "static", "group_id": group_id})
+            sessions.append(
+                {
+                    "key": f"user-{agent_config.id}-{group_id}",
+                    "type": "static",
+                    "group_id": group_id,
+                }
+            )
 
     return sessions
 

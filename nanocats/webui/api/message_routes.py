@@ -16,7 +16,7 @@ router = APIRouter(prefix="/agents", tags=["messages"])
 async def list_messages(
     agent_id: str,
     channel: str | None = None,
-    chat_id: str | None = None,
+    chat_key: str | None = None,
     session_key: str | None = None,
     limit: int = 50,
     before: str | None = None,
@@ -46,10 +46,11 @@ async def list_messages(
                         continue
                     source = msg.get("_source", {})
                     msg_channel = msg.get("channel") or source.get("channel")
-                    msg_chat_id = msg.get("chat_id") or source.get("chat_id")
+                    msg_chat_key = source.get("chat_key")
+
                     if channel and msg_channel != channel:
                         continue
-                    if chat_id and msg_chat_id != chat_id:
+                    if chat_key and msg_chat_key != chat_key:
                         continue
                     if before and msg.get("timestamp", "") >= before:
                         continue
@@ -60,7 +61,7 @@ async def list_messages(
                             "content": msg.get("content", ""),
                             "timestamp": msg.get("timestamp"),
                             "channel": msg_channel,
-                            "chat_id": msg_chat_id,
+                            "chat_key": msg_chat_key,
                             "tool_calls": msg.get("tool_calls"),
                         }
                     )

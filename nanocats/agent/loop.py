@@ -77,6 +77,10 @@ class AgentLoop:
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
 
+        # Set reasoning_effort on provider if configured
+        if agent_config.reasoning_effort and hasattr(provider, "generation"):
+            provider.generation.reasoning_effort = agent_config.reasoning_effort
+
         self.context = ContextBuilder(agent_config)
         self.sessions = session_manager or SessionManager(resolved_workspace)
         self.tools = ToolRegistry()
@@ -269,9 +273,7 @@ class AgentLoop:
 
         while self._running:
             try:
-                msg = await asyncio.wait_for(
-                    self.bus.consume_inbound(agent_id), timeout=1.0
-                )
+                msg = await asyncio.wait_for(self.bus.consume_inbound(agent_id), timeout=1.0)
             except asyncio.TimeoutError:
                 continue
 
@@ -385,7 +387,7 @@ class AgentLoop:
             )
             logger.info("Processing system message from {}", msg.sender_id)
             key = f"{channel}:{chat_id}"
-            session = self.sessions.get_or_create(key)
+            session = self.sessions.get_or_create(key, msg.chat_key)
             await self.memory_consolidator.maybe_consolidate_by_tokens(session)
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
             history = session.get_history(max_messages=0)
@@ -410,7 +412,7 @@ class AgentLoop:
         logger.info("Processing message from {}:{}: {}", msg.channel, msg.sender_id, preview)
 
         key = session_key or msg.session_key
-        session = self.sessions.get_or_create(key)
+        session = self.sessions.get_or_create(key, msg.chat_key)
 
         record_log(
             level="INFO",
@@ -564,7 +566,11 @@ class AgentLoop:
                         continue
                     entry["content"] = filtered
             entry.setdefault("timestamp", datetime.now().isoformat())
-            session.messages.append(entry)
+            session.add_message(
+                entry["role"],
+                entry.get("content") or "",
+                **{k: v for k, v in entry.items() if k not in ("role", "content")},
+            )
         session.updated_at = datetime.now()
 
     async def process_direct(

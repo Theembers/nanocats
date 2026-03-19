@@ -19,6 +19,7 @@ class InboundMessage:
     agent_id: str | None = None
     agent_type: str | None = None
     session_group_id: str | None = None
+    chat_key: str | None = None
 
     _session_key: str | None = field(default=None, repr=False)
 
@@ -33,13 +34,19 @@ class InboundMessage:
         return f"{self.channel}:{self.chat_id}"
 
     def to_session_message(self) -> dict:
+        chat_key = self.chat_key
+        if chat_key and ":" in chat_key:
+            source_channel = chat_key.split(":")[0]
+        else:
+            source_channel = self.channel
         return {
             "role": "user",
             "content": self.content,
             "_source": {
-                "channel": self.channel,
+                "channel": source_channel,
                 "chat_id": self.chat_id,
                 "sender_id": self.sender_id,
+                "chat_key": chat_key,
             },
         }
 

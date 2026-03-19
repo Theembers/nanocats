@@ -153,24 +153,26 @@ class BaseChannel(ABC):
 
         result = self.agent_registry.find_by_channel(msg.channel, msg.chat_id)
         if result:
-            agent, group_id = result
+            agent, group_id, chat_key = result
             session_key = self.agent_registry.resolve_session_key(agent, group_id)
 
             logger.info(
                 "[Channel] routed: channel={}, chat_id={}, agent_id={}, "
-                "agent_type={}, session_key={}, group_id={}",
+                "agent_type={}, session_key={}, group_id={}, chat_key={}",
                 msg.channel,
                 msg.chat_id,
                 agent.id,
                 agent.type.value,
                 session_key,
                 group_id,
+                chat_key,
             )
 
             msg.agent_id = agent.id
             msg.agent_type = agent.type.value
             msg._session_key = session_key
             msg.session_group_id = group_id
+            msg.chat_key = chat_key
         else:
             logger.warning(
                 "No agent resolved for channel={}, chat_id={}",

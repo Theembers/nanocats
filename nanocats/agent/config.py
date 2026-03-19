@@ -63,7 +63,7 @@ class AgentConfigLoader:
         session_groups = [
             SessionGroup(
                 group_id=sg.get("group_id") or sg.get("groupId", ""),
-                chat_ids=sg.get("chat_ids") or sg.get("chatIds", {}),
+                chat_keys=sg.get("chat_keys") or sg.get("chatKeys", {}),
             )
             for sg in channels_data.get("session_groups") or channels_data.get("sessionGroups", [])
         ]
@@ -83,6 +83,9 @@ class AgentConfigLoader:
             model=data.get("model", "anthropic/claude-opus-4-5"),
             provider=data.get("provider", "anthropic"),
             ttl=data.get("ttl"),
-            auto_start=data.get("auto_start") if "auto_start" in data else data.get("autoStart", True),
+            auto_start=data.get("auto_start")
+            if "auto_start" in data
+            else data.get("autoStart", True),
             routing=data.get("routing", {}),
+            reasoning_effort=data.get("reasoning_effort"),
         )

@@ -36,10 +36,18 @@ function AgentTabBar() {
     return null;
   }
 
+  const typeOrder = { admin: 0, user: 1, specialized: 2, task: 3 };
+  const sortedAgents = [...agents].sort((a, b) => {
+    const orderA = typeOrder[a.type] ?? 99;
+    const orderB = typeOrder[b.type] ?? 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.name || a.id).localeCompare(b.name || b.id);
+  });
+
   return (
     <div className="agent-tab-bar">
       <div className="agent-tabs">
-        {agents.map((agent) => (
+        {sortedAgents.map((agent) => (
           <button
             key={agent.id}
             className={`agent-tab ${currentAgentId === agent.id ? 'active' : ''}`}

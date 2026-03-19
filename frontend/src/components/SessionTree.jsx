@@ -17,13 +17,29 @@ const CHANNEL_ICONS = {
   default: '📨',
 };
 
-function SessionTree({ 
-  agentId, 
-  selectedSession, 
-  selectedChannel, 
-  onSessionSelect, 
+function getChannelFromChatKey(chatKey) {
+  if (!chatKey) return 'default';
+  const parts = chatKey.split(':');
+  return parts[0] || 'default';
+}
+
+function getChatKeyDisplayName(chatKey) {
+  if (!chatKey) return '';
+  const parts = chatKey.split(':');
+  if (parts.length > 1) {
+    return parts.slice(1).join(':');
+  }
+  return chatKey;
+}
+
+function SessionTree({
+  agentId,
+  selectedSession,
+  selectedChannel,
+  selectedChatKey,
+  onSessionSelect,
   onChannelSelect,
-  onChatIdSelect 
+  onChatKeySelect
 }) {
   const [expandedSessions, setExpandedSessions] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,14 +53,13 @@ function SessionTree({
 
   const sessions = treeData?.sessions || [];
 
-  // Filter sessions by search
   const filteredSessions = useMemo(() => {
     if (!searchQuery) return sessions;
     const query = searchQuery.toLowerCase();
     return sessions.filter(session => {
       const displayKey = formatSessionKey(session.key);
       if (displayKey.toLowerCase().includes(query)) return true;
-      if (session.channels?.some(ch => ch.name.toLowerCase().includes(query))) return true;
+      if (session.chat_keys?.some(ck => ck.toLowerCase().includes(query))) return true;
       return false;
     });
   }, [sessions, searchQuery]);
@@ -59,22 +74,23 @@ function SessionTree({
   const handleSessionClick = (sessionKey) => {
     onSessionSelect(sessionKey);
     onChannelSelect(null);
-    onChatIdSelect?.(null);
+    onChatKeySelect?.(null);
   };
 
-  const handleChannelClick = (sessionKey, channel, e) => {
+  const handleChatKeyClick = (sessionKey, chatKey, e) => {
     e.stopPropagation();
     onSessionSelect(sessionKey);
-    onChannelSelect(channel.name);
-    onChatIdSelect?.(channel.chat_ids?.[0] || null);
+    const channel = getChannelFromChatKey(chatKey);
+    onChannelSelect(channel);
+    onChatKeySelect?.(chatKey);
   };
 
   const isSessionSelected = (sessionKey) => {
     return selectedSession === sessionKey && selectedChannel === null;
   };
 
-  const isChannelSelected = (sessionKey, channelName) => {
-    return selectedSession === sessionKey && selectedChannel === channelName;
+  const isChatKeySelected = (sessionKey, chatKey) => {
+    return selectedSession === sessionKey && selectedChatKey === chatKey;
   };
 
   if (isLoading) {
@@ -110,7 +126,7 @@ function SessionTree({
             />
           </div>
         ) : (
-          <button 
+          <button
             className="search-toggle"
             onClick={() => setSearchExpanded(true)}
           >
@@ -120,10 +136,9 @@ function SessionTree({
       </div>
 
       <div className="session-tree-list">
-        {/* All Sessions Option */}
         <button
           className={`session-tree-item session-all ${!selectedSession ? 'active' : ''}`}
-          onClick={() => { onSessionSelect(null); onChannelSelect(null); onChatIdSelect?.(null); }}
+          onClick={() => { onSessionSelect(null); onChannelSelect(null); onChatKeySelect?.(null); }}
         >
           <span className="session-tree-icon">💬</span>
           <span className="session-tree-name">All Sessions</span>
@@ -135,7 +150,8 @@ function SessionTree({
           filteredSessions.map((session) => {
             const isExpanded = expandedSessions[session.key];
             const displayKey = formatSessionKey(session.key);
-            const hasChannels = session.channels && session.channels.length > 0;
+            const chatKeys = session.chat_keys || [];
+            const hasChatKeys = chatKeys.length > 0;
 
             return (
               <div key={session.key} className="session-tree-node">
@@ -143,8 +159,8 @@ function SessionTree({
                   className={`session-tree-item ${isSessionSelected(session.key) ? 'active' : ''}`}
                   onClick={() => handleSessionClick(session.key)}
                 >
-                  {hasChannels ? (
-                    <span 
+                  {hasChatKeys ? (
+                    <span
                       className="session-tree-toggle"
                       onClick={(e) => { e.stopPropagation(); toggleSession(session.key); }}
                     >
@@ -159,25 +175,29 @@ function SessionTree({
                   <span className="session-tree-name" title={session.key}>
                     {displayKey}
                   </span>
-                  {hasChannels && (
-                    <span className="session-tree-badge">{session.channels.length}</span>
+                  {hasChatKeys && (
+                    <span className="session-tree-badge">{chatKeys.length}</span>
                   )}
                 </button>
 
-                {isExpanded && hasChannels && (
+                {isExpanded && hasChatKeys && (
                   <div className="session-tree-children">
-                    {session.channels.map((channel) => (
-                      <button
-                        key={`${session.key}-${channel.name}`}
-                        className={`session-tree-item session-tree-channel ${isChannelSelected(session.key, channel.name) ? 'active' : ''}`}
-                        onClick={(e) => handleChannelClick(session.key, channel, e)}
-                      >
-                        <span className="session-tree-icon">
-                          {CHANNEL_ICONS[channel.name] || CHANNEL_ICONS.default}
-                        </span>
-                        <span className="session-tree-name">{channel.name}</span>
-                      </button>
-                    ))}
+                    {chatKeys.map((chatKey) => {
+                      const channel = getChannelFromChatKey(chatKey);
+                      const displayName = getChatKeyDisplayName(chatKey);
+                      return (
+                        <button
+                          key={`${session.key}-${chatKey}`}
+                          className={`session-tree-item session-tree-channel ${isChatKeySelected(session.key, chatKey) ? 'active' : ''}`}
+                          onClick={(e) => handleChatKeyClick(session.key, chatKey, e)}
+                        >
+                          <span className="session-tree-icon">
+                            {CHANNEL_ICONS[channel] || CHANNEL_ICONS.default}
+                          </span>
+                          <span className="session-tree-name">{chatKey}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -190,11 +210,10 @@ function SessionTree({
 }
 
 function formatSessionKey(key) {
-  // Remove prefixes like "user:", "group:" etc.
   if (!key) return 'Unknown';
-  const parts = key.split(':');
-  if (parts.length > 1) {
-    return parts.slice(1).join(':');
+  const parts = key.split('-');
+  if (parts.length > 2) {
+    return parts.slice(2).join('-');
   }
   return key;
 }

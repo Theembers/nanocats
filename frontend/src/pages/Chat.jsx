@@ -8,7 +8,7 @@ import SessionTree from '../components/SessionTree';
 import Message from '../components/Message';
 import DateSeparator from '../components/DateSeparator';
 import PreviewModal from '../components/PreviewModal';
-import { Send, Square, Plus, MessageSquare, Clock } from 'lucide-react';
+import { Send, Square, Plus, MessageSquare, Clock, Loader2 } from 'lucide-react';
 import './Chat.css';
 
 class ErrorBoundary extends React.Component {
@@ -62,9 +62,10 @@ function Chat() {
 function ChatInner() {
   const { agentId } = useParams();
   const navigate = useNavigate();
+
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [selectedChatId, setSelectedChatId] = useState(null);
+  const [selectedChatKey, setSelectedChatKey] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const [previewItem, setPreviewItem] = useState(null);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
@@ -83,37 +84,77 @@ function ChatInner() {
     clearMessages,
   } = useChatStore();
 
-  const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
+  const agentsQuery = useQuery({
     queryKey: ['agents'],
     queryFn: listAgents,
   });
 
-  const currentAgentId = agentId || (agents && agents.length > 0 ? agents[0].id : null);
+  const effectiveAgentId = useMemo(() => {
+    if (agentId) return agentId;
+    if (agentsQuery.data?.length > 0) return agentsQuery.data[0].id;
+    return null;
+  }, [agentId, agentsQuery.data]);
 
-  const { data: agent, isLoading: agentLoading, error: agentError } = useQuery({
-    queryKey: ['agent', currentAgentId],
-    queryFn: () => getAgent(currentAgentId),
-    enabled: !!currentAgentId,
+  const agentQuery = useQuery({
+    queryKey: ['agent', effectiveAgentId],
+    queryFn: () => getAgent(effectiveAgentId),
+    enabled: effectiveAgentId != null,
   });
 
-  const { data: messagesData, isLoading: messagesLoading } = useQuery({
-    queryKey: ['messages', currentAgentId, selectedChannel, selectedSession, selectedChatId],
-    queryFn: () => getMessages(currentAgentId, {
+  const messagesQuery = useQuery({
+    queryKey: ['messages', effectiveAgentId, selectedChannel, selectedSession, selectedChatKey],
+    queryFn: () => getMessages(effectiveAgentId, {
       channel: selectedChannel,
-      chat_id: selectedChatId,
+      chat_key: selectedChatKey,
       session_key: selectedSession,
       limit: 100,
     }),
-    enabled: !!currentAgentId,
+    enabled: effectiveAgentId != null,
   });
 
   useEffect(() => {
-    if (!agentId && currentAgentId) {
-      navigate(`/chat/${currentAgentId}`, { replace: true });
+    if (!agentId && effectiveAgentId) {
+      navigate(`/chat/${effectiveAgentId}`, { replace: true });
     }
-  }, [agentId, currentAgentId, navigate]);
+  }, [agentId, effectiveAgentId, navigate]);
 
-  if (agentsLoading) {
+  useEffect(() => {
+    if (effectiveAgentId) {
+      connect(effectiveAgentId);
+      return () => {
+        disconnect();
+        clearMessages();
+      };
+    }
+  }, [effectiveAgentId, connect, disconnect, clearMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messagesQuery.data?.messages, realtimeMessages]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() || !effectiveAgentId) return;
+    sendMessage(inputValue, effectiveAgentId);
+    setInputValue('');
+  };
+
+  const handleStopClick = () => {
+    if (effectiveAgentId) sendStopCommand(effectiveAgentId);
+  };
+
+  const handleNewSession = () => setShowNewConfirm(true);
+
+  const confirmNewSession = () => {
+    if (effectiveAgentId) {
+      sendNewSessionCommand(effectiveAgentId);
+      setShowNewConfirm(false);
+    }
+  };
+
+  const handlePreview = (item) => setPreviewItem(item);
+
+  if (agentsQuery.isLoading) {
     return (
       <div className="chat-page-container">
         <LoadingSpinner />
@@ -121,15 +162,15 @@ function ChatInner() {
     );
   }
 
-  if (agentsError) {
+  if (agentsQuery.isError) {
     return (
       <div className="chat-page-container">
-        <div className="error-message">Failed to load agents: {agentsError.message}</div>
+        <div className="error-message">Failed to load agents: {agentsQuery.error.message}</div>
       </div>
     );
   }
 
-  if (!currentAgentId) {
+  if (!effectiveAgentId) {
     return (
       <div className="chat-page-container">
         <div className="chat-empty">
@@ -140,63 +181,16 @@ function ChatInner() {
     );
   }
 
-  useEffect(() => {
-    if (currentAgentId) {
-      connect(currentAgentId);
-      return () => {
-        disconnect();
-        clearMessages();
-      };
-    }
-  }, [currentAgentId, connect, disconnect, clearMessages]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messagesData?.messages, realtimeMessages]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!inputValue.trim() || !currentAgentId) {
-      return;
-    }
-    sendMessage(inputValue, currentAgentId);
-    setInputValue('');
-  };
-
-  const handleStopClick = () => {
-    if (currentAgentId) {
-      sendStopCommand(currentAgentId);
-    }
-  };
-
-  const handleNewSession = () => {
-    setShowNewConfirm(true);
-  };
-
-  const confirmNewSession = () => {
-    if (currentAgentId) {
-      sendNewSessionCommand(currentAgentId);
-      setShowNewConfirm(false);
-    }
-  };
-
-  const handlePreview = (item) => {
-    setPreviewItem(item);
-  };
-
   const messages = useMemo(() => {
-    const historical = messagesData?.messages || [];
+    const historical = messagesQuery.data?.messages || [];
     const combined = [...historical, ...realtimeMessages];
     return combined.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }, [messagesData?.messages, realtimeMessages]);
+  }, [messagesQuery.data?.messages, realtimeMessages]);
 
   const groupedMessages = useMemo(() => {
     const groups = [];
     let currentDate = null;
-
-    // Filter out tool role messages (tool results are folded into tool_calls)
     const filteredMessages = messages.filter(msg => msg.role !== 'tool');
-
     filteredMessages.forEach((msg) => {
       const msgDate = new Date(msg.timestamp).toDateString();
       if (msgDate !== currentDate) {
@@ -205,48 +199,37 @@ function ChatInner() {
       }
       groups.push({ type: 'message', message: msg });
     });
-
     return groups;
   }, [messages]);
-
-  if (agentLoading) {
-    return (
-      <div className="chat-page-container">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (agentError) {
-    return (
-      <div className="chat-page-container">
-        <div className="error-message">Failed to load agent: {agentError.message}</div>
-      </div>
-    );
-  }
 
   return (
     <div className="chat-page-container">
       <SessionTree
-        agentId={currentAgentId}
+        agentId={effectiveAgentId}
         selectedSession={selectedSession}
         selectedChannel={selectedChannel}
+        selectedChatKey={selectedChatKey}
         onSessionSelect={setSelectedSession}
         onChannelSelect={setSelectedChannel}
-        onChatIdSelect={setSelectedChatId}
+        onChatKeySelect={setSelectedChatKey}
       />
 
       <div className="chat-main">
         <div className="chat-header">
           <div className="chat-header-agent">
-            <span className="chat-header-icon">
-              {CHANNEL_ICONS[selectedChannel] || '💬'}
-            </span>
             <div className="chat-header-info">
-              <h2>{agent?.name || currentAgentId}</h2>
-              <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
+              <h2>{agentQuery.data?.name || effectiveAgentId}</h2>
+              <div className="chat-header-status">
+                <span className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+                {isAgentResponding && (
+                  <span className="agent-responding-status">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Agent is responding...</span>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           {selectedSession && (
@@ -276,7 +259,7 @@ function ChatInner() {
                 <Message
                   key={msg.id || index}
                   message={msg}
-                  agentName={agent?.name}
+                  agentName={agentQuery.data?.name}
                   onPreview={handlePreview}
                 />
               );
@@ -286,7 +269,6 @@ function ChatInner() {
         </div>
 
         <div className="chat-input-area">
-          {/* Message queue indicator */}
           {messageQueue.length > 0 && (
             <div className="message-queue-indicator">
               <Clock size={14} />
@@ -294,7 +276,6 @@ function ChatInner() {
             </div>
           )}
 
-          {/* New session confirmation */}
           {showNewConfirm && (
             <div className="new-session-confirm">
               <span>Start a new session?</span>
@@ -331,8 +312,8 @@ function ChatInner() {
                 <Square size={16} />
               </button>
             ) : (
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="btn-primary chat-send-btn"
                 disabled={!inputValue.trim()}
               >
@@ -354,9 +335,9 @@ function ChatInner() {
 
 function formatSessionDisplay(key) {
   if (!key) return '';
-  const parts = key.split(':');
-  if (parts.length > 1) {
-    return parts.slice(1).join(':');
+  const parts = key.split('-');
+  if (parts.length > 2) {
+    return parts.slice(2).join('-');
   }
   return key;
 }

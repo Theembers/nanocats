@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { format, isToday } from 'date-fns';
 import { ChevronDown, ChevronRight, Paperclip, Image as ImageIcon } from 'lucide-react';
 import ToolCallContent from './ToolCallContent';
@@ -185,7 +187,9 @@ function Message({ message, agentName, onPreview }) {
 
         <div className="message-bubble">
           {mainContent && (
-            <div className="message-text">{mainContent}</div>
+            <div className="message-text">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{mainContent}</ReactMarkdown>
+            </div>
           )}
 
           {/* Thinking process for assistant */}

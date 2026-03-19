@@ -33,7 +33,7 @@ class ChannelConfig(BaseModel):
 
 class SessionGroup(BaseModel):
     group_id: str
-    chat_ids: dict[str, str]
+    chat_keys: dict[str, str]
 
 
 class AgentChannelsConfig(BaseModel):
@@ -60,6 +60,7 @@ class AgentConfig(BaseModel):
     auto_start: bool = True
 
     routing: dict[str, Any] = Field(default_factory=dict)
+    reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
 
     @property
     def workspace(self) -> Path:

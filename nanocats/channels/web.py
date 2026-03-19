@@ -313,7 +313,7 @@ class WebChannel(BaseChannel):
                 if content:
                     await self._handle_message(
                         sender_id=user_id,
-                        chat_id=session_id,
+                        chat_id=user_id,
                         content=content,
                         session_key=session_id,
                         metadata={"agent_id": agent_id},
@@ -331,7 +331,7 @@ class WebChannel(BaseChannel):
                                 session_id=session_id,
                                 command=data.get("command", ""),
                                 channel=data.get("channel", "web"),
-                                chat_id=data.get("chat_id", session_id),
+                                chat_id=data.get("chat_id", user_id),
                                 agent_id=agent_id,
                             )
                         elif msg_type == "typing":
@@ -345,7 +345,7 @@ class WebChannel(BaseChannel):
                             if content:
                                 await self._handle_message(
                                     sender_id=user_id,
-                                    chat_id=session_id,
+                                    chat_id=user_id,
                                     content=content,
                                     session_key=session_id,
                                     metadata={"agent_id": agent_id},
