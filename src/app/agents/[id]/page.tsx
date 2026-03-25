@@ -208,7 +208,7 @@ export default function AgentDetailPage() {
       )}
 
       {/* Details Card */}
-      <Card className="glass-card border-0">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-white uppercase tracking-wider text-sm">Details</CardTitle>
           <CardDescription className="text-zinc-400">
@@ -267,36 +267,42 @@ export default function AgentDetailPage() {
           description="View and edit the agent configuration file"
           icon={<SettingsIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/config`)}
+          delay={0}
         />
         <ActionCard
           title="View Logs"
           description="Stream real-time logs from the agent"
           icon={<FileTextIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/logs`)}
+          delay={1}
         />
         <ActionCard
           title="Workspace"
           description="Edit AGENTS, SOUL, USER, TOOLS, HEARTBEAT files"
           icon={<FolderIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/workspace`)}
+          delay={2}
         />
         <ActionCard
           title="Cron Jobs"
           description="Manage scheduled tasks and cron configurations"
           icon={<ClockIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/cron`)}
+          delay={3}
         />
         <ActionCard
           title="Memory"
           description="Manage MEMORY and HISTORY files"
           icon={<BrainIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/memory`)}
+          delay={4}
         />
         <ActionCard
           title="Skills"
           description="Enable/disable and edit agent skills"
           icon={<ZapIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/skills`)}
+          delay={5}
         />
       </div>
     </div>
@@ -309,29 +315,36 @@ function ActionCard({
   description,
   icon,
   onClick,
+  delay = 0,
 }: {
   title: string;
   description: string;
   icon: React.ReactNode;
   onClick: () => void;
+  delay?: number;
 }) {
   return (
-    <Card 
-      className="glass-card border-0 cursor-pointer" 
-      onClick={onClick}
+    <div 
+      className="animate-fade-in-up"
+      style={{ animationDelay: `${delay * 0.1}s` }}
     >
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2 text-white">
-          <span className="p-2 rounded-lg bg-zinc-800">
-            {icon}
-          </span>
-          {title}
-        </CardTitle>
-        <CardDescription className="text-zinc-400">
-          {description}
-        </CardDescription>
-      </CardHeader>
-    </Card>
+      <Card 
+        className="glass-card cursor-pointer" 
+        onClick={onClick}
+      >
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-white">
+            <span className="p-2 rounded-lg bg-zinc-800">
+              {icon}
+            </span>
+            {title}
+          </CardTitle>
+          <CardDescription className="text-zinc-400">
+            {description}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
   );
 }
 

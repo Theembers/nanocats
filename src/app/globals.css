@@ -175,153 +175,167 @@
    扁平化卡片样式
    ============================================ */
 
-/* 基础卡片 */
-.glass {
-  background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
+@layer components {
+  /* 基础卡片 */
+  .glass {
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
 
-.glass-hover:hover {
-  background: #1a1a1c;
-  border-color: rgba(255, 255, 255, 0.12);
-}
+  .glass-hover:hover {
+    background: #1a1a1c;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
 
-/* 扁平卡片 - 主样式 */
-.glass-card {
-  background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s ease;
-}
+  /* 扁平卡片 - 主样式 */
+  .glass-card {
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s ease;
+  }
 
-.glass-card:hover {
-  background: #1a1a1c;
-  border-color: rgba(255, 255, 255, 0.12);
-}
+  .glass-card:hover {
+    background: #1a1a1c;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
 
-/* 扁平导航 */
-.glass-nav {
-  background: #0a0a0b;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
+  /* 扁平导航 */
+  .glass-nav {
+    background: #0a0a0b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
 
-/* 扁平头部 */
-.glass-header {
-  background: #0a0a0b;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
+  /* 扁平头部 */
+  .glass-header {
+    background: #0a0a0b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
 
-/* 扁平按钮 */
-.glass-button {
-  background: #1f1f21;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.2s ease;
-}
+  /* 扁平按钮 */
+  .glass-button {
+    background: #1f1f21;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+  }
 
-.glass-button:hover {
-  background: #2a2a2c;
-  border-color: rgba(255, 255, 255, 0.15);
-}
+  .glass-button:hover {
+    background: #2a2a2c;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
 
-/* 主按钮 - 扁平 */
-.btn-primary {
-  background: #f97316;
-  border: none;
-  transition: all 0.2s ease;
-}
+  /* 主按钮 - 扁平 */
+  .btn-primary {
+    background: #f97316;
+    border: none;
+    transition: all 0.2s ease;
+  }
 
-.btn-primary:hover {
-  background: #fb923c;
-}
+  .btn-primary:hover {
+    background: #fb923c;
+  }
 
-/* 危险按钮 - 扁平 */
-.btn-destructive {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-  transition: all 0.2s ease;
-}
+  /* 危险按钮 - 扁平 */
+  .btn-destructive {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    transition: all 0.2s ease;
+  }
 
-.btn-destructive:hover {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.5);
-}
+  .btn-destructive:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.5);
+  }
 
-/* 成功按钮 - 扁平 */
-.btn-success {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #22c55e;
-  transition: all 0.2s ease;
-}
+  /* 成功按钮 - 扁平 */
+  .btn-success {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+    transition: all 0.2s ease;
+  }
 
-.btn-success:hover {
-  background: rgba(34, 197, 94, 0.25);
-  border-color: rgba(34, 197, 94, 0.5);
+  .btn-success:hover {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: rgba(34, 197, 94, 0.5);
+  }
 }
 
 /* ============================================
    动画效果
    ============================================ */
 
-/* 淡入上滑 */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+@layer utilities {
+  /* 淡入上滑 */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  opacity: 0;
-}
-
-/* 状态指示器脉冲 */
-@keyframes status-pulse {
-  0%, 100% {
-    opacity: 1;
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
-  50% {
-    opacity: 0.5;
-  }
-}
 
-.animate-status-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
-}
-
-/* 旋转 */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
+  /* 如果用户偏好减少动画，直接显示内容 */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
   }
-  to {
-    transform: rotate(360deg);
-  }
-}
 
-.animate-spin-slow {
-  animation: spin 3s linear infinite;
+  /* 状态指示器脉冲 */
+  @keyframes status-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-status-pulse {
+    animation: status-pulse 2s ease-in-out infinite;
+  }
+
+  /* 旋转 */
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
 }
 
 /* ============================================
    状态指示器
    ============================================ */
 
-.status-running {
-  background: #22c55e;
-}
+@layer components {
+  .status-running {
+    background: #22c55e;
+  }
 
-.status-stopped {
-  background: #71717a;
-}
+  .status-stopped {
+    background: #71717a;
+  }
 
-.status-error {
-  background: #ef4444;
+  .status-error {
+    background: #ef4444;
+  }
 }
 
 /* ============================================
@@ -357,37 +371,41 @@
    工具类
    ============================================ */
 
-/* 文字渐变 */
-.text-gradient {
-  background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+@layer utilities {
+  /* 文字渐变 */
+  .text-gradient {
+    background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* 输入框焦点 */
+  .input-focus:focus {
+    border-color: rgba(249, 115, 22, 0.5);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
+  }
 }
 
-/* 输入框焦点 */
-.input-focus:focus {
-  border-color: rgba(249, 115, 22, 0.5);
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
-}
+@layer components {
+  /* 卡片顶部状态条 */
+  .card-status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+  }
 
-/* 卡片顶部状态条 */
-.card-status-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-}
+  .card-status-bar.running {
+    background: #22c55e;
+  }
 
-.card-status-bar.running {
-  background: #22c55e;
-}
+  .card-status-bar.stopped {
+    background: #71717a;
+  }
 
-.card-status-bar.stopped {
-  background: #71717a;
-}
-
-.card-status-bar.error {
-  background: #ef4444;
+  .card-status-bar.error {
+    background: #ef4444;
+  }
 }
