@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { AgentInstance } from "@/lib/types";
 
 export default function AgentDetailPage() {
@@ -17,6 +18,7 @@ export default function AgentDetailPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmingStop, setConfirmingStop] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const fetchAgent = async () => {
     try {
@@ -85,6 +87,37 @@ export default function AgentDetailPage() {
     setConfirmingStop(false);
   };
 
+  const handleDeleteClick = () => {
+    setConfirmingDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setActionLoading("delete");
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/agents/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setFeedback({ type: "success", message: "Agent deleted successfully" });
+        // 延迟跳转到首页
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
+      } else {
+        const data = await res.json();
+        setFeedback({ type: "error", message: data.error || "Failed to delete agent" });
+      }
+    } catch (error) {
+      setFeedback({ type: "error", message: "Failed to delete agent" });
+    } finally {
+      setActionLoading(null);
+      setConfirmingDelete(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmingDelete(false);
+  };
+
   const handleRestart = async () => {
     setActionLoading("restart");
     setFeedback(null);
@@ -129,13 +162,10 @@ export default function AgentDetailPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <span className="text-white">{agent.name}</span>
-      </nav>
+      <Breadcrumb items={[
+        { label: "Dashboard", href: "/" },
+        { label: agent.name }
+      ]} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -191,6 +221,32 @@ export default function AgentDetailPage() {
           >
             {actionLoading === "restart" ? "Restarting..." : "Restart"}
           </button>
+          {confirmingDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-red-400 font-medium">Confirm delete?</span>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={actionLoading !== null}
+                className="px-3 py-1.5 rounded-md btn-destructive text-sm font-medium disabled:opacity-50"
+              >
+                {actionLoading === "delete" ? "Deleting..." : "Confirm"}
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="px-3 py-1.5 rounded-md glass-button text-sm text-zinc-300"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleDeleteClick}
+              disabled={actionLoading !== null}
+              className="px-4 py-2 rounded-lg btn-destructive font-medium disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -259,6 +315,17 @@ export default function AgentDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Chat Button - Full Width */}
+      <div className="animate-fade-in-up">
+        <button
+          onClick={() => router.push(`/agents/${id}/chat`)}
+          className="w-full px-6 py-4 rounded-xl bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-400 font-medium flex items-center justify-center gap-3 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <ChatIcon className="w-5 h-5" />
+          <span className="uppercase tracking-wide">Chat with Agent</span>
+        </button>
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -468,6 +535,14 @@ function BotIcon({ className }: { className?: string }) {
       <path d="M20 14h2"/>
       <path d="M15 13v2"/>
       <path d="M9 13v2"/>
+    </svg>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
     </svg>
   );
 }

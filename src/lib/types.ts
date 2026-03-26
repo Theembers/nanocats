@@ -4,6 +4,7 @@ export interface AgentInstance {
   configPath: string;
   workspacePath: string;
   port: number;
+  webchatPort?: number;
   status: "running" | "stopped" | "error";
   pid?: number;
   createdAt: string;

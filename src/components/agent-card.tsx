@@ -39,7 +39,9 @@ export function AgentCard({ agent, onStatusChange }: AgentCardProps) {
     setConfirmingStop(true);
   };
 
-  const handleConfirmStop = async () => {
+  const handleConfirmStop = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setLoading(true);
     try {
       const res = await fetch(`/api/agents/${agent.id}/stop`, {

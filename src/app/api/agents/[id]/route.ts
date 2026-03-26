@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgent, updateAgent, deleteAgent } from "@/lib/store";
 import { processManager } from "@/lib/process-manager";
+import fs from "fs";
+import path from "path";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -97,7 +99,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       await processManager.stopGateway(id);
     }
 
-    // Remove from store (but don't delete filesystem files)
+    // Delete the agent workspace directory from filesystem
+    try {
+      if (fs.existsSync(agent.workspacePath)) {
+        fs.rmSync(agent.workspacePath, { recursive: true, force: true });
+      }
+    } catch (fsError) {
+      console.error("Failed to delete agent workspace:", fsError);
+      return NextResponse.json(
+        { error: "Failed to delete agent workspace files" },
+        { status: 500 }
+      );
+    }
+
+    // Remove from store
     const deleted = deleteAgent(id);
 
     if (!deleted) {

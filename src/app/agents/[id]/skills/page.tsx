@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AgentInstance } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FileEditor } from "@/components/file-editor";
+import { Breadcrumb } from "@/components/breadcrumb";
 import {
   Dialog,
   DialogContent,
@@ -81,17 +82,11 @@ export default function SkillsPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <Link href={`/agents/${id}`} className="hover:text-white transition-colors">
-          {agent.name}
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <span className="text-white">Skills</span>
-      </nav>
+      <Breadcrumb items={[
+        { label: "Dashboard", href: "/" },
+        { label: agent.name, href: `/agents/${id}` },
+        { label: "Skills" }
+      ]} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

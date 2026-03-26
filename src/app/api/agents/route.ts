@@ -105,9 +105,20 @@ export async function POST(request: NextRequest) {
       if (fs.existsSync(configPath)) {
         const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
-        if (provider) configData.provider = provider;
-        if (apiKey) configData.api_key = apiKey;
-        if (model) configData.model = model;
+        // 确保 agents.defaults 存在
+        if (!configData.agents) configData.agents = {};
+        if (!configData.agents.defaults) configData.agents.defaults = {};
+
+        // 设置 provider 和 model 到 agents.defaults
+        if (provider) configData.agents.defaults.provider = provider;
+        if (model) configData.agents.defaults.model = model;
+
+        // 设置 API key 到对应 provider 配置
+        if (apiKey && provider) {
+          if (!configData.providers) configData.providers = {};
+          if (!configData.providers[provider]) configData.providers[provider] = {};
+          configData.providers[provider].apiKey = apiKey;
+        }
 
         fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), "utf-8");
       }

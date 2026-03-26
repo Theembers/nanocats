@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { AgentInstance } from "@/lib/types";
 
 export default function ConfigEditorPage() {
@@ -111,17 +112,11 @@ export default function ConfigEditorPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <Link href={`/agents/${id}`} className="hover:text-white transition-colors">
-          {agent?.name || "Agent"}
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <span className="text-white">Config</span>
-      </nav>
+      <Breadcrumb items={[
+        { label: "Dashboard", href: "/" },
+        { label: agent?.name || "Agent", href: `/agents/${id}` },
+        { label: "Config" }
+      ]} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

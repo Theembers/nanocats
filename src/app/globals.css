@@ -409,3 +409,227 @@
     background: #ef4444;
   }
 }
+
+/* ============================================
+   Markdown 代码高亮样式 (GitHub Dark 风格)
+   ============================================ */
+
+/* 基础代码样式 */
+.markdown-content pre code {
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e6edf3;
+}
+
+/* highlight.js 主题样式 */
+.hljs {
+  color: #e6edf3;
+  background: transparent;
+}
+
+/* 注释 */
+.hljs-comment,
+.hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+
+/* 关键字 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-addition {
+  color: #ff7b72;
+}
+
+/* 字符串 */
+.hljs-string,
+.hljs-meta .hljs-string,
+.hljs-regexp,
+.hljs-attr {
+  color: #a5d6ff;
+}
+
+/* 数字 */
+.hljs-number,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-literal {
+  color: #79c0ff;
+}
+
+/* 函数/方法 */
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: #d2a8ff;
+}
+
+/* 类名 */
+.hljs-title.class_,
+.hljs-class .hljs-title {
+  color: #ffa657;
+}
+
+/* 变量 */
+.hljs-variable,
+.hljs-template-variable {
+  color: #ffa657;
+}
+
+/* 属性 */
+.hljs-property {
+  color: #79c0ff;
+}
+
+/* 类型 */
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #ffa657;
+}
+
+/* 属性名 */
+.hljs-attribute {
+  color: #7ee787;
+}
+
+/* 符号 */
+.hljs-symbol,
+.hljs-bullet {
+  color: #7ee787;
+}
+
+/* 链接 */
+.hljs-link {
+  color: #a5d6ff;
+  text-decoration: underline;
+}
+
+/* 删除 */
+.hljs-deletion {
+  color: #ffa198;
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+/* 标签 */
+.hljs-tag {
+  color: #7ee787;
+}
+
+.hljs-tag .hljs-name {
+  color: #7ee787;
+}
+
+.hljs-tag .hljs-attr {
+  color: #79c0ff;
+}
+
+/* 标识符 */
+.hljs-name {
+  color: #7ee787;
+}
+
+/* 关联数据 */
+.hljs-meta {
+  color: #8b949e;
+}
+
+/* 强调 */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* 公式 */
+.hljs-formula {
+  color: #a5d6ff;
+}
+
+/* 模板 */
+.hljs-template-tag {
+  color: #7ee787;
+}
+
+/* 操作符 */
+.hljs-operator {
+  color: #ff7b72;
+}
+
+/* 参数 */
+.hljs-params {
+  color: #e6edf3;
+}
+
+/* 常量 */
+.hljs-constant {
+  color: #79c0ff;
+}
+
+/* 选择器 */
+.hljs-selector-id {
+  color: #ffa657;
+}
+
+.hljs-selector-class {
+  color: #7ee787;
+}
+
+/* ============================================
+   面包屑导航样式
+   ============================================ */
+
+@layer components {
+  .breadcrumb {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+  }
+
+  .breadcrumb-item {
+    display: flex;
+    align-items: center;
+  }
+
+  .breadcrumb-link {
+    display: flex;
+    align-items: center;
+    color: #a1a1aa;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    transition: all 0.15s ease;
+  }
+
+  .breadcrumb-link:hover {
+    color: #fafafa;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .breadcrumb-separator {
+    display: flex;
+    align-items: center;
+    color: #52525b;
+    margin: 0 0.125rem;
+  }
+
+  .breadcrumb-current {
+    display: flex;
+    align-items: center;
+    color: #fafafa;
+    font-weight: 500;
+    padding: 0.25rem 0.625rem;
+    background: rgba(249, 115, 22, 0.15);
+    border-radius: 0.375rem;
+  }
+
+  .breadcrumb-item-active .breadcrumb-current {
+    color: #fb923c;
+  }
+}

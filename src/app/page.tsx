@@ -12,6 +12,10 @@ const staggerDelay = (index: number) => ({ animationDelay: `${index * 0.1}s` });
 export default function DashboardPage() {
   const [agents, setAgents] = useState<AgentInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nanobotVersion, setNanobotVersion] = useState<string | null>(null);
+  const [versionLoading, setVersionLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -27,11 +31,51 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const fetchNanobotVersion = useCallback(async (forceRefresh = false) => {
+    try {
+      setVersionLoading(true);
+      const url = forceRefresh ? "/api/nanobot/version?refresh=true" : "/api/nanobot/version";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setNanobotVersion(data.version);
+      }
+    } catch (error) {
+      console.error("Failed to fetch nanobot version:", error);
+      setNanobotVersion(null);
+    } finally {
+      setVersionLoading(false);
+    }
+  }, []);
+
+  const handleUpdateNanobot = async () => {
+    try {
+      setUpdating(true);
+      setUpdateMessage(null);
+      const res = await fetch("/api/nanobot/update", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setUpdateMessage("更新成功");
+        // 更新成功后强制刷新版本（清除缓存重新查找二进制文件）
+        setTimeout(() => fetchNanobotVersion(true), 500);
+      } else {
+        setUpdateMessage(`更新失败: ${data.error || "未知错误"}`);
+      }
+    } catch (error) {
+      setUpdateMessage("更新失败: 网络错误");
+    } finally {
+      setUpdating(false);
+      // 3秒后清除消息
+      setTimeout(() => setUpdateMessage(null), 3000);
+    }
+  };
+
   useEffect(() => {
     fetchAgents();
+    fetchNanobotVersion();
     const interval = setInterval(fetchAgents, 5000);
     return () => clearInterval(interval);
-  }, [fetchAgents]);
+  }, [fetchAgents, fetchNanobotVersion]);
 
   const runningCount = agents.filter((a) => a.status === "running").length;
   const stoppedCount = agents.filter((a) => a.status === "stopped").length;
@@ -50,6 +94,26 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Nanobot Version & Update */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-white/10">
+              <span className="text-zinc-500 text-xs uppercase tracking-wider">Nanobot</span>
+              <span className="text-zinc-300 text-sm font-mono">
+                {versionLoading ? "..." : (nanobotVersion || "Unknown")}
+              </span>
+              <button
+                onClick={handleUpdateNanobot}
+                disabled={updating}
+                className="ml-1 p-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-400 hover:text-white transition-all duration-200 disabled:opacity-50"
+                title="更新 Nanobot"
+              >
+                <UpdateIcon className={`w-3.5 h-3.5 ${updating ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+            {updateMessage && (
+              <span className={`text-xs ${updateMessage.includes("成功") ? "text-green-400" : "text-red-400"}`}>
+                {updateMessage}
+              </span>
+            )}
             <button
               onClick={() => {
                 setLoading(true);
@@ -223,6 +287,17 @@ function PauseIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="6" y="4" width="4" height="16" />
       <rect x="14" y="4" width="4" height="16" />
+    </svg>
+  );
+}
+
+function UpdateIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 21h5v-5" />
     </svg>
   );
 }

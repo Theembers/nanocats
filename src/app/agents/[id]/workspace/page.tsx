@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { FileEditor } from "@/components/file-editor";
+import { Breadcrumb } from "@/components/breadcrumb";
 import { AgentInstance } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -84,17 +85,11 @@ export default function WorkspacePage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <Link href={`/agents/${id}`} className="hover:text-white transition-colors">
-          {agent.name}
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <span className="text-white">Workspace</span>
-      </nav>
+      <Breadcrumb items={[
+        { label: "Dashboard", href: "/" },
+        { label: agent.name, href: `/agents/${id}` },
+        { label: "Workspace" }
+      ]} />
 
       {/* Header */}
       <div>

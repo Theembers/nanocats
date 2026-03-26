@@ -41,10 +41,13 @@ export async function findNanobotBinary(): Promise<string> {
     // which 命令失败，继续检查候选路径
   }
 
-  // 3. 检查常见候选路径
+  // 3. 检查常见候选路径（优先检查 uv 工具安装的路径）
   const homeDir = os.homedir();
   const candidatePaths = [
+    // uv 工具安装路径（优先级最高）
+    path.join(homeDir, ".local/share/uv/tools/nanobot-ai/bin/nanobot"),
     path.join(homeDir, ".local/bin/nanobot"),
+    // 其他路径
     "/opt/homebrew/bin/nanobot",
     "/usr/local/bin/nanobot",
     path.join(homeDir, "workspace/ai/ClawTeam/.venv/bin/nanobot"),
@@ -94,8 +97,12 @@ export async function nanobotOnboard(
 
 /**
  * 获取 nanobot 版本信息
+ * @param forceRefresh 是否强制重新查找二进制文件路径
  */
-export async function nanobotVersion(): Promise<string> {
+export async function nanobotVersion(forceRefresh = false): Promise<string> {
+  if (forceRefresh) {
+    clearNanobotPathCache();
+  }
   const nanobotPath = await findNanobotBinary();
 
   const { stdout } = await execFileAsync(nanobotPath, ["--version"]);

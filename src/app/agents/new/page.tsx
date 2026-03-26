@@ -4,18 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AgentForm } from "@/components/agent-form";
+import { Breadcrumb } from "@/components/breadcrumb";
 
 export default function NewAgentPage() {
   return (
     <div className="animate-fade-in-up">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-zinc-400 mb-6">
-        <Link href="/" className="hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <ChevronRightIcon className="w-4 h-4" />
-        <span className="text-white">New Agent</span>
-      </nav>
+      <div className="mb-6">
+        <Breadcrumb items={[
+          { label: "Dashboard", href: "/" },
+          { label: "New Agent" }
+        ]} />
+      </div>
 
       {/* Header */}
       <div className="mb-8">
