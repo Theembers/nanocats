@@ -114,16 +114,6 @@ export default function DashboardPage() {
                 {updateMessage}
               </span>
             )}
-            <button
-              onClick={() => {
-                setLoading(true);
-                fetchAgents();
-              }}
-              disabled={loading}
-              className="h-10 w-10 flex items-center justify-center rounded-lg bg-zinc-800 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-700 hover:border-white/15 transition-all duration-200 disabled:opacity-50"
-            >
-              <RefreshIcon className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
-            </button>
             <Link href="/agents/new">
               <button className="h-10 px-5 rounded-lg btn-primary text-white font-medium flex items-center gap-2">
                 <PlusIcon className="w-4 h-4" />

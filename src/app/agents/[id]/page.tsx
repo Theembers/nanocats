@@ -272,31 +272,29 @@ export default function AgentDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-zinc-800">
-              <div className="flex items-center gap-2 mb-1">
-                <GlobeIcon className="w-4 h-4 text-zinc-500" />
-                <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Port</label>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <GlobeIcon className="w-6 h-6 text-zinc-500" />
+                <label className="text-xl font-bold text-zinc-400 uppercase tracking-wider">Port</label>
               </div>
-              <p className="text-zinc-200 font-mono">{agent.port}</p>
+              <p className="text-2xl font-bold text-zinc-500 font-heading">{agent.port}</p>
             </div>
-            <div className="p-4 rounded-lg bg-zinc-800">
-              <div className="flex items-center gap-2 mb-1">
-                <HashIcon className="w-4 h-4 text-zinc-500" />
-                <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">PID</label>
+            <div className="p-4 rounded-lg bg-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <HashIcon className="w-6 h-6 text-zinc-500" />
+                <label className="text-xl font-bold text-zinc-400 uppercase tracking-wider">PID</label>
               </div>
-              <p className="text-zinc-200 font-mono">{agent.pid || "N/A"}</p>
+              <p className="text-2xl font-bold text-zinc-500 font-heading">{agent.pid || "N/A"}</p>
             </div>
-            <div className="col-span-2 p-4 rounded-lg bg-zinc-800">
-              <div className="flex items-center gap-2 mb-1">
-                <FolderIcon className="w-4 h-4 text-zinc-500" />
-                <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Workspace Path</label>
+            <div className="p-4 rounded-lg bg-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CalendarIcon className="w-6 h-6 text-zinc-500" />
+                <label className="text-xl font-bold text-zinc-400 uppercase tracking-wider">Days</label>
               </div>
-              <p className="text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
-                {agent.workspacePath}
-              </p>
+              <p className="text-2xl font-bold text-orange-400 font-heading">{Math.floor((Date.now() - new Date(agent.createdAt).getTime()) / (1000 * 60 * 60 * 24))}</p>
             </div>
-            <div className="col-span-2 p-4 rounded-lg bg-zinc-800">
+            <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
               <div className="flex items-center gap-2 mb-1">
                 <FileIcon className="w-4 h-4 text-zinc-500" />
                 <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Config Path</label>
@@ -305,12 +303,14 @@ export default function AgentDetailPage() {
                 {agent.configPath}
               </p>
             </div>
-            <div className="p-4 rounded-lg bg-zinc-800">
+            <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
               <div className="flex items-center gap-2 mb-1">
-                <CalendarIcon className="w-4 h-4 text-zinc-500" />
-                <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Created At</label>
+                <FolderIcon className="w-4 h-4 text-zinc-500" />
+                <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Workspace Path</label>
               </div>
-              <p className="text-zinc-200">{new Date(agent.createdAt).toLocaleString()}</p>
+              <p className="text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
+                {agent.workspacePath}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -337,17 +337,17 @@ export default function AgentDetailPage() {
           delay={0}
         />
         <ActionCard
-          title="View Logs"
-          description="Stream real-time logs from the agent"
-          icon={<FileTextIcon className="w-5 h-5" />}
-          onClick={() => router.push(`/agents/${id}/logs`)}
-          delay={1}
-        />
-        <ActionCard
           title="Workspace"
           description="Edit AGENTS, SOUL, USER, TOOLS, HEARTBEAT files"
           icon={<FolderIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/workspace`)}
+          delay={1}
+        />
+        <ActionCard
+          title="Skills"
+          description="Enable/disable and edit agent skills"
+          icon={<ZapIcon className="w-5 h-5" />}
+          onClick={() => router.push(`/agents/${id}/skills`)}
           delay={2}
         />
         <ActionCard
@@ -365,10 +365,10 @@ export default function AgentDetailPage() {
           delay={4}
         />
         <ActionCard
-          title="Skills"
-          description="Enable/disable and edit agent skills"
-          icon={<ZapIcon className="w-5 h-5" />}
-          onClick={() => router.push(`/agents/${id}/skills`)}
+          title="View Logs"
+          description="Stream real-time logs from the agent"
+          icon={<FileTextIcon className="w-5 h-5" />}
+          onClick={() => router.push(`/agents/${id}/logs`)}
           delay={5}
         />
       </div>
