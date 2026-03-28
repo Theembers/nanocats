@@ -51,7 +51,7 @@ nanocats-manager is a sleek web-based dashboard for managing [nanobot](https://g
 ## 📦 Install
 
 ```bash
-git clone https://github.com/HKUDS/nanocats-manager.git
+git clone git@github.com:Theembers/nanocats-manager.git
 cd nanocats-manager
 npm install
 ```
