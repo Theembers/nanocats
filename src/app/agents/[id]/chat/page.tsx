@@ -753,8 +753,8 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
   const language = className?.replace(/language-/, "") || "code";
 
   return (
-    <div className="group relative">
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
+    <span className="group relative block">
+      <span className="absolute right-2 top-2 z-10 flex items-center gap-2">
         {language && (
           <span className="text-[10px] uppercase tracking-wider text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800/50">
             {language}
@@ -776,11 +776,11 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
             </>
           )}
         </button>
-      </div>
+      </span>
       <code ref={codeRef} className={className}>
         {children}
       </code>
-    </div>
+    </span>
   );
 }
 
