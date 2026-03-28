@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgent } from "@/lib/store";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -19,6 +20,12 @@ interface ToolResult {
   content: string;
 }
 
+interface Attachment {
+  name: string;
+  type: string;
+  preview?: string;
+}
+
 interface ChatMessage {
   id: string;
   type: "user" | "bot" | "tool";
@@ -27,6 +34,7 @@ interface ChatMessage {
   thinkContent?: string;
   toolCalls?: ToolCall[];
   toolResult?: ToolResult;
+  attachments?: Attachment[];
 }
 
 /**
@@ -88,11 +96,182 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
         // 处理 user 消息
         if (record.role === "user") {
+          let textContent = "";
+          let msgAttachments: Attachment[] | undefined;
+
+          // 处理多模态格式（content 为数组）
+          if (Array.isArray(record.content)) {
+            const textParts: string[] = [];
+            const imageAttachments: Attachment[] = [];
+
+            for (const part of record.content) {
+              if (part.type === "text" && part.text) {
+                // 检查是否是图片引用格式: [image: /path/to/file]
+                const imageMatch = part.text.match(/^\[image:\s*(.+?)\]$/);
+                if (imageMatch) {
+                  const localPath = imageMatch[1];
+                  let preview: string | undefined;
+                  let mimeType = "image/png";
+
+                  try {
+                    if (fs.existsSync(localPath)) {
+                      const fileName = path.basename(localPath);
+                      const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                      if (!fs.existsSync(uploadsDir)) {
+                        fs.mkdirSync(uploadsDir, { recursive: true });
+                      }
+                      const destPath = path.join(uploadsDir, fileName);
+                      // 只在目标不存在时复制（避免重复）
+                      if (!fs.existsSync(destPath)) {
+                        fs.copyFileSync(localPath, destPath);
+                      }
+                      preview = `/api/agents/${name}/media?file=${fileName}`;
+
+                      // 从文件扩展名推断 MIME 类型
+                      const ext = path.extname(localPath).toLowerCase();
+                      const mimeMap: Record<string, string> = {
+                        ".png": "image/png",
+                        ".jpg": "image/jpeg",
+                        ".jpeg": "image/jpeg",
+                        ".gif": "image/gif",
+                        ".webp": "image/webp",
+                      };
+                      mimeType = mimeMap[ext] || "image/png";
+                    }
+                  } catch (e) {
+                    console.error("Failed to copy media file:", e);
+                  }
+
+                  imageAttachments.push({
+                    name: path.basename(localPath),
+                    type: mimeType,
+                    preview,
+                  });
+                } else {
+                  // 普通文本，但也可能包含内嵌的 [image: ...] 引用
+                  // 用正则替换掉所有 [image: ...] 引用
+                  let cleanText = part.text.replace(/\[image:\s*.+?\]/g, "").trim();
+                  if (cleanText) {
+                    textParts.push(cleanText);
+                  }
+                }
+              } else if (part.type === "image_url" && part.image_url?.url) {
+                // 也保留对 image_url 格式的支持（以防将来 nanobot 改格式）
+                const url = part.image_url.url;
+                let preview: string | undefined;
+                let mimeType = "image/png";
+
+                if (url.startsWith("data:")) {
+                  // base64 data URL，直接可用
+                  preview = url;
+                  const match = url.match(/data:([^;]+);/);
+                  if (match) mimeType = match[1];
+                } else {
+                  // 本地文件路径，复制到用户数据目录并生成 URL
+                  const localPath = url.startsWith("file://") ? url.slice(7) : url;
+                  try {
+                    if (fs.existsSync(localPath)) {
+                      const fileName = path.basename(localPath);
+                      const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                      if (!fs.existsSync(uploadsDir)) {
+                        fs.mkdirSync(uploadsDir, { recursive: true });
+                      }
+                      const destPath = path.join(uploadsDir, fileName);
+                      // 只在目标不存在时复制（避免重复）
+                      if (!fs.existsSync(destPath)) {
+                        fs.copyFileSync(localPath, destPath);
+                      }
+                      preview = `/api/agents/${name}/media?file=${fileName}`;
+
+                      // 从文件扩展名推断 MIME 类型
+                      const ext = path.extname(localPath).toLowerCase();
+                      const mimeMap: Record<string, string> = {
+                        ".png": "image/png",
+                        ".jpg": "image/jpeg",
+                        ".jpeg": "image/jpeg",
+                        ".gif": "image/gif",
+                        ".webp": "image/webp",
+                      };
+                      mimeType = mimeMap[ext] || "image/png";
+                    }
+                  } catch (e) {
+                    console.error("Failed to copy media file:", e);
+                  }
+                }
+
+                imageAttachments.push({
+                  name: path.basename(url),
+                  type: mimeType,
+                  preview,
+                });
+              }
+            }
+
+            textContent = textParts.join("\n");
+            if (imageAttachments.length > 0) {
+              msgAttachments = imageAttachments;
+            }
+          } else {
+            // content 是字符串，处理可能包含的 [image: ...] 引用
+            const contentStr = typeof record.content === "string" ? record.content : String(record.content || "");
+            const imageRegex = /\[image:\s*(.+?)\]/g;
+            const imageAttachments: Attachment[] = [];
+            let match;
+
+            while ((match = imageRegex.exec(contentStr)) !== null) {
+              const localPath = match[1];
+              let preview: string | undefined;
+              let mimeType = "image/png";
+
+              try {
+                if (fs.existsSync(localPath)) {
+                  const fileName = path.basename(localPath);
+                  const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                  if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                  }
+                  const destPath = path.join(uploadsDir, fileName);
+                  // 只在目标不存在时复制（避免重复）
+                  if (!fs.existsSync(destPath)) {
+                    fs.copyFileSync(localPath, destPath);
+                  }
+                  preview = `/api/agents/${name}/media?file=${fileName}`;
+
+                  // 从文件扩展名推断 MIME 类型
+                  const ext = path.extname(localPath).toLowerCase();
+                  const mimeMap: Record<string, string> = {
+                    ".png": "image/png",
+                    ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg",
+                    ".gif": "image/gif",
+                    ".webp": "image/webp",
+                  };
+                  mimeType = mimeMap[ext] || "image/png";
+                }
+              } catch (e) {
+                console.error("Failed to copy media file:", e);
+              }
+
+              imageAttachments.push({
+                name: path.basename(localPath),
+                type: mimeType,
+                preview,
+              });
+            }
+
+            // 移除所有 [image: ...] 引用，保留纯文本
+            textContent = contentStr.replace(/\[image:\s*.+?\]/g, "").trim();
+            if (imageAttachments.length > 0) {
+              msgAttachments = imageAttachments;
+            }
+          }
+
           messages.push({
             id: `msg_${timestamp}_user`,
             type: "user",
-            content: record.content || "",
+            content: textContent,
             timestamp,
+            attachments: msgAttachments,
           });
         }
         // 处理 assistant 消息

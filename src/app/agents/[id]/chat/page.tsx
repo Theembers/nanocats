@@ -29,7 +29,16 @@ interface ToolCall {
 interface ToolResult {
   toolCallId: string;
   name: string;
-  content: string;
+  content: string | { type: string; text: string } | unknown;
+}
+
+interface Attachment {
+  id: string;
+  file: File;
+  name: string;
+  type: string;       // MIME type
+  size: number;
+  preview?: string;   // data URL（用于图片预览和发送）
 }
 
 interface Message {
@@ -42,6 +51,7 @@ interface Message {
   toolCalls?: ToolCall[];
   toolResult?: ToolResult;
   isHistory?: boolean; // 标记是否为历史消息
+  attachments?: { name: string; type: string; preview?: string }[];
 }
 
 export default function AgentChatPage() {
@@ -57,9 +67,12 @@ export default function AgentChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // 固定 sessionId：每个 agent 对应一个固定的 sessionId，格式为 web_{agentName}
   const sessionIdRef = useRef<string>(`web_${id}`);
 
@@ -249,24 +262,84 @@ export default function AgentChatPage() {
     }
   };
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+  const handleSendMessage = async () => {
+    const text = inputValue.trim();
+    const hasAttachments = attachments.length > 0;
+    if ((!text && !hasAttachments) || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || pendingFiles > 0) {
       return;
     }
 
-    const text = inputValue.trim();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg_${Date.now()}`,
-        type: "user",
-        content: text,
-        isStreaming: false,
-      },
-    ]);
-
-    wsRef.current.send(JSON.stringify({ text }));
+    // 先清空输入，给用户即时反馈
     setInputValue("");
+
+    let messageAttachments: { name: string; type: string; preview?: string }[] | undefined;
+    let wsMedia: { data: string; filename: string }[] | undefined;
+
+    if (hasAttachments) {
+      // 1. 上传文件到服务端获取持久化 URL
+      try {
+        const uploadRes = await fetch(`/api/agents/${id}/media`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            files: attachments.map(a => ({
+              data: a.preview || "",
+              filename: a.name,
+            })),
+          }),
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          // 用服务端 URL 替代 base64 data URL 作为预览
+          messageAttachments = attachments.map((a, i) => ({
+            name: a.name,
+            type: a.type,
+            preview: uploadData.files?.[i]?.url || a.preview,
+          }));
+        } else {
+          // 上传失败，fallback 使用 base64
+          messageAttachments = attachments.map(a => ({
+            name: a.name,
+            type: a.type,
+            preview: a.preview,
+          }));
+        }
+      } catch {
+        // 上传失败，fallback
+        messageAttachments = attachments.map(a => ({
+          name: a.name,
+          type: a.type,
+          preview: a.preview,
+        }));
+      }
+
+      // 2. 构造 WebSocket media payload（仍用 base64 发给 nanobot）
+      wsMedia = attachments.map(a => ({
+        data: a.preview || "",
+        filename: a.name,
+      }));
+    }
+
+    // 构造本地消息（用服务端 URL）
+    const newMessage: Message = {
+      id: `msg_${Date.now()}`,
+      type: "user",
+      content: text,
+      timestamp: new Date().toISOString(),
+      attachments: messageAttachments,
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+
+    // 发送 WebSocket 消息（用 base64 给 nanobot）
+    const wsPayload: Record<string, unknown> = { text: text || "" };
+    if (wsMedia) {
+      wsPayload.media = wsMedia;
+    }
+    wsRef.current.send(JSON.stringify(wsPayload));
+
+    setAttachments([]);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -275,6 +348,85 @@ export default function AgentChatPage() {
       handleSendMessage();
     }
   };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleFileSelect = useCallback(async (files: FileList | File[]) => {
+    const maxAttachments = 5;
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'zip'];
+
+    const fileArray = Array.from(files);
+
+    // 检查附件数量限制
+    if (attachments.length + fileArray.length > maxAttachments) {
+      alert(`最多只能上传 ${maxAttachments} 个附件`);
+      return;
+    }
+
+    // 先过滤出有效文件
+    const validFiles: File[] = [];
+    for (const file of fileArray) {
+      // 检查文件大小
+      if (file.size > maxFileSize) {
+        alert(`文件 "${file.name}" 超过 10MB 限制`);
+        continue;
+      }
+
+      // 检查文件扩展名
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      if (!allowedExtensions.includes(extension)) {
+        alert(`不支持的文件类型: "${file.name}"`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    // 增加待处理文件计数
+    setPendingFiles(prev => prev + validFiles.length);
+
+    for (const file of validFiles) {
+      // 读取文件为 data URL（所有文件都需要 data URL 用于发送）
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+
+        const newAttachment: Attachment = {
+          id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          file,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          preview: dataUrl,
+        };
+
+        setAttachments(prev => [...prev, newAttachment]);
+        setPendingFiles(prev => prev - 1);
+      };
+      reader.onerror = () => {
+        setPendingFiles(prev => prev - 1);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [attachments]);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  }, []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0) {
+      e.preventDefault();
+      handleFileSelect(files);
+    }
+    // 纯文本粘贴保持原有行为
+  }, [handleFileSelect]);
 
   if (loading) {
     return (
@@ -488,11 +640,36 @@ export default function AgentChatPage() {
                         </>
                       )}
                       {msg.type === "user" && (
-                        <CollapsibleUserContent
-                          content={msg.content}
-                          isHistory={msg.isHistory}
-                          timestamp={msg.timestamp}
-                        />
+                        <>
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {msg.attachments.map((att, idx) => (
+                                att.type.startsWith('image/') && att.preview ? (
+                                  <img
+                                    key={idx}
+                                    src={att.preview}
+                                    alt={att.name}
+                                    className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer"
+                                    onClick={() => window.open(att.preview, '_blank')}
+                                  />
+                                ) : (
+                                  <div key={idx} className="flex items-center gap-1.5 bg-orange-600/30 rounded px-2 py-1 text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                                      <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                    </svg>
+                                    <span>{att.name}</span>
+                                  </div>
+                                )
+                              ))}
+                            </div>
+                          )}
+                          <CollapsibleUserContent
+                            content={msg.content}
+                            isHistory={msg.isHistory}
+                            timestamp={msg.timestamp}
+                          />
+                        </>
                       )}
                     </div>
                   </div>
@@ -504,19 +681,83 @@ export default function AgentChatPage() {
 
           {/* Input Area */}
           <div className="border-t border-zinc-800 p-4">
+            {/* Attachments Preview */}
+            {attachments.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto mb-3 pb-1">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="relative flex-shrink-0 bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden"
+                  >
+                    {attachment.type.startsWith('image/') ? (
+                      <div className="w-16 h-16">
+                        <img
+                          src={attachment.preview}
+                          alt={attachment.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 flex flex-col items-center justify-center p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400">
+                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                          <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                        </svg>
+                        <span className="text-zinc-400 text-[10px] mt-1 truncate max-w-[56px]">
+                          {attachment.name}
+                        </span>
+                        <span className="text-zinc-500 text-[8px]">
+                          {formatFileSize(attachment.size)}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removeAttachment(attachment.id)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                multiple
+                accept="image/*,.pdf,.txt,.doc,.docx,.zip"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    handleFileSelect(e.target.files);
+                    e.target.value = ''; // 允许重复选择同一文件
+                  }
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!isConnected || attachments.length >= 5}
+                className="px-3 py-3 text-zinc-400 hover:text-orange-400 disabled:text-zinc-600 disabled:hover:text-zinc-600 transition-colors"
+                title="Attach file"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
               <input
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
+                onPaste={handlePaste}
                 placeholder={isConnected ? "Type a message..." : "Connecting..."}
                 disabled={!isConnected}
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 disabled:opacity-50"
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!isConnected || !inputValue.trim()}
+                disabled={!isConnected || (!inputValue.trim() && attachments.length === 0) || pendingFiles > 0}
                 className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
               >
                 Send
@@ -692,14 +933,25 @@ function ToolCallBlock({ toolCalls, timestamp }: { toolCalls: ToolCall[]; timest
   );
 }
 
+// 辅助函数：将可能的复杂类型转换为可显示的字符串
+const getDisplayText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && 'text' in value) return String((value as any).text);
+  if (value === null || value === undefined) return '';
+  return JSON.stringify(value);
+};
+
 // Tool Result Block 组件
 function ToolResultBlock({ toolResult, timestamp }: { toolResult: ToolResult; timestamp?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // 将 content 转换为字符串
+  const contentStr = getDisplayText(toolResult.content);
+
   // 截取内容预览
-  const preview = toolResult.content.length > 100
-    ? toolResult.content.slice(0, 100) + "..."
-    : toolResult.content;
+  const preview = contentStr.length > 100
+    ? contentStr.slice(0, 100) + "..."
+    : contentStr;
 
   return (
     <div className="rounded-lg border border-green-500/30 bg-green-500/10 overflow-hidden">
@@ -720,7 +972,7 @@ function ToolResultBlock({ toolResult, timestamp }: { toolResult: ToolResult; ti
       <div className="px-3 py-2 border-t border-green-500/30">
         {isExpanded ? (
           <pre className="text-xs text-green-300/80 overflow-x-auto whitespace-pre-wrap break-all max-h-96 overflow-y-auto">
-            {toolResult.content}
+            {contentStr}
           </pre>
         ) : (
           <div className="text-xs text-green-300/60 truncate">
@@ -964,11 +1216,12 @@ function CollapsibleUserContent({
   timestamp?: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(!isHistory);
-  const lines = content.split("\n");
+  const safeContent = typeof content === 'string' ? content : String(content || '');
+  const lines = safeContent.split("\n");
   const shouldCollapse = isHistory && lines.length > MAX_LINES;
   const displayContent = shouldCollapse && !isExpanded
     ? lines.slice(0, MAX_LINES).join("\n")
-    : content;
+    : safeContent;
 
   return (
     <>
