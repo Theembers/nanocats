@@ -57,7 +57,7 @@ export default function TeamsPage() {
               </button>
             </Link>
             <Link href="/teams/new">
-              <button className="h-10 px-5 rounded-lg btn-primary text-white font-medium flex items-center gap-2">
+              <button className="h-10 px-5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 transition-all">
                 <PlusIcon className="w-4 h-4" />
                 New Team
               </button>
@@ -119,7 +119,7 @@ export default function TeamsPage() {
               </button>
             </Link>
             <Link href="/teams/new">
-              <button className="px-6 py-2.5 rounded-lg btn-primary text-white font-medium flex items-center gap-2">
+              <button className="px-6 py-2.5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 transition-all">
                 <PlusIcon className="w-4 h-4" />
                 Create Team
               </button>

@@ -114,7 +114,6 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             {/* Nanobot Version & Update */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-white/10">
-              <span className="text-zinc-500 text-xs uppercase tracking-wider">Nanobot</span>
               <span className="text-zinc-300 text-sm font-mono">
                 {versionLoading ? "..." : (nanobotVersion || "Unknown")}
               </span>
@@ -132,14 +131,8 @@ export default function DashboardPage() {
                 {updateMessage}
               </span>
             )}
-            <Link href="/teams">
-              <button className="h-10 px-5 rounded-lg glass-button text-zinc-300 font-medium flex items-center gap-2">
-                <UsersIcon className="w-4 h-4" />
-                Agent Teams
-              </button>
-            </Link>
             <Link href="/agents/new">
-              <button className="h-10 px-5 rounded-lg btn-primary text-white font-medium flex items-center gap-2">
+              <button className="h-10 px-5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 transition-all">
                 <PlusIcon className="w-4 h-4" />
                 New Agent
               </button>
@@ -210,7 +203,7 @@ export default function DashboardPage() {
             Create your first nanobot agent to start automating your workflows
           </p>
           <Link href="/agents/new">
-            <button className="px-6 py-2.5 rounded-lg btn-primary text-white font-medium flex items-center gap-2 mx-auto">
+            <button className="px-6 py-2.5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 mx-auto transition-all">
               <PlusIcon className="w-4 h-4" />
               Create Agent
             </button>

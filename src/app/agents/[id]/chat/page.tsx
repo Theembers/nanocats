@@ -987,6 +987,32 @@ function ToolResultBlock({ toolResult, timestamp }: { toolResult: ToolResult; ti
 // 可折叠的 Bot 消息内容组件
 const MAX_LINES = 20;
 
+// 格式化消息时间：当天只显示时间，超过一天显示日期+时间
+function formatMessageTime(timestamp?: string): string {
+  if (!timestamp) return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  const date = new Date(timestamp);
+  const now = new Date();
+  
+  // 判断是否是今天
+  const isToday = date.getDate() === now.getDate() && 
+                  date.getMonth() === now.getMonth() && 
+                  date.getFullYear() === now.getFullYear();
+  
+  if (isToday) {
+    // 当天只显示时间
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
+    // 超过一天显示日期+时间
+    return date.toLocaleString([], { 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  }
+}
+
 // 代码块组件（带复制按钮）
 function CodeBlock({ children, className }: { children: React.ReactNode; className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -1190,9 +1216,7 @@ function CollapsibleContent({
         </button>
       )}
       <div className="text-xs mt-2 text-zinc-500">
-        {timestamp
-          ? new Date(timestamp).toLocaleTimeString()
-          : new Date().toLocaleTimeString()}
+        {formatMessageTime(timestamp)}
       </div>
       {isStreaming && (
         <div className="flex gap-1 mt-2">
@@ -1236,9 +1260,7 @@ function CollapsibleUserContent({
         </button>
       )}
       <div className="text-xs mt-2 text-zinc-400 text-right">
-        {timestamp
-          ? new Date(timestamp).toLocaleTimeString()
-          : new Date().toLocaleTimeString()}
+        {formatMessageTime(timestamp)}
       </div>
     </>
   );

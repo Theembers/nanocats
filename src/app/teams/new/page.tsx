@@ -160,7 +160,7 @@ export default function NewTeamPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 rounded-lg btn-primary text-white font-medium disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2.5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium disabled:opacity-50 flex items-center gap-2 transition-all"
             >
               {loading ? (
                 <>
