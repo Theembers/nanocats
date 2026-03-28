@@ -584,12 +584,12 @@
 
 @layer components {
   .breadcrumb {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 9999px;
+    padding: 0.625rem 1rem;
+    background: #141416;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
     font-size: 0.8125rem;
   }
 

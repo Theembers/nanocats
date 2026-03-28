@@ -721,7 +721,7 @@ export default function AgentChatPage() {
                 ))}
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex items-end gap-2">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -738,27 +738,56 @@ export default function AgentChatPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!isConnected || attachments.length >= 5}
-                className="px-3 py-3 text-zinc-400 hover:text-orange-400 disabled:text-zinc-600 disabled:hover:text-zinc-600 transition-colors"
+                className="w-11 h-11 flex items-center justify-center text-zinc-400 hover:text-orange-400 disabled:text-zinc-600 disabled:hover:text-zinc-600 transition-colors"
                 title="Attach file"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
               </button>
-              <input
-                type="text"
+              <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
                 onPaste={handlePaste}
                 placeholder={isConnected ? "Type a message..." : "Connecting..."}
                 disabled={!isConnected}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 disabled:opacity-50"
+                rows={1}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 disabled:opacity-50 resize-none"
+                style={{ height: "auto", overflow: "hidden" }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = "auto";
+                  target.style.height = Math.min(target.scrollHeight, 160) + "px";
+                }}
               />
+              <button
+                onClick={() => {
+                  if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || pendingFiles > 0) return;
+                  const newMessage: Message = {
+                    id: `msg_${Date.now()}`,
+                    type: "user",
+                    content: "/new",
+                    timestamp: new Date().toISOString(),
+                  };
+                  setMessages(prev => [...prev, newMessage]);
+                  wsRef.current.send(JSON.stringify({ text: "/new" }));
+                }}
+                disabled={!isConnected || pendingFiles > 0}
+                className="px-4 h-11 bg-orange-500/20 hover:bg-orange-500/30 disabled:bg-zinc-700/20 disabled:opacity-50 text-orange-400 disabled:text-zinc-500 rounded-lg font-medium transition-colors border border-orange-500/30 hover:border-orange-500/50 flex items-center justify-center"
+                title="New conversation (/new)"
+              >
+                /new
+              </button>
               <button
                 onClick={handleSendMessage}
                 disabled={!isConnected || (!inputValue.trim() && attachments.length === 0) || pendingFiles > 0}
-                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                className="px-6 h-11 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
               >
                 Send
               </button>
