@@ -614,7 +614,7 @@ export default function AgentChatPage() {
                     <div
                       className={`max-w-[80%] ${
                         msg.type === "user"
-                          ? "px-4 py-3 rounded-2xl bg-orange-500 text-white rounded-br-md"
+                          ? "px-4 py-3 rounded-2xl bg-zinc-800 text-zinc-100 rounded-br-md border border-zinc-700/50"
                           : "" // bot 消息的样式在内部处理
                       }`}
                     >
@@ -653,7 +653,7 @@ export default function AgentChatPage() {
                                     onClick={() => window.open(att.preview, '_blank')}
                                   />
                                 ) : (
-                                  <div key={idx} className="flex items-center gap-1.5 bg-orange-600/30 rounded px-2 py-1 text-xs">
+                                  <div key={idx} className="flex items-center gap-1.5 bg-zinc-600/50 rounded px-2 py-1 text-xs">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
                                       <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
@@ -1170,7 +1170,7 @@ function CollapsibleContent({
     : content;
 
   return (
-    <div className={`px-4 py-3 rounded-2xl bg-zinc-800/80 text-zinc-200 rounded-bl-md border border-zinc-700/50 ${isStreaming ? "border-l-4 border-l-orange-400" : ""}`}>
+    <div className={`px-4 py-3 rounded-2xl bg-zinc-800/50 text-zinc-200 rounded-bl-md border border-zinc-700/50 ${isStreaming ? "border-l-4 border-l-orange-400" : ""}`}>
       <div className="markdown-content">
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
@@ -1229,13 +1229,13 @@ function CollapsibleUserContent({
       {shouldCollapse && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-2 flex items-center gap-1 text-xs text-orange-200 hover:text-white transition-colors"
+          className="mt-2 flex items-center gap-1 text-xs text-zinc-300 hover:text-white transition-colors"
         >
           <ChevronDownIcon className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
           <span>{isExpanded ? "收起" : `展开全部 (${lines.length} 行)`}</span>
         </button>
       )}
-      <div className="text-xs mt-2 text-orange-200 text-right">
+      <div className="text-xs mt-2 text-zinc-400 text-right">
         {timestamp
           ? new Date(timestamp).toLocaleTimeString()
           : new Date().toLocaleTimeString()}
