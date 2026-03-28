@@ -2,15 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { AgentCard } from "@/components/agent-card";
-import { AgentInstance } from "@/lib/types";
+import { AgentInstance, Team } from "@/lib/types";
 
 // 动画延迟工具
 const staggerDelay = (index: number) => ({ animationDelay: `${index * 0.1}s` });
 
 export default function DashboardPage() {
   const [agents, setAgents] = useState<AgentInstance[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [nanobotVersion, setNanobotVersion] = useState<string | null>(null);
   const [versionLoading, setVersionLoading] = useState(false);
@@ -28,6 +29,18 @@ export default function DashboardPage() {
       console.error("Failed to fetch agents:", error);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchTeams = useCallback(async () => {
+    try {
+      const res = await fetch("/api/teams");
+      if (res.ok) {
+        const data = await res.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch teams:", error);
     }
   }, []);
 
@@ -61,7 +74,7 @@ export default function DashboardPage() {
       } else {
         setUpdateMessage(`更新失败: ${data.error || "未知错误"}`);
       }
-    } catch (error) {
+    } catch {
       setUpdateMessage("更新失败: 网络错误");
     } finally {
       setUpdating(false);
@@ -72,13 +85,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchAgents();
+    fetchTeams();
     fetchNanobotVersion();
-    const interval = setInterval(fetchAgents, 5000);
+    const interval = setInterval(() => {
+      fetchAgents();
+      fetchTeams();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [fetchAgents, fetchNanobotVersion]);
+  }, [fetchAgents, fetchTeams, fetchNanobotVersion]);
 
   const runningCount = agents.filter((a) => a.status === "running").length;
   const stoppedCount = agents.filter((a) => a.status === "stopped").length;
+  const activeTeamsCount = teams.filter((t) => t.status === "active").length;
 
   return (
     <div>
@@ -114,6 +132,12 @@ export default function DashboardPage() {
                 {updateMessage}
               </span>
             )}
+            <Link href="/teams">
+              <button className="h-10 px-5 rounded-lg glass-button text-zinc-300 font-medium flex items-center gap-2">
+                <UsersIcon className="w-4 h-4" />
+                Agent Teams
+              </button>
+            </Link>
             <Link href="/agents/new">
               <button className="h-10 px-5 rounded-lg btn-primary text-white font-medium flex items-center gap-2">
                 <PlusIcon className="w-4 h-4" />
@@ -124,10 +148,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      {/* Agent Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard
-          title="TOTAL"
+          title="TOTAL AGENTS"
           value={agents.length}
           icon={<BoxesIcon className="w-5 h-5" />}
           delay={1}
@@ -146,6 +170,22 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Team Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+        <StatCard
+          title="TEAMS"
+          value={teams.length}
+          icon={<UsersIcon className="w-5 h-5" />}
+          delay={4}
+        />
+        <StatCard
+          title="ACTIVE TEAMS"
+          value={activeTeamsCount}
+          icon={<PlayIcon className="w-5 h-5" />}
+          delay={5}
+        />
+      </div>
+
       {/* Agent Grid */}
       {loading && agents.length === 0 ? (
         <div className="flex items-center justify-center py-20">
@@ -156,12 +196,11 @@ export default function DashboardPage() {
         </div>
       ) : agents.length === 0 ? (
         <div className="animate-fade-in-up text-center py-20" style={{ animationDelay: "0.4s" }}>
-          <div className="relative w-24 h-24 mx-auto mb-6 opacity-80">
-            <Image
+          <div className="mx-auto mb-6 opacity-80 flex items-center justify-center">
+            <img
               src="/nanocats_logo.png"
               alt="Nanocats"
-              fill
-              className="object-contain"
+              className="h-16 w-auto"
             />
           </div>
           <h3 className="font-heading text-2xl font-semibold text-white mb-3">
@@ -227,15 +266,6 @@ function StatCard({
 }
 
 // Icon components
-function RefreshIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-    </svg>
-  );
-}
-
 function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -288,6 +318,17 @@ function UpdateIcon({ className }: { className?: string }) {
       <path d="M3 3v5h5" />
       <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
       <path d="M16 21h5v-5" />
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

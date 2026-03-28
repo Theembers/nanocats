@@ -163,7 +163,7 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
     return ensureStore();
   }
 
-  let agents = ensureStore();
+  const agents = ensureStore();
   const existingPaths = new Set(agents.map((a) => a.workspacePath));
   let hasChanges = false;
 
@@ -250,4 +250,69 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
     console.error("Failed to scan agents from disk:", error);
     return agents;
   }
+}
+
+// ==================== Agent Team Bindings 管理 ====================
+
+/**
+ * 更新 Agent 的 teamBindings 字段
+ */
+export function updateAgentTeamBindings(
+  agentId: string,
+  bindings: { teamName: string; memberName: string }[]
+): AgentInstance | undefined {
+  return updateAgent(agentId, { teamBindings: bindings });
+}
+
+/**
+ * 添加一条 Agent Team Binding
+ */
+export function addAgentTeamBinding(
+  agentId: string,
+  teamName: string,
+  memberName: string
+): AgentInstance | undefined {
+  const agent = getAgent(agentId);
+  if (!agent) {
+    return undefined;
+  }
+
+  const currentBindings = agent.teamBindings || [];
+  
+  // 检查是否已存在相同的 binding（去重）
+  const exists = currentBindings.some(
+    (b) => b.teamName === teamName && b.memberName === memberName
+  );
+  
+  if (exists) {
+    return agent;
+  }
+
+  const newBindings = [...currentBindings, { teamName, memberName }];
+  return updateAgent(agentId, { teamBindings: newBindings });
+}
+
+/**
+ * 移除指定 teamName 的 Agent Team Binding
+ */
+export function removeAgentTeamBinding(
+  agentId: string,
+  teamName: string
+): AgentInstance | undefined {
+  const agent = getAgent(agentId);
+  if (!agent) {
+    return undefined;
+  }
+
+  const currentBindings = agent.teamBindings || [];
+  
+  // 过滤掉指定 teamName 的 binding
+  const newBindings = currentBindings.filter((b) => b.teamName !== teamName);
+  
+  // 如果没有变化，直接返回
+  if (newBindings.length === currentBindings.length) {
+    return agent;
+  }
+
+  return updateAgent(agentId, { teamBindings: newBindings });
 }

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import Image from "next/image";
+
+import { NavLink } from "./nav-link";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -45,6 +46,11 @@ export default function RootLayout({
                 className="h-10 w-auto object-contain"
               />
             </Link>
+            {/* Navigation */}
+            <nav className="flex items-center gap-1">
+              <NavLink href="/" label="Agents" />
+              <NavLink href="/teams" label="Teams" />
+            </nav>
           </div>
         </header>
 

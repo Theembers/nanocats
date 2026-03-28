@@ -6,7 +6,16 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { Breadcrumb } from "@/components/breadcrumb";
-import { AgentInstance } from "@/lib/types";
+import { AgentInstance, Team } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export default function AgentDetailPage() {
   const params = useParams();
@@ -19,6 +28,10 @@ export default function AgentDetailPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [addToTeamOpen, setAddToTeamOpen] = useState(false);
+  const [bindingLoading, setBindingLoading] = useState<string | null>(null);
 
   const fetchAgent = async () => {
     try {
@@ -36,9 +49,79 @@ export default function AgentDetailPage() {
     }
   };
 
+  const fetchTeams = async () => {
+    setTeamsLoading(true);
+    try {
+      const res = await fetch("/api/teams");
+      if (res.ok) {
+        const data = await res.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch teams:", error);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
+  const handleBindTeam = async (teamName: string) => {
+    if (!agent) return;
+    setBindingLoading(teamName);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: agent.id }),
+      });
+      if (res.ok) {
+        setFeedback({ type: "success", message: `Added to ${teamName} successfully` });
+        await fetchAgent();
+        setAddToTeamOpen(false);
+      } else {
+        const data = await res.json();
+        setFeedback({ type: "error", message: data.error || "Failed to add to team" });
+      }
+    } catch (error) {
+      setFeedback({ type: "error", message: "Failed to add to team" });
+    } finally {
+      setBindingLoading(null);
+    }
+  };
+
+  const handleUnbindTeam = async (teamName: string) => {
+    if (!agent) return;
+    setBindingLoading(teamName);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: agent.id }),
+      });
+      if (res.ok) {
+        setFeedback({ type: "success", message: `Removed from ${teamName} successfully` });
+        await fetchAgent();
+      } else {
+        const data = await res.json();
+        setFeedback({ type: "error", message: data.error || "Failed to remove from team" });
+      }
+    } catch (error) {
+      setFeedback({ type: "error", message: "Failed to remove from team" });
+    } finally {
+      setBindingLoading(null);
+    }
+  };
+
   useEffect(() => {
     fetchAgent();
   }, [id]);
+
+  useEffect(() => {
+    if (addToTeamOpen) {
+      fetchTeams();
+    }
+  }, [addToTeamOpen]);
 
   const handleStart = async () => {
     setActionLoading("start");
@@ -312,6 +395,102 @@ export default function AgentDetailPage() {
                 {agent.workspacePath}
               </p>
             </div>
+            <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UsersIcon className="w-4 h-4 text-zinc-500" />
+                  <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Teams</label>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {agent.teamBindings && agent.teamBindings.length > 0 ? (
+                    agent.teamBindings.map((binding) => (
+                      <div key={binding.teamName} className="flex items-center gap-1">
+                        <Link href={`/teams/${binding.teamName}`}>
+                          <Badge
+                            variant="secondary"
+                            className="cursor-pointer hover:bg-zinc-700 transition-colors"
+                          >
+                            {binding.teamName}
+                          </Badge>
+                        </Link>
+                        <button
+                          onClick={() => handleUnbindTeam(binding.teamName)}
+                          disabled={bindingLoading === binding.teamName}
+                          className="w-4 h-4 flex items-center justify-center rounded-full bg-zinc-700 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors text-xs"
+                          title="Unbind"
+                        >
+                          {bindingLoading === binding.teamName ? "..." : "×"}
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-zinc-500">NOT IN ANY TEAM</span>
+                  )}
+                  <Dialog open={addToTeamOpen} onOpenChange={setAddToTeamOpen}>
+                    <DialogTrigger
+                      render={
+                        <button className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors">
+                          ADD TO TEAM
+                        </button>
+                      }
+                    />
+                    <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="text-white uppercase tracking-wider">Add to Team</DialogTitle>
+                        <DialogDescription className="text-zinc-400">
+                          Select a team to add this agent to
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-4 max-h-80 overflow-y-auto">
+                        {teamsLoading ? (
+                          <div className="text-center py-8 text-zinc-500">Loading teams...</div>
+                        ) : teams.length === 0 ? (
+                          <div className="text-center py-8 text-zinc-500">No teams available</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {teams
+                              .filter(
+                                (team) =>
+                                  !agent.teamBindings?.some(
+                                    (binding) => binding.teamName === team.name
+                                  )
+                              )
+                              .map((team) => (
+                                <button
+                                  key={team.name}
+                                  onClick={() => handleBindTeam(team.name)}
+                                  disabled={bindingLoading === team.name}
+                                  className="w-full p-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-left transition-colors disabled:opacity-50"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="font-medium text-zinc-200">{team.name}</div>
+                                      <div className="text-sm text-zinc-500">{team.description}</div>
+                                    </div>
+                                    <div className="text-sm text-zinc-500">
+                                      {team.agents?.length || 0} members
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            {teams.filter(
+                              (team) =>
+                                !agent.teamBindings?.some(
+                                  (binding) => binding.teamName === team.name
+                                )
+                            ).length === 0 && (
+                              <div className="text-center py-8 text-zinc-500">
+                                All teams already have this agent
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -543,6 +722,17 @@ function ChatIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
     </svg>
   );
 }
