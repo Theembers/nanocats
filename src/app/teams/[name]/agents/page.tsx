@@ -306,14 +306,14 @@ export default function TeamAgentsPage() {
               </DialogHeader>
               <div className="py-4">
                 {(() => {
-                  // Get agents already bound to this team
-                  const boundAgentIds = new Set(
+                  // Get agents already bound to this team (使用 name 作为主键)
+                  const boundAgentNames = new Set(
                     allAgents
                       .filter(a => a.teamBindings?.some(b => b.teamName === name))
-                      .map(a => a.id)
+                      .map(a => a.name)
                   );
                   // Filter out already bound agents
-                  const availableAgents = allAgents.filter(a => !boundAgentIds.has(a.id));
+                  const availableAgents = allAgents.filter(a => !boundAgentNames.has(a.name));
                   
                   if (availableAgents.length === 0) {
                     return (
@@ -329,10 +329,10 @@ export default function TeamAgentsPage() {
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                       {availableAgents.map((agent) => (
                         <div
-                          key={agent.id}
-                          onClick={() => setSelectedAgentId(agent.id)}
+                          key={agent.name}
+                          onClick={() => setSelectedAgentId(agent.name)}
                           className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                            selectedAgentId === agent.id
+                            selectedAgentId === agent.name
                               ? "border-orange-500 bg-orange-500/10"
                               : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800"
                           }`}
@@ -453,7 +453,7 @@ export default function TeamAgentsPage() {
                       {/* View in Agents link for bound agents */}
                       {isBound && boundAgent && (
                         <Link
-                          href={`/agents/${boundAgent.id}`}
+                          href={`/agents/${boundAgent.name}`}
                           className="px-3 py-1.5 rounded-md glass-button text-sm text-zinc-300 hover:text-white"
                         >
                           VIEW IN AGENTS
@@ -466,7 +466,7 @@ export default function TeamAgentsPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-orange-400">UNBIND?</span>
                             <button
-                              onClick={() => handleUnbindAgent(boundAgent.id)}
+                              onClick={() => handleUnbindAgent(boundAgent.name)}
                               disabled={unbindLoading}
                               className="px-3 py-1.5 rounded-md btn-destructive text-sm font-medium disabled:opacity-50"
                             >

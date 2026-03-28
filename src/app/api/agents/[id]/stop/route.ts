@@ -8,15 +8,17 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    await processManager.stopGateway(id);
-    updateAgentStatus(id, "stopped");
+    // 使用 agent.name 作为进程管理的 key
+    await processManager.stopGateway(agent.name);
+    // 使用 agent.name 更新状态
+    updateAgentStatus(agent.name, "stopped");
 
     return NextResponse.json({ success: true });
   } catch (error) {

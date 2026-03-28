@@ -1,5 +1,4 @@
 export interface AgentInstance {
-  id: string;
   name: string;
   configPath: string;
   workspacePath: string;

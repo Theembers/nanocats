@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface FileEditorProps {
-  agentId: string;
+  agentName: string;
   filePath: string;
   fileName: string;
   description?: string;
@@ -13,7 +13,7 @@ interface FileEditorProps {
 }
 
 export function FileEditor({
-  agentId,
+  agentName,
   filePath,
   fileName,
   description,
@@ -28,13 +28,13 @@ export function FileEditor({
 
   useEffect(() => {
     fetchContent();
-  }, [agentId, filePath]);
+  }, [agentName, filePath]);
 
   const fetchContent = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/agents/${agentId}/workspace?path=${encodeURIComponent(filePath)}`);
+      const res = await fetch(`/api/agents/${agentName}/workspace?path=${encodeURIComponent(filePath)}`);
       if (res.ok) {
         const data = await res.json();
         setContent(data.content || "");
@@ -84,7 +84,7 @@ export function FileEditor({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/agents/${agentId}/workspace?path=${encodeURIComponent(filePath)}`, {
+      const res = await fetch(`/api/agents/${agentName}/workspace?path=${encodeURIComponent(filePath)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),

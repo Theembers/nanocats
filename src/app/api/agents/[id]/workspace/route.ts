@@ -12,8 +12,8 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
@@ -123,8 +123,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });

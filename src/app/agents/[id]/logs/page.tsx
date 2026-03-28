@@ -76,7 +76,7 @@ export default function LogsPage() {
       ) : (
         <Card className="glass-card border-0 overflow-hidden">
           <CardContent className="p-0">
-            <LogViewer agentId={id} />
+            <LogViewer agentName={id} />
           </CardContent>
         </Card>
       )}

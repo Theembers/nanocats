@@ -35,11 +35,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Add member to team via ClawTeam
-    await addMemberToTeam(teamName, agent.name, agent.id);
+    // Add member to team via ClawTeam (使用 agent.name 作为 agentId)
+    await addMemberToTeam(teamName, agent.name, agent.name);
 
-    // Update store with team binding
-    await addAgentTeamBinding(agentId, teamName, agent.name);
+    // Update store with team binding (使用 agent.name 作为主键)
+    await addAgentTeamBinding(agent.name, teamName, agent.name);
 
     return NextResponse.json({
       success: true,
@@ -91,8 +91,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Remove member from team via ClawTeam
     await removeMemberFromTeam(teamName, agent.name);
 
-    // Update store to remove team binding
-    await removeAgentTeamBinding(agentId, teamName);
+    // Update store to remove team binding (使用 agent.name 作为主键)
+    await removeAgentTeamBinding(agent.name, teamName);
 
     return NextResponse.json({
       success: true,

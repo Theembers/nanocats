@@ -7,8 +7,8 @@ interface RouteParams {
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { id } = await params;
-  const agent = getAgent(id);
+  const { id: name } = await params;
+  const agent = getAgent(name);
 
   if (!agent) {
     return new Response(JSON.stringify({ error: "Agent not found" }), {
@@ -21,13 +21,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const stream = new ReadableStream({
     start(controller) {
-      const buffer = processManager.getLogBuffer(id);
+      // 使用 agent.name 作为进程管理的 key
+      const buffer = processManager.getLogBuffer(agent.name);
       for (const log of buffer) {
         const data = `data: ${JSON.stringify(log)}\n\n`;
         controller.enqueue(encoder.encode(data));
       }
 
-      const unsubscribe = processManager.subscribeToLogs(id, (log) => {
+      // 使用 agent.name 订阅日志
+      const unsubscribe = processManager.subscribeToLogs(agent.name, (log) => {
         try {
           const data = `data: ${JSON.stringify(log)}\n\n`;
           controller.enqueue(encoder.encode(data));

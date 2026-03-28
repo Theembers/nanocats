@@ -13,8 +13,8 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json(
@@ -23,7 +23,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const isRunning = processManager.isRunning(agent.id);
+    // 使用 agent.name 作为进程管理的 key
+    const isRunning = processManager.isRunning(agent.name);
     const agentWithStatus = {
       ...agent,
       status: isRunning ? "running" : "stopped",
@@ -44,11 +45,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const { id: name } = await params;
     const body = await request.json();
-    const { name, port } = body;
+    const { name: newName, port } = body;
 
-    const agent = getAgent(id);
+    const agent = getAgent(name);
     if (!agent) {
       return NextResponse.json(
         { error: "Agent not found" },
@@ -57,10 +58,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const updates: { name?: string; port?: number } = {};
-    if (name !== undefined) updates.name = name;
+    if (newName !== undefined) updates.name = newName;
     if (port !== undefined) updates.port = port;
 
-    const updatedAgent = updateAgent(id, updates);
+    const updatedAgent = updateAgent(name, updates);
 
     if (!updatedAgent) {
       return NextResponse.json(
@@ -84,9 +85,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
+    const { id: name } = await params;
 
-    const agent = getAgent(id);
+    const agent = getAgent(name);
     if (!agent) {
       return NextResponse.json(
         { error: "Agent not found" },
@@ -95,8 +96,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Stop the process if running
-    if (processManager.isRunning(id)) {
-      await processManager.stopGateway(id);
+    // 使用 agent.name 停止进程
+    if (processManager.isRunning(agent.name)) {
+      await processManager.stopGateway(agent.name);
     }
 
     // Delete the agent workspace directory from filesystem
@@ -113,7 +115,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Remove from store
-    const deleted = deleteAgent(id);
+    const deleted = deleteAgent(name);
 
     if (!deleted) {
       return NextResponse.json(

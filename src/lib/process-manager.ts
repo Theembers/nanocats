@@ -21,11 +21,12 @@ class ProcessManager {
 
   /**
    * 启动 gateway 进程
+   * 使用 agent.name 作为进程管理的 key
    */
   async startGateway(agent: AgentInstance): Promise<number> {
     // 如果进程已存在，先停止
-    if (this.processes.has(agent.id)) {
-      await this.stopGateway(agent.id);
+    if (this.processes.has(agent.name)) {
+      await this.stopGateway(agent.name);
     }
 
     const nanobotPath = await findNanobotBinary();
@@ -51,39 +52,40 @@ class ProcessManager {
       subscribers: new Set(),
     };
 
-    this.processes.set(agent.id, managedProcess);
+    // 使用 agent.name 作为进程管理的 key
+    this.processes.set(agent.name, managedProcess);
 
     // 监听 stdout
     childProcess.stdout?.on("data", (data: Buffer) => {
-      this.appendLog(agent.id, "stdout", data.toString());
+      this.appendLog(agent.name, "stdout", data.toString());
     });
 
     // 监听 stderr
     childProcess.stderr?.on("data", (data: Buffer) => {
-      this.appendLog(agent.id, "stderr", data.toString());
+      this.appendLog(agent.name, "stderr", data.toString());
     });
 
     // 监听进程关闭
     childProcess.on("close", (code) => {
       this.appendLog(
-        agent.id,
+        agent.name,
         "stderr",
         `Process exited with code ${code}`
       );
-      this.processes.delete(agent.id);
+      this.processes.delete(agent.name);
       // 更新存储中的状态
-      updateAgentStatus(agent.id, code === 0 ? "stopped" : "error");
+      updateAgentStatus(agent.name, code === 0 ? "stopped" : "error");
     });
 
     // 监听进程错误
     childProcess.on("error", (err) => {
-      this.appendLog(agent.id, "stderr", `Process error: ${err.message}`);
-      this.processes.delete(agent.id);
-      updateAgentStatus(agent.id, "error");
+      this.appendLog(agent.name, "stderr", `Process error: ${err.message}`);
+      this.processes.delete(agent.name);
+      updateAgentStatus(agent.name, "error");
     });
 
     // 更新存储中的状态
-    updateAgentStatus(agent.id, "running", pid);
+    updateAgentStatus(agent.name, "running", pid);
 
     return pid;
   }
@@ -92,11 +94,11 @@ class ProcessManager {
    * 停止 gateway 进程
    * 先尝试 SIGTERM，3秒后若仍存活则 SIGKILL
    */
-  async stopGateway(agentId: string): Promise<void> {
-    const managed = this.processes.get(agentId);
+  async stopGateway(agentName: string): Promise<void> {
+    const managed = this.processes.get(agentName);
     if (!managed) {
       // 进程不在管理中，直接更新状态
-      updateAgentStatus(agentId, "stopped");
+      updateAgentStatus(agentName, "stopped");
       return;
     }
 
@@ -107,8 +109,8 @@ class ProcessManager {
 
       const onClose = () => {
         killed = true;
-        this.processes.delete(agentId);
-        updateAgentStatus(agentId, "stopped");
+        this.processes.delete(agentName);
+        updateAgentStatus(agentName, "stopped");
         resolve();
       };
 
@@ -128,8 +130,8 @@ class ProcessManager {
       setTimeout(() => {
         if (!killed) {
           childProcess.removeListener("close", onClose);
-          this.processes.delete(agentId);
-          updateAgentStatus(agentId, "stopped");
+          this.processes.delete(agentName);
+          updateAgentStatus(agentName, "stopped");
           resolve();
         }
       }, 5000);
@@ -140,15 +142,15 @@ class ProcessManager {
    * 检查进程是否存活
    * 优先检查内存中的进程，如果没有则检查存储中记录的 PID
    */
-  isRunning(agentId: string): boolean {
+  isRunning(agentName: string): boolean {
     // 1. 先检查内存中管理的进程
-    const managed = this.processes.get(agentId);
+    const managed = this.processes.get(agentName);
     if (managed) {
       return this.isProcessAlive(managed.process.pid);
     }
 
     // 2. 内存中没有，检查存储中记录的 PID
-    const agent = getAgent(agentId);
+    const agent = getAgent(agentName);
     if (agent && agent.pid) {
       return this.isProcessAlive(agent.pid);
     }
@@ -253,7 +255,7 @@ class ProcessManager {
         const isAlive = this.isProcessAlive(agent.pid);
         if (!isAlive) {
           // 进程不存活，更新状态为 stopped
-          updateAgentStatus(agent.id, "stopped");
+          updateAgentStatus(agent.name, "stopped");
         }
       }
     }

@@ -98,7 +98,7 @@ export default function MemoryPage() {
         {MEMORY_FILES.map((file) => (
           <TabsContent key={file.id} value={file.id}>
             <FileEditor
-              agentId={id}
+              agentName={id}
               filePath={file.path}
               fileName={file.name}
               description={file.description}

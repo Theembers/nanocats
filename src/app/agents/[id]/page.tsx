@@ -72,7 +72,8 @@ export default function AgentDetailPage() {
       const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: agent.id }),
+        // 使用 agent.name 作为 agentId（name 现在是主键）
+        body: JSON.stringify({ agentId: agent.name }),
       });
       if (res.ok) {
         setFeedback({ type: "success", message: `Added to ${teamName} successfully` });
@@ -97,7 +98,8 @@ export default function AgentDetailPage() {
       const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: agent.id }),
+        // 使用 agent.name 作为 agentId（name 现在是主键）
+        body: JSON.stringify({ agentId: agent.name }),
       });
       if (res.ok) {
         setFeedback({ type: "success", message: `Removed from ${teamName} successfully` });

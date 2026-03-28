@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { AgentLog } from "@/lib/types";
 
 interface LogViewerProps {
-  agentId: string;
+  agentName: string;
 }
 
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
@@ -86,7 +86,7 @@ function parseLogContent(content: string): ParsedLog {
   return { level, message, raw: content };
 }
 
-export function LogViewer({ agentId }: LogViewerProps) {
+export function LogViewer({ agentName }: LogViewerProps) {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -94,7 +94,7 @@ export function LogViewer({ agentId }: LogViewerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const eventSource = new EventSource(`/api/agents/${agentId}/logs`);
+    const eventSource = new EventSource(`/api/agents/${agentName}/logs`);
 
     eventSource.onopen = () => {
       setIsConnected(true);
@@ -122,7 +122,7 @@ export function LogViewer({ agentId }: LogViewerProps) {
     return () => {
       eventSource.close();
     };
-  }, [agentId]);
+  }, [agentName]);
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {

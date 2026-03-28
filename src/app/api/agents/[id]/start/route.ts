@@ -8,14 +8,15 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    if (processManager.isRunning(id)) {
+    // 使用 agent.name 作为进程管理的 key
+    if (processManager.isRunning(agent.name)) {
       return NextResponse.json(
         { error: "Agent is already running" },
         { status: 400 }
@@ -23,7 +24,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const pid = await processManager.startGateway(agent);
-    updateAgentStatus(id, "running", pid);
+    // 使用 agent.name 更新状态
+    updateAgentStatus(agent.name, "running", pid);
 
     return NextResponse.json({ success: true, pid });
   } catch (error) {

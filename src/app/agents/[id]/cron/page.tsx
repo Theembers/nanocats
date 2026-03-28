@@ -87,7 +87,7 @@ export default function CronPage() {
 
       {/* Cron Jobs Editor */}
       <FileEditor
-        agentId={id}
+        agentName={id}
         filePath="workspace/cron/jobs.json"
         fileName="jobs.json"
         description="Cron job definitions in JSON format"

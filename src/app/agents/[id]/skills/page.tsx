@@ -145,7 +145,7 @@ export default function SkillsPage() {
                         {selectedSkill && (
                           <div className="flex-1 overflow-hidden p-6">
                             <FileEditor
-                              agentId={id}
+                              agentName={id}
                               filePath={`workspace/skills/${skill.path}/SKILL.md`}
                               fileName="SKILL.md"
                               description={`Editing skill: ${skill.name}`}

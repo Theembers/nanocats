@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -51,7 +50,8 @@ export async function GET() {
     processManager.syncAllStatuses();
 
     const agentsWithStatus: AgentInstance[] = agents.map((agent) => {
-      const isRunning = processManager.isRunning(agent.id);
+      // 使用 agent.name 作为进程管理的 key
+      const isRunning = processManager.isRunning(agent.name);
       return {
         ...agent,
         status: isRunning ? "running" : (agent.status === "error" ? "error" : "stopped"),
@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
     const workspacePath = agentDir;
 
     const finalPort = port ?? getNextAvailablePort();
-    const id = uuidv4();
 
     await nanobotOnboard(configPath, workspacePath);
 
@@ -124,8 +123,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 使用 name 作为主键，不再生成 UUID
     const newAgent: AgentInstance = {
-      id,
       name,
       configPath,
       workspacePath,

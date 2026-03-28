@@ -44,21 +44,22 @@ function parseThinkContent(content: string): { think: string | null; rest: strin
 
 /**
  * 读取 agent 的 webchat 历史会话记录
- * 从 workspace/sessions/webchat_webchat_web_{agentId}.jsonl 读取
+ * 从 workspace/sessions/webchat_webchat_{agentName}.jsonl 读取
+ * 使用 agent.name 作为 session 文件标识
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
     // 构造 session 文件路径
-    // sessionId 格式: web_{agentId}
-    // 文件名格式: webchat_webchat_web_{agentId}.jsonl
-    const sessionFileName = `webchat_webchat_web_${id}.jsonl`;
+    // 使用 URL 中的 name 作为 session 文件标识（与 WebSocket session_id 保持一致）
+    // 文件名格式: webchat_webchat_web_{name}.jsonl
+    const sessionFileName = `webchat_webchat_web_${name}.jsonl`;
     const sessionFilePath = path.join(
       agent.workspacePath,
       "workspace",

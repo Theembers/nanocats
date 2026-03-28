@@ -19,7 +19,8 @@ export function AgentCard({ agent, onStatusChange }: AgentCardProps) {
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/agents/${agent.id}/start`, {
+      // 使用 agent.name 作为 API 路径参数
+      const res = await fetch(`/api/agents/${agent.name}/start`, {
         method: "POST",
       });
       if (!res.ok) {
@@ -44,7 +45,8 @@ export function AgentCard({ agent, onStatusChange }: AgentCardProps) {
     e.stopPropagation();
     setLoading(true);
     try {
-      const res = await fetch(`/api/agents/${agent.id}/stop`, {
+      // 使用 agent.name 作为 API 路径参数
+      const res = await fetch(`/api/agents/${agent.name}/stop`, {
         method: "POST",
       });
       if (!res.ok) {
@@ -74,7 +76,8 @@ export function AgentCard({ agent, onStatusChange }: AgentCardProps) {
   const isError = agent.status === "error";
 
   return (
-    <Link href={`/agents/${agent.id}`} className="block">
+    // 使用 agent.name 作为页面路由参数
+    <Link href={`/agents/${agent.name}`} className="block">
       <div className="glass-card rounded-lg overflow-hidden relative">
         {/* 顶部状态条 */}
         <div 

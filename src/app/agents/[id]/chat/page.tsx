@@ -60,7 +60,7 @@ export default function AgentChatPage() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // 固定 sessionId：每个 agent 对应一个固定的 sessionId，格式为 web_{agentId}
+  // 固定 sessionId：每个 agent 对应一个固定的 sessionId，格式为 web_{agentName}
   const sessionIdRef = useRef<string>(`web_${id}`);
 
   // 滚动到底部

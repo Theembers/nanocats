@@ -12,8 +12,8 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const agent = getAgent(id);
+    const { id: name } = await params;
+    const agent = getAgent(name);
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
@@ -100,8 +100,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // 写入配置
     fs.writeFileSync(agent.configPath, JSON.stringify(config, null, 2), "utf-8");
 
-    // 更新 agent 的 webchatPort
-    updateAgent(id, { webchatPort });
+    // 更新 agent 的 webchatPort（使用 agent.name 作为主键）
+    updateAgent(agent.name, { webchatPort });
 
     return NextResponse.json({
       success: true,

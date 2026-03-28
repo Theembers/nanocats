@@ -220,7 +220,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {agents.map((agent, index) => (
             <div
-              key={agent.id}
+              key={agent.name}
               className="animate-fade-in-up"
               style={staggerDelay(index + 4)}
             >

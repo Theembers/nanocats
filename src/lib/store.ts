@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { v4 as uuidv4 } from "uuid";
 import type { AgentInstance } from "./types";
 
 const STORE_DIR = path.join(os.homedir(), ".nanocats-manager");
@@ -11,6 +10,7 @@ const NANOBOT_DIR_PREFIX = ".nanobot-";
 
 /**
  * 确保存储目录和文件存在，返回当前存储的所有 AgentInstance
+ * 同时清理孤儿数据（无法关联到配置文件的记录）
  */
 export function ensureStore(): AgentInstance[] {
   if (!fs.existsSync(STORE_DIR)) {
@@ -24,7 +24,27 @@ export function ensureStore(): AgentInstance[] {
 
   try {
     const data = fs.readFileSync(STORE_FILE, "utf-8");
-    return JSON.parse(data) as AgentInstance[];
+    const agents = JSON.parse(data) as AgentInstance[];
+    
+    // 清理孤儿数据：过滤掉无法关联到配置文件的 agent
+    const validAgents = agents.filter((agent) => {
+      const configExists = fs.existsSync(agent.configPath);
+      const workspaceExists = fs.existsSync(agent.workspacePath);
+      
+      if (!configExists || !workspaceExists) {
+        console.log(`[Store Cleanup] Removing orphan agent: ${agent.name} (config exists: ${configExists}, workspace exists: ${workspaceExists})`);
+        return false;
+      }
+      return true;
+    });
+    
+    // 如果有孤儿数据被清理，保存清理后的结果
+    if (validAgents.length !== agents.length) {
+      console.log(`[Store Cleanup] Removed ${agents.length - validAgents.length} orphan agent(s)`);
+      saveStore(validAgents);
+    }
+    
+    return validAgents;
   } catch {
     // 如果文件损坏，重置为空数组
     fs.writeFileSync(STORE_FILE, JSON.stringify([], null, 2), "utf-8");
@@ -48,22 +68,23 @@ export function getAgents(): AgentInstance[] {
 }
 
 /**
- * 根据 ID 获取单个 agent
+ * 根据 name 获取单个 agent（name 作为主键）
  */
-export function getAgent(id: string): AgentInstance | undefined {
+export function getAgent(name: string): AgentInstance | undefined {
   const agents = ensureStore();
-  return agents.find((agent) => agent.id === id);
+  return agents.find((agent) => agent.name === name);
 }
 
 /**
  * 创建新的 agent
+ * 使用 name 作为主键进行唯一性检查
  */
 export function createAgent(agent: AgentInstance): AgentInstance {
   const agents = ensureStore();
 
-  // 检查是否已存在相同 ID
-  if (agents.some((a) => a.id === agent.id)) {
-    throw new Error(`Agent with id \${agent.id} already exists`);
+  // 检查是否已存在相同 name（主键）
+  if (agents.some((a) => a.name === agent.name)) {
+    throw new Error(`Agent with name "${agent.name}" already exists`);
   }
 
   agents.push(agent);
@@ -73,13 +94,14 @@ export function createAgent(agent: AgentInstance): AgentInstance {
 
 /**
  * 更新 agent 的部分字段
+ * 使用 name 作为主键查找
  */
 export function updateAgent(
-  id: string,
-  updates: Partial<Omit<AgentInstance, "id">>
+  name: string,
+  updates: Partial<Omit<AgentInstance, "name">>
 ): AgentInstance | undefined {
   const agents = ensureStore();
-  const index = agents.findIndex((agent) => agent.id === id);
+  const index = agents.findIndex((agent) => agent.name === name);
 
   if (index === -1) {
     return undefined;
@@ -92,10 +114,11 @@ export function updateAgent(
 
 /**
  * 删除 agent
+ * 使用 name 作为主键查找
  */
-export function deleteAgent(id: string): boolean {
+export function deleteAgent(name: string): boolean {
   const agents = ensureStore();
-  const index = agents.findIndex((agent) => agent.id === id);
+  const index = agents.findIndex((agent) => agent.name === name);
 
   if (index === -1) {
     return false;
@@ -109,14 +132,15 @@ export function deleteAgent(id: string): boolean {
 /**
  * 更新 agent 的运行状态
  * 当状态变为 stopped 时，自动删除 pid
+ * 使用 name 作为主键查找
  */
 export function updateAgentStatus(
-  id: string,
+  name: string,
   status: AgentInstance["status"],
   pid?: number
 ): AgentInstance | undefined {
   const agents = ensureStore();
-  const index = agents.findIndex((agent) => agent.id === id);
+  const index = agents.findIndex((agent) => agent.name === name);
 
   if (index === -1) {
     return undefined;
@@ -225,9 +249,8 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
         port++;
       }
 
-      // 创建新的 agent
+      // 创建新的 agent（不再生成 UUID，使用 name 作为主键）
       const newAgent: AgentInstance = {
-        id: uuidv4(),
         name,
         configPath,
         workspacePath,
@@ -256,23 +279,25 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
 
 /**
  * 更新 Agent 的 teamBindings 字段
+ * 使用 agentName 作为主键
  */
 export function updateAgentTeamBindings(
-  agentId: string,
+  agentName: string,
   bindings: { teamName: string; memberName: string }[]
 ): AgentInstance | undefined {
-  return updateAgent(agentId, { teamBindings: bindings });
+  return updateAgent(agentName, { teamBindings: bindings });
 }
 
 /**
  * 添加一条 Agent Team Binding
+ * 使用 agentName 作为主键
  */
 export function addAgentTeamBinding(
-  agentId: string,
+  agentName: string,
   teamName: string,
   memberName: string
 ): AgentInstance | undefined {
-  const agent = getAgent(agentId);
+  const agent = getAgent(agentName);
   if (!agent) {
     return undefined;
   }
@@ -289,17 +314,18 @@ export function addAgentTeamBinding(
   }
 
   const newBindings = [...currentBindings, { teamName, memberName }];
-  return updateAgent(agentId, { teamBindings: newBindings });
+  return updateAgent(agentName, { teamBindings: newBindings });
 }
 
 /**
  * 移除指定 teamName 的 Agent Team Binding
+ * 使用 agentName 作为主键
  */
 export function removeAgentTeamBinding(
-  agentId: string,
+  agentName: string,
   teamName: string
 ): AgentInstance | undefined {
-  const agent = getAgent(agentId);
+  const agent = getAgent(agentName);
   if (!agent) {
     return undefined;
   }
@@ -314,5 +340,5 @@ export function removeAgentTeamBinding(
     return agent;
   }
 
-  return updateAgent(agentId, { teamBindings: newBindings });
+  return updateAgent(agentName, { teamBindings: newBindings });
 }
