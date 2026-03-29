@@ -10,10 +10,13 @@ interface LogViewerProps {
 
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
+type LogType = "process_message" | "before_execute_tools" | "general";
+
 interface ParsedLog {
   level: LogLevel;
   message: string;
   raw: string;
+  logType: LogType;
 }
 
 // Detect log level
@@ -43,6 +46,23 @@ function detectLogLevel(content: string): LogLevel {
   return "unknown";
 }
 
+// Get log type - distinguish between process_message and before_execute_tools
+function detectLogType(content: string): LogType {
+  const lower = content.toLowerCase();
+  
+  // Detect before_execute_tools first (more specific)
+  if (lower.includes("_before_execute_tools") || lower.includes("before_execute_tools")) {
+    return "before_execute_tools";
+  }
+  
+  // Detect _process_message
+  if (lower.includes("_process_message") || lower.includes("process_message")) {
+    return "process_message";
+  }
+  
+  return "general";
+}
+
 // Get log level label color
 function getLevelColor(level: LogLevel): string {
   switch (level) {
@@ -61,6 +81,30 @@ function getLevelColor(level: LogLevel): string {
   }
 }
 
+// Get background color based on log type
+function getLogTypeBackground(logType: LogType): string {
+  switch (logType) {
+    case "process_message":
+      return "bg-blue-900/50 border-l-2 border-blue-400/60";
+    case "before_execute_tools":
+      return "bg-emerald-900/50 border-l-2 border-emerald-400/60";
+    default:
+      return "";
+  }
+}
+
+// Get icon/text indicator for log type
+function getLogTypeIndicator(logType: LogType): { label: string; bgColor: string; textColor: string } | null {
+  switch (logType) {
+    case "process_message":
+      return { label: "MSG", bgColor: "bg-blue-900/60", textColor: "text-blue-300" };
+    case "before_execute_tools":
+      return { label: "TOOL", bgColor: "bg-emerald-900/60", textColor: "text-emerald-300" };
+    default:
+      return null;
+  }
+}
+
 // Get log content color - always light gray for content
 function getContentColor(level: LogLevel, stream: "stdout" | "stderr"): string {
   if (stream === "stderr") return "text-zinc-300";
@@ -70,6 +114,7 @@ function getContentColor(level: LogLevel, stream: "stdout" | "stderr"): string {
 // Parse log content
 function parseLogContent(content: string): ParsedLog {
   const level = detectLogLevel(content);
+  const logType = detectLogType(content);
   let message = content;
   
   try {
@@ -83,7 +128,7 @@ function parseLogContent(content: string): ParsedLog {
     // Not JSON
   }
   
-  return { level, message, raw: content };
+  return { level, message, raw: content, logType };
 }
 
 export function LogViewer({ agentName }: LogViewerProps) {
@@ -182,11 +227,25 @@ export function LogViewer({ agentName }: LogViewerProps) {
               </span>
             ) : null;
             
+            const typeIndicator = getLogTypeIndicator(parsed.logType);
+            const bgClass = getLogTypeBackground(parsed.logType);
+            
             return (
-              <div key={index} className="flex gap-2 items-center hover:bg-zinc-900 rounded px-1 -mx-1 text-xs leading-normal">
+              <div 
+                key={index} 
+                className={cn(
+                  "flex gap-2 items-center hover:bg-zinc-900 rounded px-1 -mx-1 text-xs leading-normal py-0.5",
+                  bgClass
+                )}
+              >
                 <span className="text-zinc-600 select-none shrink-0">
                   {formatTime(log.timestamp)}
                 </span>
+                {typeIndicator && (
+                  <span className={cn("shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide", typeIndicator.bgColor, typeIndicator.textColor)}>
+                    {typeIndicator.label}
+                  </span>
+                )}
                 {levelLabel}
                 <span
                   className={cn(
