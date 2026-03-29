@@ -1,3 +1,7 @@
+// ==================== Agent Role Types ====================
+
+export type AgentRole = "manager" | "member";
+
 export interface AgentInstance {
   name: string;
   configPath: string;
@@ -7,7 +11,26 @@ export interface AgentInstance {
   status: "running" | "stopped" | "error";
   pid?: number;
   createdAt: string;
+  role?: AgentRole;  // Agent 角色：manager 或 member
   teamBindings?: { teamName: string; memberName: string }[];
+}
+
+// ==================== Shared Config Types ====================
+
+export interface SharedConfig {
+  skills: SharedSkill[];
+  mcp: McpConfig | null;
+}
+
+export interface SharedSkill {
+  name: string;
+  path: string;
+  description?: string;
+  enabled: boolean;
+}
+
+export interface McpConfig {
+  servers: Record<string, any>;
 }
 
 export interface CreateAgentInput {
@@ -17,6 +40,7 @@ export interface CreateAgentInput {
   provider?: string;
   apiKey?: string;
   model?: string;
+  role?: AgentRole;  // Agent 角色
 }
 
 export interface AgentLog {

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { AgentInstance } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface WebchatConfig {
   enabled: boolean;
@@ -699,15 +700,19 @@ export default function AgentChatPage() {
           <h1 className="text-3xl font-bold text-white uppercase">Chat</h1>
           <StatusBadge status={agent.status} />
           <span
-            className={`text-xs px-2 py-1 rounded-full ${
+            className={cn(
+              "inline-flex items-center justify-center px-2.5 py-1 rounded border gap-1.5 text-xs font-medium",
               isConnected
-                ? "bg-green-500/20 text-green-400"
+                ? "bg-green-500/10 border-green-500/20"
                 : isConnecting
-                ? "bg-yellow-500/20 text-yellow-400"
-                : "bg-red-500/20 text-red-400"
-            }`}
+                ? "bg-yellow-500/10 border-yellow-500/20 animate-status-pulse"
+                : "bg-red-500/10 border-red-500/20"
+            )}
           >
-            {isConnected ? "Connected" : isConnecting ? "Connecting..." : "Disconnected"}
+            <WifiIcon className={cn(
+              "w-4 h-4",
+              isConnected ? "text-green-400" : isConnecting ? "text-yellow-400" : "text-red-400"
+            )} />
           </span>
         </div>
       </div>
@@ -994,6 +999,17 @@ function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="m6 9 6 6 6-6"/>
+    </svg>
+  );
+}
+
+function WifiIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 13a10 10 0 0 1 14 0"/>
+      <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
+      <path d="M2 8.82a15 15 0 0 1 20 0"/>
+      <line x1="12" x2="12.01" y1="20" y2="20"/>
     </svg>
   );
 }

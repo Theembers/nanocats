@@ -98,9 +98,20 @@ export function AgentCard({ agent, onStatusChange }: AgentCardProps) {
                 <BotIcon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading font-semibold text-white text-lg leading-tight uppercase">
-                  {agent.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading font-semibold text-white text-lg leading-tight uppercase">
+                    {agent.name}
+                  </h3>
+                  {agent.role && (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      agent.role === "manager"
+                        ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                        : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    }`}>
+                      {agent.role === "manager" ? "Manager" : "Member"}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`w-2 h-2 rounded-full ${
                     isRunning 

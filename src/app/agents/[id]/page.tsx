@@ -33,6 +33,9 @@ export default function AgentDetailPage() {
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [addToTeamOpen, setAddToTeamOpen] = useState(false);
   const [bindingLoading, setBindingLoading] = useState<string | null>(null);
+  const [setRoleOpen, setSetRoleOpen] = useState(false);
+  const [setRoleLoading, setSetRoleLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"manager" | "member" | "">("");
 
   const fetchAgent = async () => {
     try {
@@ -204,6 +207,31 @@ export default function AgentDetailPage() {
     setConfirmingDelete(false);
   };
 
+  const handleSetRole = async () => {
+    if (!agent) return;
+    setSetRoleLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/agents/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: selectedRole || undefined }),
+      });
+      if (res.ok) {
+        setFeedback({ type: "success", message: "Role updated successfully" });
+        await fetchAgent();
+        setSetRoleOpen(false);
+      } else {
+        const data = await res.json();
+        setFeedback({ type: "error", message: data.error || "Failed to update role" });
+      }
+    } catch (error) {
+      setFeedback({ type: "error", message: "Failed to update role" });
+    } finally {
+      setSetRoleLoading(false);
+    }
+  };
+
   const handleRestart = async () => {
     setActionLoading("restart");
     setFeedback(null);
@@ -260,7 +288,18 @@ export default function AgentDetailPage() {
             <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
               <BotIcon className="w-5 h-5 text-orange-400" />
             </div>
-            <h1 className="text-3xl font-bold text-white uppercase">{agent.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-white uppercase">{agent.name}</h1>
+              {agent.role && (
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  agent.role === "manager"
+                    ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                }`}>
+                  {agent.role === "manager" ? "Manager" : "Member"}
+                </span>
+              )}
+            </div>
           </div>
           <StatusBadge status={agent.status} />
         </div>
@@ -398,99 +437,184 @@ export default function AgentDetailPage() {
                 {agent.workspacePath}
               </p>
             </div>
-            <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UsersIcon className="w-4 h-4 text-zinc-500" />
-                  <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Teams</label>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {agent.teamBindings && agent.teamBindings.length > 0 ? (
-                    agent.teamBindings.map((binding) => (
-                      <div key={binding.teamName} className="flex items-center gap-1">
-                        <Link href={`/teams/${binding.teamName}`}>
-                          <Badge
-                            variant="secondary"
-                            className="cursor-pointer hover:bg-zinc-700 transition-colors"
+
+                       {/* Role + Teams 在同一行 */}
+            <div className="col-span-3 grid grid-cols-2 gap-4">
+              {/* Role */}
+              <div className="p-4 rounded-lg bg-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldIcon className="w-4 h-4 text-zinc-500" />
+                    <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Role</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {agent.role ? (
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        agent.role === "manager"
+                          ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                          : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                      }`}>
+                        {agent.role === "manager" ? "Manager" : "Member"}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-zinc-500">No role assigned</span>
+                    )}
+                    <Dialog open={setRoleOpen} onOpenChange={setSetRoleOpen}>
+                      <DialogTrigger
+                        render={
+                          <button
+                            className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors border border-white/10"
+                            onClick={() => {
+                              setSelectedRole(agent.role || "");
+                              setSetRoleOpen(true);
+                            }}
                           >
-                            {binding.teamName}
-                          </Badge>
-                        </Link>
-                        <button
-                          onClick={() => handleUnbindTeam(binding.teamName)}
-                          disabled={bindingLoading === binding.teamName}
-                          className="w-4 h-4 flex items-center justify-center rounded-full bg-zinc-700 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors text-xs"
-                          title="Unbind"
-                        >
-                          {bindingLoading === binding.teamName ? "..." : "×"}
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-sm text-zinc-500">NOT IN ANY TEAM</span>
-                  )}
-                  <Dialog open={addToTeamOpen} onOpenChange={setAddToTeamOpen}>
-                    <DialogTrigger
-                      render={
-                        <button className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors">
-                          ADD TO TEAM
-                        </button>
-                      }
-                    />
-                    <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
-                      <DialogHeader>
-                        <DialogTitle className="text-white uppercase tracking-wider">Add to Team</DialogTitle>
-                        <DialogDescription className="text-zinc-400">
-                          Select a team to add this agent to
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="mt-4 max-h-80 overflow-y-auto">
-                        {teamsLoading ? (
-                          <div className="text-center py-8 text-zinc-500">Loading teams...</div>
-                        ) : teams.length === 0 ? (
-                          <div className="text-center py-8 text-zinc-500">No teams available</div>
-                        ) : (
+                            SET ROLE
+                          </button>
+                        }
+                      />
+                      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
+                        <DialogHeader>
+                          <DialogTitle className="text-white uppercase tracking-wider">Set Agent Role</DialogTitle>
+                          <DialogDescription className="text-zinc-400">
+                            Assign a role to this agent to enable shared configuration management.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-4 space-y-4">
                           <div className="space-y-2">
-                            {teams
-                              .filter(
+                            <label className="block text-sm font-medium text-zinc-300">Role</label>
+                            <select
+                              value={selectedRole}
+                              onChange={(e) => setSelectedRole(e.target.value as "manager" | "member" | "")}
+                              className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
+                            >
+                              <option value="">No specific role</option>
+                              <option value="manager">Manager (can manage shared config)</option>
+                              <option value="member">Member (uses shared config)</option>
+                            </select>
+                            <p className="text-sm text-zinc-500">
+                              {selectedRole === "manager" && "Manager agents can manage shared skills and MCP configuration."}
+                              {selectedRole === "member" && "Member agents will use shared skills and MCP configuration."}
+                              {selectedRole === "" && "No role - the agent will not participate in shared configuration."}
+                            </p>
+                          </div>
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              onClick={handleSetRole}
+                              disabled={setRoleLoading}
+                              className="px-4 py-2 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium disabled:opacity-50"
+                            >
+                              {setRoleLoading ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              onClick={() => setSetRoleOpen(false)}
+                              className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </div>
+
+              {/* Teams */}
+              <div className="p-4 rounded-lg bg-zinc-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UsersIcon className="w-4 h-4 text-zinc-500" />
+                    <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Teams</label>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {agent.teamBindings && agent.teamBindings.length > 0 ? (
+                      agent.teamBindings.map((binding) => (
+                        <div key={binding.teamName} className="flex items-center gap-1">
+                          <Link href={`/teams/${binding.teamName}`}>
+                            <Badge
+                              variant="secondary"
+                              className="cursor-pointer hover:bg-zinc-700 transition-colors"
+                            >
+                              {binding.teamName}
+                            </Badge>
+                          </Link>
+                          <button
+                            onClick={() => handleUnbindTeam(binding.teamName)}
+                            disabled={bindingLoading === binding.teamName}
+                            className="w-4 h-4 flex items-center justify-center rounded-full bg-zinc-700 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors text-xs border border-white/10"
+                            title="Unbind"
+                          >
+                            {bindingLoading === binding.teamName ? "..." : "×"}
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-sm text-zinc-500">NOT IN ANY TEAM</span>
+                    )}
+                    <Dialog open={addToTeamOpen} onOpenChange={setAddToTeamOpen}>
+                      <DialogTrigger
+                        render={
+                          <button className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors border border-white/10">
+                            ADD TO TEAM
+                          </button>
+                        }
+                      />
+                      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
+                        <DialogHeader>
+                          <DialogTitle className="text-white uppercase tracking-wider">Add to Team</DialogTitle>
+                          <DialogDescription className="text-zinc-400">
+                            Select a team to add this agent to
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-4 max-h-80 overflow-y-auto">
+                          {teamsLoading ? (
+                            <div className="text-center py-8 text-zinc-500">Loading teams...</div>
+                          ) : teams.length === 0 ? (
+                            <div className="text-center py-8 text-zinc-500">No teams available</div>
+                          ) : (
+                            <div className="space-y-2">
+                              {teams
+                                .filter(
+                                  (team) =>
+                                    !agent.teamBindings?.some(
+                                      (binding) => binding.teamName === team.name
+                                    )
+                                )
+                                .map((team) => (
+                                  <button
+                                    key={team.name}
+                                    onClick={() => handleBindTeam(team.name)}
+                                    disabled={bindingLoading === team.name}
+                                    className="w-full p-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-left transition-colors disabled:opacity-50"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <div className="font-medium text-zinc-200">{team.name}</div>
+                                        <div className="text-sm text-zinc-500">{team.description}</div>
+                                      </div>
+                                      <div className="text-sm text-zinc-500">
+                                        {team.agents?.length || 0} members
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              {teams.filter(
                                 (team) =>
                                   !agent.teamBindings?.some(
                                     (binding) => binding.teamName === team.name
                                   )
-                              )
-                              .map((team) => (
-                                <button
-                                  key={team.name}
-                                  onClick={() => handleBindTeam(team.name)}
-                                  disabled={bindingLoading === team.name}
-                                  className="w-full p-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-left transition-colors disabled:opacity-50"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <div className="font-medium text-zinc-200">{team.name}</div>
-                                      <div className="text-sm text-zinc-500">{team.description}</div>
-                                    </div>
-                                    <div className="text-sm text-zinc-500">
-                                      {team.agents?.length || 0} members
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            {teams.filter(
-                              (team) =>
-                                !agent.teamBindings?.some(
-                                  (binding) => binding.teamName === team.name
-                                )
-                            ).length === 0 && (
-                              <div className="text-center py-8 text-zinc-500">
-                                All teams already have this agent
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                              ).length === 0 && (
+                                <div className="text-center py-8 text-zinc-500">
+                                  All teams already have this agent
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </div>
             </div>
@@ -511,47 +635,56 @@ export default function AgentDetailPage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {agent.role === "manager" && (
+          <ActionCard
+            title="Manager Console"
+            description="Manage shared skills and MCP configuration"
+            icon={<ShieldIcon className="w-5 h-5" />}
+            onClick={() => router.push(`/agents/${id}/manager`)}
+            delay={0}
+          />
+        )}
         <ActionCard
           title="Edit Config"
           description="View and edit the agent configuration file"
           icon={<SettingsIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/config`)}
-          delay={0}
+          delay={agent.role === "manager" ? 1 : 0}
         />
         <ActionCard
           title="Workspace"
           description="Edit AGENTS, SOUL, USER, TOOLS, HEARTBEAT files"
           icon={<FolderIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/workspace`)}
-          delay={1}
+          delay={agent.role === "manager" ? 2 : 1}
         />
         <ActionCard
           title="Skills"
           description="Enable/disable and edit agent skills"
           icon={<ZapIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/skills`)}
-          delay={2}
+          delay={agent.role === "manager" ? 3 : 2}
         />
         <ActionCard
           title="Cron Jobs"
           description="Manage scheduled tasks and cron configurations"
           icon={<ClockIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/cron`)}
-          delay={3}
+          delay={agent.role === "manager" ? 4 : 3}
         />
         <ActionCard
           title="Memory"
           description="Manage MEMORY and HISTORY files"
           icon={<BrainIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/memory`)}
-          delay={4}
+          delay={agent.role === "manager" ? 5 : 4}
         />
         <ActionCard
           title="View Logs"
           description="Stream real-time logs from the agent"
           icon={<FileTextIcon className="w-5 h-5" />}
           onClick={() => router.push(`/agents/${id}/logs`)}
-          delay={5}
+          delay={agent.role === "manager" ? 6 : 5}
         />
       </div>
 
@@ -728,6 +861,14 @@ function ChatIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
     </svg>
   );
 }
