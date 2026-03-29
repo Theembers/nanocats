@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown, { Components } from "react-markdown";
@@ -24,6 +24,14 @@ interface ToolCall {
   id: string;
   name: string;
   arguments: string;
+}
+
+// 新增：实时工具调用提示（来自 WebSocket）
+interface ToolExecuting {
+  id: string;
+  name: string;
+  hint: string; // e.g., "web_search(\"天气\")"
+  timestamp?: string;
 }
 
 interface ToolResult {
@@ -50,6 +58,7 @@ interface Message {
   thinkContent?: string;
   toolCalls?: ToolCall[];
   toolResult?: ToolResult;
+  toolExecuting?: ToolExecuting[]; // 实时工具调用列表
   isHistory?: boolean; // 标记是否为历史消息
   attachments?: { name: string; type: string; preview?: string }[];
 }
@@ -69,6 +78,12 @@ export default function AgentChatPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pendingFiles, setPendingFiles] = useState(0);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
+
+  // 输入框高度 ref，避免每次 onInput 都触发布局计算
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 防抖定时器 ref
+  const inputDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -200,42 +215,145 @@ export default function AgentChatPage() {
     wsRef.current = ws;
   };
 
+  // 从工具提示中提取工具名称 e.g. "web_search(\"天气\")" -> "web_search"
+  const extractToolName = (hint: string): string => {
+    const match = hint.match(/^(\w+)\(/);
+    return match ? match[1] : hint;
+  };
+
   const handleWebSocketMessage = (data: any) => {
-    if (data.type === "delta") {
-      setMessages((prev) => {
-        const lastMessage = prev[prev.length - 1];
-        if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
-          // 更新正在流式传输的消息
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...lastMessage,
-            content: data.content,
-            isStreaming: !data.is_end,
-          };
-          return updated;
-        } else {
-          // 创建新的流式消息
+    switch (data.type) {
+      case "typing":
+        // 设置 Agent 正在输入状态
+        setIsAgentTyping(data.is_typing);
+        break;
+
+      case "think_content":
+        // 思考内容片段，累积到当前消息
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
+            // 更新正在流式传输的消息的思考内容
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...lastMessage,
+              thinkContent: (lastMessage.thinkContent || "") + data.content,
+            };
+            return updated;
+          } else {
+            // 创建新的流式消息（思考中）
+            return [
+              ...prev,
+              {
+                id: `msg_${Date.now()}`,
+                type: "bot",
+                content: "",
+                thinkContent: data.content,
+                isStreaming: true,
+              },
+            ];
+          }
+        });
+        break;
+
+      case "tool_call":
+        // 工具调用提示
+        const toolName = extractToolName(data.content);
+        const newToolExecuting: ToolExecuting = {
+          id: `tool_exec_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          name: toolName,
+          hint: data.content,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
+            // 添加到当前消息的工具执行列表
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...lastMessage,
+              toolExecuting: [...(lastMessage.toolExecuting || []), newToolExecuting],
+            };
+            return updated;
+          } else {
+            // 创建新的流式消息（工具执行中）
+            return [
+              ...prev,
+              {
+                id: `msg_${Date.now()}`,
+                type: "bot",
+                content: "",
+                toolExecuting: [newToolExecuting],
+                isStreaming: true,
+              },
+            ];
+          }
+        });
+        break;
+
+      case "delta":
+        // 流式内容增量
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
+            // 更新正在流式传输的消息
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...lastMessage,
+              content: data.content,
+              // 工具调用结束后清空 toolExecuting
+              toolExecuting: data.is_resuming ? lastMessage.toolExecuting : [],
+              isStreaming: !data.is_end,
+            };
+            // 流结束时清除 typing 状态
+            if (data.is_end) {
+              setIsAgentTyping(false);
+            }
+            return updated;
+          } else {
+            // 创建新的流式消息
+            return [
+              ...prev,
+              {
+                id: `msg_${Date.now()}`,
+                type: "bot",
+                content: data.content,
+                isStreaming: !data.is_end,
+              },
+            ];
+          }
+        });
+        break;
+
+      case "message":
+        // 最终消息，清空中间状态后添加
+        setIsAgentTyping(false);
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          // 如果最后一条是正在流式的 bot 消息，用最终内容替换
+          if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...lastMessage,
+              content: data.content,
+              thinkContent: undefined,
+              toolExecuting: undefined,
+              isStreaming: false,
+            };
+            return updated;
+          }
+          // 否则添加新消息
           return [
             ...prev,
             {
               id: `msg_${Date.now()}`,
               type: "bot",
               content: data.content,
-              isStreaming: !data.is_end,
+              isStreaming: false,
             },
           ];
-        }
-      });
-    } else if (data.type === "message") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg_${Date.now()}`,
-          type: "bot",
-          content: data.content,
-          isStreaming: false,
-        },
-      ]);
+        });
+        break;
     }
   };
 
@@ -349,6 +467,23 @@ export default function AgentChatPage() {
       handleSendMessage();
     }
   };
+
+  // 处理输入框内容变化（带防抖优化高度调整）
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    // 防抖调整高度，避免频繁触发 layout thrashing
+    if (inputDebounceRef.current) {
+      clearTimeout(inputDebounceRef.current);
+    }
+    inputDebounceRef.current = setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+      }
+    }, 16); // ~1 frame
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
@@ -621,16 +756,20 @@ export default function AgentChatPage() {
                     >
                       {msg.type === "bot" && (
                         <>
-                          {/* Think Block */}
+                          {/* Think Block (实时思考过程) */}
                           {msg.thinkContent && (
                             <ThinkBlock content={msg.thinkContent} isStreaming={msg.isStreaming} />
                           )}
-                          {/* Tool Calls Block */}
+                          {/* Tool Calls Block (历史消息中的工具调用) */}
                           {msg.toolCalls && msg.toolCalls.length > 0 && (
                             <ToolCallBlock toolCalls={msg.toolCalls} timestamp={msg.timestamp} />
                           )}
+                          {/* Tool Executing Block (实时工具执行) */}
+                          {msg.toolExecuting && msg.toolExecuting.length > 0 && (
+                            <ToolExecutingBlock tools={msg.toolExecuting} />
+                          )}
                           {/* Bot 消息内容 */}
-                          {msg.content && (
+                          {(msg.content || msg.isStreaming) && (
                             <CollapsibleContent
                               content={msg.content}
                               isHistory={msg.isHistory}
@@ -747,26 +886,16 @@ export default function AgentChatPage() {
                 </svg>
               </button>
               <textarea
+                ref={textareaRef}
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => {
-                  const nativeEvent = e.nativeEvent as unknown as { isComposing?: boolean };
-                  if (e.key === "Enter" && !e.shiftKey && !nativeEvent.isComposing) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                }}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
                 onPaste={handlePaste}
                 placeholder={isConnected ? "Type a message..." : "Connecting..."}
                 disabled={!isConnected}
                 rows={1}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 disabled:opacity-50 resize-none"
                 style={{ height: "auto", overflow: "hidden" }}
-                onInput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "auto";
-                  target.style.height = Math.min(target.scrollHeight, 160) + "px";
-                }}
               />
               <button
                 onClick={() => {
@@ -788,10 +917,22 @@ export default function AgentChatPage() {
               </button>
               <button
                 onClick={handleSendMessage}
-                disabled={!isConnected || (!inputValue.trim() && attachments.length === 0) || pendingFiles > 0}
-                className="px-6 h-11 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
+                disabled={!isConnected || (!inputValue.trim() && attachments.length === 0) || pendingFiles > 0 || isAgentTyping}
+                className={`px-4 min-w-[80px] h-11 rounded-lg font-medium transition-all duration-200 flex items-center justify-center ${
+                  isAgentTyping
+                    ? "bg-green-500/20 border border-green-500/30 text-green-400 cursor-wait"
+                    : "bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-400 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:hover:scale-100"
+                }`}
               >
-                Send
+                {isAgentTyping ? (
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  </span>
+                ) : (
+                  <span>Send</span>
+                )}
               </button>
             </div>
           </div>
@@ -958,6 +1099,32 @@ function ToolCallBlock({ toolCalls, timestamp }: { toolCalls: ToolCall[]; timest
               </pre>
             </div>
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Tool Executing Block 组件（实时工具执行指示器）
+function ToolExecutingBlock({ tools }: { tools: ToolExecuting[] }) {
+  return (
+    <div className="mb-3 space-y-2">
+      {tools.map((tool) => (
+        <div 
+          key={tool.id} 
+          className="rounded-lg border border-blue-500/30 bg-blue-500/10 overflow-hidden"
+        >
+          <div className="flex items-center gap-2 px-3 py-2 text-blue-400 text-sm font-medium">
+            <div className="relative">
+              <ToolIcon className="w-4 h-4" />
+              {/* 执行中指示器 */}
+              <span className="absolute -top-1 -right-1 w-2 h-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 animate-ping"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+            </div>
+            <span className="font-mono text-blue-300">{tool.hint}</span>
+          </div>
         </div>
       ))}
     </div>
@@ -1208,6 +1375,20 @@ const markdownComponents: Components = {
   },
 };
 
+// 优化的 Markdown 内容组件（带 memo）
+const MemoizedMarkdown = memo(({ content }: { content: string }) => {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight]}
+      components={markdownComponents}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+});
+MemoizedMarkdown.displayName = "MemoizedMarkdown";
+
 function CollapsibleContent({
   content,
   isHistory,
@@ -1229,13 +1410,7 @@ function CollapsibleContent({
   return (
     <div className={`px-4 py-3 rounded-2xl bg-zinc-800/50 text-zinc-200 rounded-bl-md border border-zinc-700/50 ${isStreaming ? "border-l-4 border-l-orange-400" : ""}`}>
       <div className="markdown-content">
-        <ReactMarkdown 
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-          components={markdownComponents}
-        >
-          {displayContent}
-        </ReactMarkdown>
+        <MemoizedMarkdown content={displayContent} />
       </div>
       {shouldCollapse && (
         <button
