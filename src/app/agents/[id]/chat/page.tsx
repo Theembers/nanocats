@@ -343,7 +343,8 @@ export default function AgentChatPage() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    const nativeEvent = e.nativeEvent as unknown as { isComposing?: boolean };
+    if (e.key === "Enter" && !e.shiftKey && !nativeEvent.isComposing) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -749,7 +750,8 @@ export default function AgentChatPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  const nativeEvent = e.nativeEvent as unknown as { isComposing?: boolean };
+                  if (e.key === "Enter" && !e.shiftKey && !nativeEvent.isComposing) {
                     e.preventDefault();
                     handleSendMessage();
                   }

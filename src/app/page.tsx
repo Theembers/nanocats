@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 import { AgentCard } from "@/components/agent-card";
+import { StartupLogPanel } from "@/components/startup-log-panel";
 import { AgentInstance, Team } from "@/lib/types";
 
 // 动画延迟工具
@@ -222,6 +223,9 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      {/* 启动日志面板 */}
+      <StartupLogPanel />
     </div>
   );
 }

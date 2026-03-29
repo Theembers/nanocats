@@ -1,9 +1,101 @@
 import { spawn, ChildProcess } from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
 import type { AgentInstance, AgentLog } from "./types";
 import { findNanobotBinary } from "./nanobot";
 import { getAgents, getAgent, updateAgentStatus } from "./store";
 
 const MAX_LOG_LINES = 1000;
+
+// CLI 日志文件路径
+const CLI_LOG_DIR = path.join(os.homedir(), ".nanocats-manager", "logs");
+const CLI_LOG_FILE = path.join(CLI_LOG_DIR, "cli-commands.log");
+
+// 确保日志目录存在
+function ensureLogDir(): void {
+  if (!fs.existsSync(CLI_LOG_DIR)) {
+    fs.mkdirSync(CLI_LOG_DIR, { recursive: true });
+  }
+}
+
+// 写入日志到文件
+function writeToLogFile(message: string): void {
+  try {
+    ensureLogDir();
+    fs.appendFileSync(CLI_LOG_FILE, message + "\n", "utf-8");
+  } catch (error) {
+    console.error("Failed to write log to file:", error);
+  }
+}
+
+// CLI 操作日志缓冲区
+interface CliLogEntry {
+  timestamp: string;
+  agentName: string;
+  command: string;
+  action: "start" | "stop" | "restart";
+}
+
+const MAX_CLI_LOG_ENTRIES = 100;
+const globalForCliLogs = globalThis as unknown as {
+  cliLogs: CliLogEntry[];
+};
+
+/**
+ * 将 CLI 日志写入文件
+ */
+function writeCliLogToFile(logEntry: CliLogEntry): void {
+  try {
+    ensureLogDir();
+    const logLine = `[${logEntry.timestamp}] [${logEntry.action.toUpperCase()}] [${logEntry.agentName}] ${logEntry.command}\n`;
+    fs.appendFileSync(CLI_LOG_FILE, logLine, "utf-8");
+  } catch (error) {
+    console.error("Failed to write CLI log to file:", error);
+  }
+}
+
+/**
+ * 打印 CLI 指令日志（用于排查问题）
+ */
+function logCliCommand(agentName: string, command: string, args: string[], action: "start" | "stop" | "restart"): void {
+  const fullCommand = `${command} ${args.join(" ")}`;
+  const logEntry: CliLogEntry = {
+    timestamp: new Date().toISOString(),
+    agentName,
+    command: fullCommand,
+    action,
+  };
+
+  // 添加到全局日志缓冲区
+  globalForCliLogs.cliLogs = globalForCliLogs.cliLogs || [];
+  globalForCliLogs.cliLogs.push(logEntry);
+
+  // 保持日志缓冲区不超过最大行数
+  if (globalForCliLogs.cliLogs.length > MAX_CLI_LOG_ENTRIES) {
+    globalForCliLogs.cliLogs.shift();
+  }
+
+  // 写入日志文件
+  writeCliLogToFile(logEntry);
+
+  // 输出到控制台
+  console.log(`[CLI ${action.toUpperCase()}] [${agentName}] ${fullCommand}`);
+}
+
+/**
+ * 获取 CLI 操作日志
+ */
+export function getCliLogs(): CliLogEntry[] {
+  return globalForCliLogs.cliLogs || [];
+}
+
+/**
+ * 清除 CLI 操作日志
+ */
+export function clearCliLogs(): void {
+  globalForCliLogs.cliLogs = [];
+}
 
 interface ManagedProcess {
   process: ChildProcess;
@@ -16,8 +108,46 @@ const globalForProcessManager = globalThis as unknown as {
   processManager: ProcessManager | undefined;
 };
 
+// 持久化日志存储：即使进程退出也能查看历史日志
+const globalForHistoricalLogs = globalThis as unknown as {
+  historicalLogs: Map<string, AgentLog[]>;
+};
+
 class ProcessManager {
   private processes: Map<string, ManagedProcess> = new Map();
+
+  /**
+   * 获取历史日志（进程退出后仍可访问）
+   */
+  private getHistoricalLogs(agentId: string): AgentLog[] {
+    if (!globalForHistoricalLogs.historicalLogs) {
+      globalForHistoricalLogs.historicalLogs = new Map();
+    }
+    return globalForHistoricalLogs.historicalLogs.get(agentId) || [];
+  }
+
+  /**
+   * 保存日志到历史记录
+   */
+  private saveToHistoricalLogs(agentId: string, logs: AgentLog[]): void {
+    if (!globalForHistoricalLogs.historicalLogs) {
+      globalForHistoricalLogs.historicalLogs = new Map();
+    }
+    globalForHistoricalLogs.historicalLogs.set(agentId, logs);
+  }
+
+  /**
+   * 添加历史日志条目
+   */
+  private appendHistoricalLog(agentId: string, log: AgentLog): void {
+    const logs = this.getHistoricalLogs(agentId);
+    logs.push(log);
+    // 保持历史日志不超过最大行数
+    if (logs.length > MAX_LOG_LINES) {
+      logs.shift();
+    }
+    this.saveToHistoricalLogs(agentId, logs);
+  }
 
   /**
    * 启动 gateway 进程
@@ -31,9 +161,21 @@ class ProcessManager {
 
     const nanobotPath = await findNanobotBinary();
 
+    // 构造 CLI 指令并打印日志
+    const cliArgs = ["gateway", "--config", agent.configPath, "--port", String(agent.port)];
+    logCliCommand(agent.name, nanobotPath, cliArgs, "start");
+
+    // 记录启动命令到历史日志
+    const startLog: AgentLog = {
+      timestamp: new Date().toISOString(),
+      stream: "stdout",
+      content: `[START] ${nanobotPath} ${cliArgs.join(" ")}`,
+    };
+    this.appendHistoricalLog(agent.name, startLog);
+
     const childProcess = spawn(
       nanobotPath,
-      ["gateway", "--config", agent.configPath, "--port", String(agent.port)],
+      cliArgs,
       {
         detached: false,
         stdio: ["ignore", "pipe", "pipe"],
@@ -43,6 +185,13 @@ class ProcessManager {
 
     const pid = childProcess.pid;
     if (!pid) {
+      // 启动失败，记录错误日志
+      const errorLog: AgentLog = {
+        timestamp: new Date().toISOString(),
+        stream: "stderr",
+        content: "[ERROR] Failed to start gateway process: no PID returned",
+      };
+      this.appendHistoricalLog(agent.name, errorLog);
       throw new Error("Failed to start gateway process: no PID returned");
     }
 
@@ -55,23 +204,33 @@ class ProcessManager {
     // 使用 agent.name 作为进程管理的 key
     this.processes.set(agent.name, managedProcess);
 
-    // 监听 stdout
-    childProcess.stdout?.on("data", (data: Buffer) => {
-      this.appendLog(agent.name, "stdout", data.toString());
-    });
-
     // 监听 stderr
     childProcess.stderr?.on("data", (data: Buffer) => {
-      this.appendLog(agent.name, "stderr", data.toString());
+      const content = data.toString();
+      if (content.trim()) {
+        this.appendLog(agent.name, "stderr", content);
+      }
+    });
+
+    // 监听进程标准输出
+    childProcess.stdout?.on("data", (data: Buffer) => {
+      const content = data.toString();
+      if (content.trim()) {
+        this.appendLog(agent.name, "stdout", content);
+      }
     });
 
     // 监听进程关闭
     childProcess.on("close", (code) => {
-      this.appendLog(
-        agent.name,
-        "stderr",
-        `Process exited with code ${code}`
-      );
+      const exitLog: AgentLog = {
+        timestamp: new Date().toISOString(),
+        stream: "stderr",
+        content: `[EXIT] Process exited with code ${code}`,
+      };
+      this.appendLog(agent.name, "stderr", `Process exited with code ${code}`);
+      // 保存日志到历史记录
+      const logs = this.getLogBuffer(agent.name);
+      this.saveToHistoricalLogs(agent.name, logs);
       this.processes.delete(agent.name);
       // 更新存储中的状态
       updateAgentStatus(agent.name, code === 0 ? "stopped" : "error");
@@ -79,7 +238,16 @@ class ProcessManager {
 
     // 监听进程错误
     childProcess.on("error", (err) => {
+      const errorLog: AgentLog = {
+        timestamp: new Date().toISOString(),
+        stream: "stderr",
+        content: `[ERROR] Process error: ${err.message}`,
+      };
       this.appendLog(agent.name, "stderr", `Process error: ${err.message}`);
+      this.appendHistoricalLog(agent.name, errorLog);
+      // 保存日志到历史记录
+      const logs = this.getLogBuffer(agent.name);
+      this.saveToHistoricalLogs(agent.name, logs);
       this.processes.delete(agent.name);
       updateAgentStatus(agent.name, "error");
     });
@@ -104,6 +272,12 @@ class ProcessManager {
 
     const { process: childProcess } = managed;
 
+    // 打印 SIGTERM 指令日志
+    const pid = childProcess.pid;
+    if (pid) {
+      logCliCommand(agentName, "kill", ["-TERM", String(pid)], "stop");
+    }
+
     return new Promise<void>((resolve) => {
       let killed = false;
 
@@ -122,6 +296,11 @@ class ProcessManager {
       // 3秒后检查是否还存活
       setTimeout(() => {
         if (!killed && this.isProcessAlive(childProcess.pid)) {
+          // 打印 SIGKILL 指令日志
+          const killPid = childProcess.pid;
+          if (killPid) {
+            logCliCommand(agentName, "kill", ["-KILL", String(killPid)], "stop");
+          }
           childProcess.kill("SIGKILL");
         }
       }, 3000);
@@ -177,13 +356,15 @@ class ProcessManager {
 
   /**
    * 获取进程的日志缓冲区
+   * 优先从当前运行的进程获取，进程不存在时从历史日志获取
    */
   getLogBuffer(agentId: string): AgentLog[] {
     const managed = this.processes.get(agentId);
-    if (!managed) {
-      return [];
+    if (managed) {
+      return [...managed.logs];
     }
-    return [...managed.logs];
+    // 进程不存在，从历史日志获取
+    return this.getHistoricalLogs(agentId);
   }
 
   /**
@@ -196,7 +377,8 @@ class ProcessManager {
   ): () => void {
     const managed = this.processes.get(agentId);
     if (!managed) {
-      // 进程不存在，返回空的取消订阅函数
+      // 进程不存在，订阅者将不会收到任何日志
+      // 日志可以从历史日志中获取（通过 getLogBuffer）
       return () => {};
     }
 
@@ -220,10 +402,16 @@ class ProcessManager {
       return;
     }
 
+    // 清理内容（移除尾部换行符，统一格式）
+    const cleanContent = content.replace(/\n+$/, "");
+    if (!cleanContent) {
+      return;
+    }
+
     const log: AgentLog = {
       timestamp: new Date().toISOString(),
       stream,
-      content,
+      content: cleanContent,
     };
 
     managed.logs.push(log);

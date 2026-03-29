@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogViewer } from "@/components/log-viewer";
 import { Breadcrumb } from "@/components/breadcrumb";
@@ -11,7 +10,7 @@ import { AgentInstance } from "@/lib/types";
 export default function LogsPage() {
   const params = useParams();
   const id = params.id as string;
-  
+
   const [agent, setAgent] = useState<AgentInstance | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +30,9 @@ export default function LogsPage() {
     };
 
     fetchAgent();
+    // 定期刷新 agent 状态
+    const interval = setInterval(fetchAgent, 5000);
+    return () => clearInterval(interval);
   }, [id]);
 
   if (loading) {
@@ -55,39 +57,35 @@ export default function LogsPage() {
         Live Logs - {agent?.name || "Agent"}
       </h1>
 
-      {/* Log Viewer or Not Running Message */}
-      {agent?.status !== "running" ? (
+      {/* Agent Status Banner */}
+      {agent?.status !== "running" && (
         <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="text-white">Agent Not Running</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-400">
-              This agent is currently not running. Start the agent to view live logs.
-            </p>
-            <Link
-              href={`/agents/${id}`}
-              className="text-orange-400 hover:text-orange-300 inline-block mt-2 transition-colors"
-            >
-              Go to agent details to start it
-            </Link>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="glass-card border-0 overflow-hidden">
-          <CardContent className="p-0">
-            <LogViewer agentName={id} />
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-zinc-500" />
+                <div>
+                  <p className="text-zinc-300 font-medium">Agent is not running</p>
+                  <p className="text-zinc-500 text-sm">
+                    Current status: {agent?.status || "unknown"}
+                    {agent?.pid ? ` (PID: ${agent.pid})` : ""}
+                  </p>
+                </div>
+              </div>
+              <p className="text-zinc-500 text-sm">
+                Start the agent to see live logs. Historical logs from this session will appear below.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
 
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9 18 6-6-6-6" />
-    </svg>
+      {/* Log Viewer - Always show */}
+      <Card className="glass-card border-0 overflow-hidden">
+        <CardContent className="p-0">
+          <LogViewer agentName={id} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

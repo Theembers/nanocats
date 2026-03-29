@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { Breadcrumb } from "@/components/breadcrumb";
+import { StartupLogPanel } from "@/components/startup-log-panel";
 import { AgentInstance, Team } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -553,6 +554,9 @@ export default function AgentDetailPage() {
           delay={5}
         />
       </div>
+
+      {/* 启动日志面板 - 只显示当前 agent 的日志 */}
+      <StartupLogPanel agentName={id} />
     </div>
   );
 }
