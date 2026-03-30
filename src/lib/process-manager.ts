@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import type { AgentInstance, AgentLog } from "./types";
 import { findNanobotBinary } from "./nanobot";
-import { getAgents, getAgent, updateAgentStatus } from "./store";
+import { getAgents, getAgent, updateAgentStatus, getAgentEnvContent, parseEnvContent, ensureAgentEnvFile } from "./store";
 
 const MAX_LOG_LINES = 1000;
 
@@ -117,6 +117,48 @@ class ProcessManager {
   private processes: Map<string, ManagedProcess> = new Map();
 
   /**
+   * 加载 agent 的 .env 文件并合并到环境变量
+   * 同时确保 .env 文件存在于 nanobot 工作目录（通过 shell source 命令加载）
+   */
+  private loadAgentEnvVariables(agentName: string): NodeJS.ProcessEnv {
+    // 继承当前进程的所有环境变量
+    const env: NodeJS.ProcessEnv = { ...process.env };
+
+    // 获取 .env 文件路径（与 config.json 同目录）
+    const envPath = path.join(os.homedir(), "agents", `.nanobot-${agentName}`, ".env");
+    console.log(`[Env] Looking for .env file at: ${envPath}`);
+    console.log(`[Env] .env file exists: ${fs.existsSync(envPath)}`);
+
+    // 确保 .env 文件存在于 nanobot 工作目录
+    // nanobot 使用 shell 的 "source .env" 命令加载，所以文件必须在 cwd 下
+    ensureAgentEnvFile(agentName);
+    console.log(`[Env] Ensured .env file exists at workspace`);
+
+    // 获取 agent 的 .env 文件内容
+    const envContent = getAgentEnvContent(agentName);
+    if (!envContent) {
+      console.log(`[Env] No .env content found for agent ${agentName}`);
+      return env;
+    }
+
+    console.log(`[Env] .env content preview: ${envContent.substring(0, 200)}...`);
+
+    // 解析并合并到环境变量（作为备用，防止 nanobot 内部不加载）
+    try {
+      const parsed = parseEnvContent(envContent);
+      const keyCount = Object.keys(parsed).length;
+      console.log(`[Env] Parsed ${keyCount} env variables: ${Object.keys(parsed).join(", ")}`);
+      for (const [key, value] of Object.entries(parsed)) {
+        env[key] = value;
+      }
+    } catch (error) {
+      console.error(`[Env] Failed to parse .env for agent ${agentName}:`, error);
+    }
+
+    return env;
+  }
+
+  /**
    * 获取历史日志（进程退出后仍可访问）
    */
   private getHistoricalLogs(agentId: string): AgentLog[] {
@@ -152,6 +194,7 @@ class ProcessManager {
   /**
    * 启动 gateway 进程
    * 使用 agent.name 作为进程管理的 key
+   * 支持加载 .env 环境变量文件
    */
   async startGateway(agent: AgentInstance): Promise<number> {
     // 如果进程已存在，先停止
@@ -173,6 +216,15 @@ class ProcessManager {
     };
     this.appendHistoricalLog(agent.name, startLog);
 
+    // 加载 .env 文件并合并到环境变量
+    const envVars = this.loadAgentEnvVariables(agent.name);
+    
+    // 验证环境变量是否被设置到 env 对象中
+    const customKeys = Object.keys(envVars).filter(k => !Object.keys(process.env).includes(k));
+    if (customKeys.length > 0) {
+      console.log(`[Env] Custom env keys passed to process: ${customKeys.join(", ")}`);
+    }
+
     const childProcess = spawn(
       nanobotPath,
       cliArgs,
@@ -180,6 +232,7 @@ class ProcessManager {
         detached: false,
         stdio: ["ignore", "pipe", "pipe"],
         cwd: agent.workspacePath,
+        env: envVars,
       }
     );
 

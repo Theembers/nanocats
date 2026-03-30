@@ -686,6 +686,13 @@ export default function AgentDetailPage() {
           onClick={() => router.push(`/agents/${id}/logs`)}
           delay={agent.role === "manager" ? 6 : 5}
         />
+        <ActionCard
+          title="Environment"
+          description="Configure .env environment variables"
+          icon={<TerminalIcon className="w-5 h-5" />}
+          onClick={() => router.push(`/agents/${id}/env`)}
+          delay={agent.role === "manager" ? 7 : 6}
+        />
       </div>
 
       {/* 启动日志面板 - 只显示当前 agent 的日志 */}
@@ -880,6 +887,15 @@ function UsersIcon({ className }: { className?: string }) {
       <circle cx="9" cy="7" r="4"/>
       <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
       <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+}
+
+function TerminalIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 17 10 11 4 5"/>
+      <line x1="12" x2="20" y1="19" y2="19"/>
     </svg>
   );
 }

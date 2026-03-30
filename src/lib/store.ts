@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import type { AgentInstance } from "./types";
+// 编译时嵌入 SKILL.md 内容
+import MANAGER_SKILL_CONTENT from "../assets/skills/nanocats-manager-skill/SKILL.md";
 
 const STORE_DIR = path.join(os.homedir(), ".nanocats-manager");
 const STORE_FILE = path.join(STORE_DIR, "agents-store.json");
@@ -281,6 +283,122 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
     console.error("Failed to scan agents from disk:", error);
     return agents;
   }
+}
+
+// ==================== Agent Env 文件管理 ====================
+
+/**
+ * 获取 agent 的 .env 文件路径
+ * 路径格式: ~/agents/.nanobot-{name}/.env (与 config.json 同目录)
+ */
+export function getAgentEnvPath(agentName: string): string {
+  return path.join(AGENTS_BASE_PATH, `${NANOBOT_DIR_PREFIX}${agentName}`, ".env");
+}
+
+/**
+ * 确保 agent 的 .env 文件存在
+ * 如果不存在则创建一个空文件
+ */
+export function ensureAgentEnvFile(agentName: string): void {
+  const envPath = getAgentEnvPath(agentName);
+  const dir = path.dirname(envPath);
+  
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
+  if (!fs.existsSync(envPath)) {
+    fs.writeFileSync(envPath, "", "utf-8");
+  }
+}
+
+/**
+ * 获取 agent 的 .env 文件内容
+ * 如果文件不存在，返回空字符串
+ */
+export function getAgentEnvContent(agentName: string): string {
+  const envPath = getAgentEnvPath(agentName);
+  if (!fs.existsSync(envPath)) {
+    return "";
+  }
+  try {
+    return fs.readFileSync(envPath, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * 写入 agent 的 .env 文件内容
+ */
+export function setAgentEnvContent(agentName: string, content: string): boolean {
+  const envPath = getAgentEnvPath(agentName);
+  try {
+    // 确保目录存在
+    const dir = path.dirname(envPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(envPath, content, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`[Env] Failed to write .env file for agent ${agentName}:`, error);
+    return false;
+  }
+}
+
+/**
+ * 删除 agent 的 .env 文件
+ */
+export function deleteAgentEnvFile(agentName: string): boolean {
+  const envPath = getAgentEnvPath(agentName);
+  if (!fs.existsSync(envPath)) {
+    return true;
+  }
+  try {
+    fs.unlinkSync(envPath);
+    return true;
+  } catch (error) {
+    console.error(`[Env] Failed to delete .env file for agent ${agentName}:`, error);
+    return false;
+  }
+}
+
+/**
+ * 解析 .env 文件内容，返回环境变量键值对
+ * 支持注释（#开头）、空行、KEY=VALUE 格式
+ */
+export function parseEnvContent(content: string): Record<string, string> {
+  const envVars: Record<string, string> = {};
+  const lines = content.split("\n");
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    // 跳过空行和注释
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      continue;
+    }
+
+    const equalIndex = trimmedLine.indexOf("=");
+    if (equalIndex === -1) {
+      continue;
+    }
+
+    const key = trimmedLine.substring(0, equalIndex).trim();
+    let value = trimmedLine.substring(equalIndex + 1).trim();
+
+    // 移除引号（如果值被引号包围）
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    if (key) {
+      envVars[key] = value;
+    }
+  }
+
+  return envVars;
 }
 
 // ==================== Agent Team Bindings 管理 ====================
@@ -574,41 +692,16 @@ export function setupManagerSkill(agent: AgentInstance): void {
     return;
   }
 
-  // 确保目录存在
-  fs.mkdirSync(path.join(agent.workspacePath, "workspace", "skills"), { recursive: true });
-
-  // 创建 Manager Skill 目录
+  // 确保目标目录存在
   fs.mkdirSync(managerSkillDir, { recursive: true });
 
-  // 创建 SKILL.md
-  const skillContent = `---
-name: nanocats-manager-skill
-description: nanocats-manager 共享配置管理能力
----
-
-# nanocats-manager 配置管理
-
-你可以通过 nanocats-manager 的 Web API 管理共享配置。
-
-## 可用操作
-
-### 管理共享 Skills
-- GET /api/shared-config/skills - 列出所有共享 skills
-- POST /api/shared-config/skills - 添加新 skill
-- PUT /api/shared-config/skills/[name] - 启用/禁用 skill
-- DELETE /api/shared-config/skills/[name] - 删除 skill
-
-### 管理共享 MCP
-- GET /api/shared-config/mcp - 获取 MCP 配置
-- PUT /api/shared-config/mcp - 更新 MCP 配置
-
-### 管理成员
-- GET /api/shared-config/members - 列出所有成员 agent
-- POST /api/shared-config/apply - 应用配置到成员
-`;
-
-  fs.writeFileSync(path.join(managerSkillDir, "SKILL.md"), skillContent, "utf-8");
-  console.log(`[ManagerSkill] Installed nanocats-manager-skill to agent ${agent.name}`);
+  // 写入 SKILL.md
+  try {
+    fs.writeFileSync(path.join(managerSkillDir, "SKILL.md"), MANAGER_SKILL_CONTENT, "utf-8");
+    console.log(`[ManagerSkill] Installed nanocats-manager-skill to agent ${agent.name}`);
+  } catch (error) {
+    console.error(`[ManagerSkill] Failed to write skill to agent ${agent.name}:`, error);
+  }
 }
 
 /**
