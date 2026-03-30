@@ -149,6 +149,17 @@ def main():
         if subcmd == 'skills':
             result = get(port, 'shared-config/skills')
             print(json.dumps(result, indent=2, ensure_ascii=False))
+        elif subcmd == 'add-skill':
+            # nanocat-api.py <port> shared-config add-skill <name> <path> <managerName>
+            if len(args) < 4: print("Usage: shared-config add-skill <name> <path> <managerName>"); sys.exit(1)
+            data = {'skillPath': args[1], 'managerName': args[3]}
+            result = post(port, 'shared-config/skills', data)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        elif subcmd == 'remove-skill':
+            # nanocat-api.py <port> shared-config remove-skill <name> <managerName>
+            if len(args) < 3: print("Usage: shared-config remove-skill <name> <managerName>"); sys.exit(1)
+            result = delete(port, f'shared-config/skills/{args[1]}?managerName={args[2]}')
+            print(json.dumps(result, indent=2, ensure_ascii=False))
         elif subcmd == 'mcp':
             result = get(port, 'shared-config/mcp')
             print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -160,7 +171,7 @@ def main():
             print(json.dumps(result, indent=2, ensure_ascii=False))
         else:
             print(f"Unknown shared-config subcommand: {subcmd}")
-            print("Available: skills, mcp, members, apply")
+            print("Available: skills, add-skill, remove-skill, mcp, members, apply")
     
     # Teams
     elif cmd == 'list-teams':

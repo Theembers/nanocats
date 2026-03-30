@@ -54,6 +54,8 @@ Manager/Member agents 可以查询和同步共享的 Skills、MCP 配置。
 | 操作 | 命令 |
 |------|------|
 | 获取共享 Skills | `nanocat-api.py <port> shared-config skills` |
+| 添加共享 Skill | `nanocat-api.py <port> shared-config add-skill <name> <path> <managerName>` |
+| 移除共享 Skill | `nanocat-api.py <port> shared-config remove-skill <name> <managerName>` |
 | 获取共享 MCP | `nanocat-api.py <port> shared-config mcp` |
 | 查看已链接 Agents | `nanocat-api.py <port> shared-config members` |
 | 触发配置同步 | `nanocat-api.py <port> shared-config apply` |
@@ -70,6 +72,12 @@ Manager/Member agents 可以查询和同步共享的 Skills、MCP 配置。
 # 查询共享 Skills
 python3 nanocat-api.py 3000 shared-config skills
 # 返回: { "skills": [{ "name": "persona", "enabled": true }, ...] }
+
+# 添加共享 Skill（从 Manager 的 workspace/skills 复制）
+python3 nanocat-api.py 3000 shared-config add-skill my-skill /path/to/skill Master
+
+# 移除共享 Skill
+python3 nanocat-api.py 3000 shared-config remove-skill my-skill Master
 
 # 查询共享 MCP
 python3 nanocat-api.py 3000 shared-config mcp
