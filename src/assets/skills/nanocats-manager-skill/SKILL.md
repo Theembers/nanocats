@@ -5,71 +5,29 @@ description: 管理 Agent 生命周期、配置、Skills、Teams 及共享配置
 
 # nanocats-manager Skill
 
-> **重要**: exec 安全策略会阻止含 `localhost`/`127.0.0.1` 的内联 Python/curl 命令。
-> 
-> **解决方案**: 使用封装脚本
+> **重要**: exec 安全策略会阻止含 `localhost`/`127.0.0.1` 的内联 Python/curl 命令，请使用封装脚本。
 
 ---
 
-## 脚本位置
+## 概述
 
-```
-{skill_dir}/nanocat-api.py
-```
+通过 REST API 管理 nanocats-manager 的所有功能，包括 Agent 生命周期、共享配置、Teams 等。
 
-完整路径：
-```
-/Users/theembersguo/agents/.nanobot-master/workspace/skills/nanocats-manager-skill/nanocat-api.py
-```
+**脚本位置**: `{skill_dir}/nanocat-api.py`
 
----
-
-## 基本用法
-
+**基本用法**:
 ```bash
 python3 nanocat-api.py <port> <command> [args...]
-
-# 示例：
-python3 nanocat-api.py 3000 list-agents
-python3 nanocat-api.py 3000 restart-agent bro
-python3 nanocat-api.py 3000 agent-status justin
 ```
 
-### 端口说明
-- nanocat-manager 默认端口可能是 18789, 18790, 3000, 3001 等
-- 通过 nanocat-manager 的 UI 可以确认实际端口
-- **第一个参数必须是端口号**
+> **端口说明**: nanocat-manager 默认端口可能是 18789, 18790, 3000, 3001 等，通过 UI 确认实际端口。`<port>` 是第一个参数。
 
 ---
 
-## 快速操作
-
-### 重启 Agent
-```bash
-python3 nanocat-api.py <port> restart-agent <agent-name>
-```
-
-### 查看所有 Agent
-```bash
-python3 nanocat-api.py <port> list-agents
-```
-
-### 查看单个 Agent 状态
-```bash
-python3 nanocat-api.py <port> agent-status <agent-name>
-```
-
-### 启动/停止 Agent
-```bash
-python3 nanocat-api.py <port> start-agent <agent-name>
-python3 nanocat-api.py <port> stop-agent <agent-name>
-```
-
----
-
-## 完整命令列表
+## 核心功能
 
 ### Agent 管理
+
 | 操作 | 命令 |
 |------|------|
 | 列出所有 Agent | `nanocat-api.py <port> list-agents` |
@@ -78,19 +36,71 @@ python3 nanocat-api.py <port> stop-agent <agent-name>
 | 停止 Agent | `nanocat-api.py <port> stop-agent <name>` |
 | 重启 Agent | `nanocat-api.py <port> restart-agent <name>` |
 
-### Agent 配置 (nanobot.json)
+**示例**:
+```bash
+# 查看所有 Agent
+python3 nanocat-api.py 3000 list-agents
+
+# 重启指定 Agent
+python3 nanocat-api.py 3000 restart-agent bro
+```
+
+---
+
+### 共享配置
+
+Manager/Member agents 可以查询和同步共享的 Skills、MCP 配置。
+
+| 操作 | 命令 |
+|------|------|
+| 获取共享 Skills | `nanocat-api.py <port> shared-config skills` |
+| 获取共享 MCP | `nanocat-api.py <port> shared-config mcp` |
+| 查看已链接 Agents | `nanocat-api.py <port> shared-config members` |
+| 触发配置同步 | `nanocat-api.py <port> shared-config apply` |
+
+**共享配置同步内容**:
+
+1. **MCP**: 追加到 `config.json` 的 `tools.mcpServers`
+2. **Skills**: 在 `workspace/skills/` 创建符号链接
+
+> 只有 Manager agent 调用 `apply` 才会真正执行同步。
+
+**示例**:
+```bash
+# 查询共享 Skills
+python3 nanocat-api.py 3000 shared-config skills
+# 返回: { "skills": [{ "name": "persona", "enabled": true }, ...] }
+
+# 查询共享 MCP
+python3 nanocat-api.py 3000 shared-config mcp
+# 返回: { "MiniMax": { "command": "uvx", ... } }
+
+# 触发同步
+python3 nanocat-api.py 3000 shared-config apply
+```
+
+---
+
+### Agent 配置
+
 | 操作 | 命令 |
 |------|------|
 | 获取配置 | `nanocat-api.py <port> get-config <name>` |
 | 更新配置 | `nanocat-api.py <port> update-config <name> '<json>'` |
 
-### Agent 环境变量 (.env)
+---
+
+### Agent 环境变量
+
 | 操作 | 命令 |
 |------|------|
 | 获取环境变量 | `nanocat-api.py <port> get-env <name>` |
 | 更新环境变量 | `nanocat-api.py <port> update-env <name> '<content>'` |
 
+---
+
 ### Agent Workspace 文件
+
 可管理文件: `AGENTS`, `SOUL`, `USER`, `TOOLS`, `HEARTBEAT`
 
 | 操作 | 命令 |
@@ -99,26 +109,27 @@ python3 nanocat-api.py <port> stop-agent <agent-name>
 | 读取文件 | `nanocat-api.py <port> get-workspace <name> <file>` |
 | 更新文件 | `nanocat-api.py <port> update-workspace <name> <file> '<content>'` |
 
+---
+
 ### Agent Skills
+
 | 操作 | 命令 |
 |------|------|
 | 列出 Skills | `nanocat-api.py <port> list-skills <name>` |
 | 更新 Skills | `nanocat-api.py <port> update-skills <name> '<json>'` |
 
+---
+
 ### 日志
+
 | 操作 | 命令 |
 |------|------|
 | 运行日志 | `nanocat-api.py <port> logs <name>` |
 
-### 共享配置
-| 操作 | 命令 |
-|------|------|
-| 列出共享 Skills | `nanocat-api.py <port> shared-config skills` |
-| 获取 MCP 配置 | `nanocat-api.py <port> shared-config mcp` |
-| 列出成员 Agent | `nanocat-api.py <port> shared-config members` |
-| 应用配置到所有成员 | `nanocat-api.py <port> shared-config apply` |
+---
 
-### Teams
+## Teams 功能
+
 | 操作 | 命令 |
 |------|------|
 | 列出所有 Teams | `nanocat-api.py <port> list-teams` |
@@ -126,44 +137,14 @@ python3 nanocat-api.py <port> stop-agent <agent-name>
 | Team 任务 | `nanocat-api.py <port> team-tasks <team-name>` |
 | Team 成员 | `nanocat-api.py <port> team-agents <team-name>` |
 
-### Nanobot 版本
+---
+
+## 系统信息
+
 | 操作 | 命令 |
 |------|------|
 | 获取版本 | `nanocat-api.py <port> version` |
 | 检查更新 | `nanocat-api.py <port> check-update` |
-
----
-
-## 常用操作示例
-
-### 创建并启动 Agent
-```bash
-# 1. 启动 (需通过 nanocats-manager UI 创建)
-# 2. 启动
-python3 nanocat-api.py <port> start-agent <agent-name>
-
-# 3. 验证状态
-python3 nanocat-api.py <port> agent-status <agent-name>
-```
-
-### 停止并重启 Agent
-```bash
-python3 nanocat-api.py <port> restart-agent <agent-name>
-```
-
-### 配置 MCP 并应用
-```bash
-# 获取当前 MCP
-python3 nanocat-api.py <port> shared-config mcp
-
-# 应用配置
-python3 nanocat-api.py <port> shared-config apply
-```
-
-### 批量查看 Agent 状态
-```bash
-python3 nanocat-api.py <port> list-agents
-```
 
 ---
 
