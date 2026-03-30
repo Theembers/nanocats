@@ -36,6 +36,7 @@ export default function AgentDetailPage() {
   const [setRoleOpen, setSetRoleOpen] = useState(false);
   const [setRoleLoading, setSetRoleLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"manager" | "member" | "">("");
+  const [openingFolder, setOpeningFolder] = useState<string | null>(null);
 
   const fetchAgent = async () => {
     try {
@@ -232,6 +233,25 @@ export default function AgentDetailPage() {
     }
   };
 
+  const handleOpenFolder = async (folderPath: string, type: string) => {
+    setOpeningFolder(type);
+    try {
+      const res = await fetch("/api/open-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderPath }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setFeedback({ type: "error", message: data.error || "Failed to open folder" });
+      }
+    } catch (error) {
+      setFeedback({ type: "error", message: "Failed to open folder" });
+    } finally {
+      setOpeningFolder(null);
+    }
+  };
+
   const handleRestart = async () => {
     setActionLoading("restart");
     setFeedback(null);
@@ -424,18 +444,38 @@ export default function AgentDetailPage() {
                 <FileIcon className="w-4 h-4 text-zinc-500" />
                 <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Config Path</label>
               </div>
-              <p className="text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
-                {agent.configPath}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="flex-1 text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
+                  {agent.configPath}
+                </p>
+                <button
+                  onClick={() => handleOpenFolder(agent.configPath, "config")}
+                  disabled={openingFolder === "config"}
+                  className="p-2 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white transition-colors disabled:opacity-50 border border-white/10"
+                  title="Open in Finder"
+                >
+                  <ExternalLinkIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
               <div className="flex items-center gap-2 mb-1">
                 <FolderIcon className="w-4 h-4 text-zinc-500" />
                 <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Workspace Path</label>
               </div>
-              <p className="text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
-                {agent.workspacePath}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="flex-1 text-sm font-mono text-zinc-300 bg-black/50 px-3 py-2 rounded-md">
+                  {agent.workspacePath}
+                </p>
+                <button
+                  onClick={() => handleOpenFolder(agent.workspacePath, "workspace")}
+                  disabled={openingFolder === "workspace"}
+                  className="p-2 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-300 hover:text-white transition-colors disabled:opacity-50 border border-white/10"
+                  title="Open in Finder"
+                >
+                  <ExternalLinkIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
                        {/* Role + Teams 在同一行 */}
@@ -896,6 +936,16 @@ function TerminalIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="4 17 10 11 4 5"/>
       <line x1="12" x2="20" y1="19" y2="19"/>
+    </svg>
+  );
+}
+
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+      <polyline points="15 3 21 3 21 9"/>
+      <line x1="10" x2="21" y1="14" y2="3"/>
     </svg>
   );
 }
