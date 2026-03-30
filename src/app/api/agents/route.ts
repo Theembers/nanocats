@@ -97,9 +97,16 @@ export async function POST(request: NextRequest) {
     const agentDir = path.join(resolvedBasePath, agentDirName);
 
     const configPath = path.join(agentDir, "config.json");
-    const workspacePath = agentDir;
+    // nanobot onboard 会在 workspace 目录下直接创建文件
+    // 所以需要指向 workspace/ 子目录，而不是 agent 根目录
+    const workspacePath = path.join(agentDir, "workspace");
 
     const finalPort = port ?? getNextAvailablePort();
+
+    // 确保 workspace 目录存在
+    if (!fs.existsSync(workspacePath)) {
+      fs.mkdirSync(workspacePath, { recursive: true });
+    }
 
     await nanobotOnboard(configPath, workspacePath);
 
