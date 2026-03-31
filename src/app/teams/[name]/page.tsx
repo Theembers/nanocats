@@ -36,8 +36,8 @@ export default function TeamDetailPage() {
 
   useEffect(() => {
     fetchTeam();
-    // 5 second polling
-    const interval = setInterval(fetchTeam, 5000);
+    // 30 second polling
+    const interval = setInterval(fetchTeam, 30000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);

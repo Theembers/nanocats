@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { AgentCard } from "@/components/agent-card";
 import { StartupLogPanel } from "@/components/startup-log-panel";
+import { OpenSpaceDashboardCard } from "@/components/openspace-dashboard-card";
 import { AgentInstance, Team } from "@/lib/types";
 
 // 动画延迟工具
@@ -88,11 +89,14 @@ export default function DashboardPage() {
     fetchAgents();
     fetchTeams();
     fetchNanobotVersion();
-    const interval = setInterval(() => {
-      fetchAgents();
-      fetchTeams();
-    }, 5000);
-    return () => clearInterval(interval);
+    // Agents 轮询：10秒
+    const agentsInterval = setInterval(fetchAgents, 10000);
+    // Teams 轮询：30秒
+    const teamsInterval = setInterval(fetchTeams, 30000);
+    return () => {
+      clearInterval(agentsInterval);
+      clearInterval(teamsInterval);
+    };
   }, [fetchAgents, fetchTeams, fetchNanobotVersion]);
 
   const runningCount = agents.filter((a) => a.status === "running").length;
@@ -142,122 +146,118 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Agent Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard
-          title="TOTAL AGENTS"
-          value={agents.length}
-          icon={<BoxesIcon className="w-5 h-5" />}
-          delay={1}
-        />
-        <StatCard
-          title="RUNNING"
-          value={runningCount}
-          icon={<PlayIcon className="w-5 h-5" />}
-          delay={2}
-        />
-        <StatCard
-          title="STOPPED"
-          value={stoppedCount}
-          icon={<PauseIcon className="w-5 h-5" />}
-          delay={3}
-        />
-      </div>
-
-      {/* Team Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-        <StatCard
-          title="TEAMS"
-          value={teams.length}
-          icon={<UsersIcon className="w-5 h-5" />}
-          delay={4}
-        />
-        <StatCard
-          title="ACTIVE TEAMS"
-          value={activeTeamsCount}
-          icon={<PlayIcon className="w-5 h-5" />}
-          delay={5}
-        />
-      </div>
-
-      {/* Agent Grid */}
-      {loading && agents.length === 0 ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="relative">
-            <div className="w-12 h-12 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-            <div className="absolute inset-0 w-12 h-12 border-2 border-transparent border-t-amber-500 rounded-full animate-spin" style={{ animationDuration: "1.5s" }} />
-          </div>
+      {/* Overview Section */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">Overview</span>
         </div>
-      ) : agents.length === 0 ? (
-        <div className="animate-fade-in-up text-center py-20" style={{ animationDelay: "0.4s" }}>
-          <div className="mx-auto mb-6 opacity-80 flex items-center justify-center">
-            <img
-              src="/nanocats_logo.png"
-              alt="Nanocats"
-              className="h-16 w-auto"
-            />
-          </div>
-          <h3 className="font-heading text-2xl font-semibold text-white mb-3">
-            No agents yet
-          </h3>
-          <p className="text-zinc-400 mb-6 max-w-sm mx-auto">
-            Create your first nanobot agent to start automating your workflows
-          </p>
-          <Link href="/agents/new">
-            <button className="px-6 py-2.5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 mx-auto transition-all">
-              <PlusIcon className="w-4 h-4" />
-              Create Agent
-            </button>
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {agents.map((agent, index) => (
-            <div
-              key={agent.name}
-              className="animate-fade-in-up"
-              style={staggerDelay(index + 4)}
-            >
-              <AgentCard agent={agent} onStatusChange={fetchAgents} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+          {/* Agents Stats Card */}
+          <div className="bg-zinc-900/90 p-6 rounded-xl min-h-[138px] flex flex-col" style={{ animationDelay: "0.1s" }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-orange-500/70 text-[11px] font-semibold mb-2 uppercase tracking-widest">Agents</p>
+                <p className="font-heading text-4xl font-bold text-orange-400">{agents.length}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-orange-500/10 text-orange-400">
+                <BoxesIcon className="w-5 h-5" />
+              </div>
             </div>
-          ))}
+            <div className="flex gap-4 mt-auto pt-4 border-t border-zinc-800/50">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-orange-400" />
+                <span className="text-sm text-zinc-400">
+                  <span className="text-white font-semibold">{runningCount}</span> Running
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-zinc-600" />
+                <span className="text-sm text-zinc-400">
+                  <span className="text-white font-semibold">{stoppedCount}</span> Stopped
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Teams Stats Card */}
+          <div className="bg-zinc-900/90 p-6 rounded-xl min-h-[138px] flex flex-col" style={{ animationDelay: "0.2s" }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sky-500/70 text-[11px] font-semibold mb-2 uppercase tracking-widest">Teams</p>
+                <p className="font-heading text-4xl font-bold text-sky-400">{teams.length}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-sky-500/10 text-sky-400">
+                <UsersIcon className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-auto pt-4 border-t border-zinc-800/50">
+              <div className="w-2 h-2 rounded-full bg-sky-400" />
+              <span className="text-sm text-zinc-400">
+                <span className="text-white font-semibold">{activeTeamsCount}</span> Active
+              </span>
+            </div>
+          </div>
+
+          {/* OpenSpace Dashboard Card */}
+          <div style={{ animationDelay: "0.3s" }}>
+            <OpenSpaceDashboardCard />
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Agent Instances Section - glass-card 玻璃态 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">Instances</span>
+        </div>
+
+        {/* Agent Grid */}
+        {loading && agents.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="relative">
+              <div className="w-12 h-12 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 w-12 h-12 border-2 border-transparent border-t-amber-500 rounded-full animate-spin" style={{ animationDuration: "1.5s" }} />
+            </div>
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="animate-fade-in-up text-center py-20" style={{ animationDelay: "0.4s" }}>
+            <div className="mx-auto mb-6 opacity-80 flex items-center justify-center">
+              <img
+                src="/nanocats_logo.png"
+                alt="Nanocats"
+                className="h-16 w-auto"
+              />
+            </div>
+            <h3 className="font-heading text-2xl font-semibold text-white mb-3">
+              No agents yet
+            </h3>
+            <p className="text-zinc-400 mb-6 max-w-sm mx-auto">
+              Create your first nanobot agent to start automating your workflows
+            </p>
+            <Link href="/agents/new">
+              <button className="px-6 py-2.5 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium flex items-center gap-2 mx-auto transition-all">
+                <PlusIcon className="w-4 h-4" />
+                Create Agent
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {agents.map((agent, index) => (
+              <div
+                key={agent.name}
+                className="animate-fade-in-up"
+                style={staggerDelay(index)}
+              >
+                <AgentCard agent={agent} onStatusChange={fetchAgents} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 启动日志面板 */}
       <StartupLogPanel />
-    </div>
-  );
-}
-
-// Stat card component
-function StatCard({
-  title,
-  value,
-  icon,
-  delay,
-}: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  delay: number;
-}) {
-  return (
-    <div
-      className="animate-fade-in-up"
-      style={{ animationDelay: `${delay * 0.1}s` }}
-    >
-      <div className="glass-card p-6 rounded-lg">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-zinc-500 text-xs font-medium mb-1 uppercase tracking-wider">{title}</p>
-            <p className="font-heading text-3xl font-bold text-white">{value}</p>
-          </div>
-          <div className="p-3 rounded-lg bg-zinc-800 text-zinc-400">
-            {icon}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -291,19 +291,13 @@ function BoxesIcon({ className }: { className?: string }) {
   );
 }
 
-function PlayIcon({ className }: { className?: string }) {
+function UsersIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  );
-}
-
-function PauseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="6" y="4" width="4" height="16" />
-      <rect x="14" y="4" width="4" height="16" />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
@@ -315,17 +309,6 @@ function UpdateIcon({ className }: { className?: string }) {
       <path d="M3 3v5h5" />
       <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
       <path d="M16 21h5v-5" />
-    </svg>
-  );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

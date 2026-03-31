@@ -79,7 +79,7 @@ export default function TeamAgentsPage() {
       setLoading(false);
     };
     init();
-    const interval = setInterval(fetchAllData, 5000);
+    const interval = setInterval(fetchAllData, 30000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);

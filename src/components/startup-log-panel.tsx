@@ -16,8 +16,8 @@ interface StartupLogPanelProps {
 
 // 休眠超时时间（毫秒）：1分钟
 const SLEEP_TIMEOUT = 60 * 1000;
-// 轮询间隔（毫秒）
-const POLL_INTERVAL = 2000;
+// 轮询间隔（毫秒）：10秒
+const POLL_INTERVAL = 10000;
 
 export function StartupLogPanel({ agentName }: StartupLogPanelProps) {
   const [logs, setLogs] = useState<CliLogEntry[]>([]);

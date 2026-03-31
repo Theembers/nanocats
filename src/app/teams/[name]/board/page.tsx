@@ -32,7 +32,7 @@ export default function TeamBoardPage() {
 
   useEffect(() => {
     fetchBoard();
-    const interval = setInterval(fetchBoard, 5000);
+    const interval = setInterval(fetchBoard, 30000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);

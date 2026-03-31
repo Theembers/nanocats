@@ -30,8 +30,8 @@ export default function LogsPage() {
     };
 
     fetchAgent();
-    // 定期刷新 agent 状态
-    const interval = setInterval(fetchAgent, 5000);
+    // 定期刷新 agent 状态：10秒
+    const interval = setInterval(fetchAgent, 10000);
     return () => clearInterval(interval);
   }, [id]);
 

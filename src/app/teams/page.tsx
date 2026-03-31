@@ -29,7 +29,7 @@ export default function TeamsPage() {
 
   useEffect(() => {
     fetchTeams();
-    const interval = setInterval(fetchTeams, 5000);
+    const interval = setInterval(fetchTeams, 30000);
     return () => clearInterval(interval);
   }, [fetchTeams]);
 
