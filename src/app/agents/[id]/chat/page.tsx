@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo, memo, Children } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown, { Components } from "react-markdown";
@@ -736,12 +736,22 @@ export default function AgentChatPage() {
               </div>
             ) : (
               messages.map((msg) => {
-                // Tool result 消息单独渲染
+                // Tool result 消息独立渲染（绿色头像）
                 if (msg.type === "tool" && msg.toolResult) {
                   return (
-                    <div key={msg.id} className="flex justify-start">
-                      <div className="max-w-[90%]">
-                        <ToolResultBlock toolResult={msg.toolResult} timestamp={msg.timestamp} />
+                    <div key={msg.id} className="flex justify-start gap-3">
+                      {/* 工具头像 */}
+                      <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center flex-shrink-0">
+                        <ToolIcon className="w-4 h-4 text-green-400" />
+                      </div>
+                      <div className="flex flex-col max-w-[85%]">
+                        {/* 名称显示在气泡上方 */}
+                        <span className="text-xs text-zinc-500 mb-1">Tool</span>
+                        <ToolResultBlock toolResult={msg.toolResult} />
+                        {/* 时间显示在气泡外 */}
+                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                          <span>{formatMessageTime(msg.timestamp)}</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -750,73 +760,98 @@ export default function AgentChatPage() {
                 return (
                   <div
                     key={msg.id}
-                    className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+                    className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} gap-3`}
                   >
-                    <div
-                      className={`max-w-[80%] ${
-                        msg.type === "user"
-                          ? "px-4 py-3 rounded-2xl bg-zinc-800 text-zinc-100 rounded-br-md border border-zinc-700/50"
-                          : "" // bot 消息的样式在内部处理
-                      }`}
-                    >
+                    {/* Agent/Bot 头像 - 左侧 */}
+                    {msg.type === "bot" && (
+                      <div className="w-8 h-8 rounded-full bg-orange-500/20 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
+                        <BotIcon className="w-4 h-4 text-orange-400" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-col max-w-[75%]">
                       {msg.type === "bot" && (
                         <>
-                          {/* Think Block (实时思考过程) */}
-                          {msg.thinkContent && (
-                            <ThinkBlock content={msg.thinkContent} isStreaming={msg.isStreaming} />
-                          )}
-                          {/* Tool Calls Block (历史消息中的工具调用) */}
-                          {msg.toolCalls && msg.toolCalls.length > 0 && (
-                            <ToolCallBlock toolCalls={msg.toolCalls} timestamp={msg.timestamp} />
-                          )}
-                          {/* Tool Executing Block (实时工具执行) */}
-                          {msg.toolExecuting && msg.toolExecuting.length > 0 && (
-                            <ToolExecutingBlock tools={msg.toolExecuting} />
-                          )}
-                          {/* Bot 消息内容 */}
-                          {(msg.content || msg.isStreaming) && (
-                            <CollapsibleContent
-                              content={msg.content}
-                              isHistory={msg.isHistory}
-                              isStreaming={msg.isStreaming}
-                              timestamp={msg.timestamp}
-                            />
-                          )}
+                          {/* 名称显示在气泡上方 */}
+                          <span className="text-xs text-zinc-500 mb-1">Assistant</span>
+                          <div className="px-4 py-3 rounded-2xl bg-zinc-800/50 text-zinc-200 rounded-bl-md border border-zinc-700/50 space-y-2">
+                            {/* Think Block (实时思考过程) */}
+                            {msg.thinkContent && (
+                              <ThinkBlock content={msg.thinkContent} isStreaming={msg.isStreaming} />
+                            )}
+                            {/* Tool Calls Block (历史消息中的工具调用) */}
+                            {msg.toolCalls && msg.toolCalls.length > 0 && (
+                              <ToolCallBlock toolCalls={msg.toolCalls} />
+                            )}
+                            {/* Tool Executing Block (实时工具执行) */}
+                            {msg.toolExecuting && msg.toolExecuting.length > 0 && (
+                              <ToolExecutingBlock tools={msg.toolExecuting} />
+                            )}
+                            {/* Bot 消息内容 */}
+                            {(msg.content || msg.isStreaming) && (
+                              <div className={msg.isStreaming ? "border-l-4 border-l-orange-400 pl-3" : ""}>
+                                <div className="markdown-content">
+                                  <MemoizedMarkdown content={msg.content} />
+                                </div>
+                                {msg.isStreaming && (
+                                  <div className="flex gap-1 mt-2">
+                                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {/* 时间和复制按钮显示在气泡外 */}
+                          <MessageMeta timestamp={msg.timestamp} content={msg.content} />
                         </>
                       )}
                       {msg.type === "user" && (
                         <>
-                          {msg.attachments && msg.attachments.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2">
-                              {msg.attachments.map((att, idx) => (
-                                att.type.startsWith('image/') && att.preview ? (
-                                  <img
-                                    key={idx}
-                                    src={att.preview}
-                                    alt={att.name}
-                                    className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer"
-                                    onClick={() => window.open(att.preview, '_blank')}
-                                  />
-                                ) : (
-                                  <div key={idx} className="flex items-center gap-1.5 bg-zinc-600/50 rounded px-2 py-1 text-xs">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-                                      <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-                                    </svg>
-                                    <span>{att.name}</span>
-                                  </div>
-                                )
-                              ))}
-                            </div>
-                          )}
-                          <CollapsibleUserContent
-                            content={msg.content}
-                            isHistory={msg.isHistory}
-                            timestamp={msg.timestamp}
-                          />
+                          {/* 名称显示在气泡上方 - 右对齐 */}
+                          <span className="text-xs text-zinc-500 mb-1 text-right">You</span>
+                          <div className="px-4 py-3 rounded-2xl bg-zinc-800 text-zinc-100 rounded-br-md border border-zinc-700/50">
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {msg.attachments.map((att, idx) => (
+                                  att.type.startsWith('image/') && att.preview ? (
+                                    <img
+                                      key={idx}
+                                      src={att.preview}
+                                      alt={att.name}
+                                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer"
+                                      onClick={() => window.open(att.preview, '_blank')}
+                                    />
+                                  ) : (
+                                    <div key={idx} className="flex items-center gap-1.5 bg-zinc-600/50 rounded px-2 py-1 text-xs">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                                        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                      </svg>
+                                      <span>{att.name}</span>
+                                    </div>
+                                  )
+                                ))}
+                              </div>
+                            )}
+                            <CollapsibleUserContent
+                              content={msg.content}
+                              isHistory={msg.isHistory}
+                            />
+                          </div>
+                          {/* 时间和复制按钮显示在气泡外 - 右对齐 */}
+                          <MessageMeta timestamp={msg.timestamp} content={msg.content} alignRight />
                         </>
                       )}
                     </div>
+
+                    {/* 用户头像 - 右侧 */}
+                    {msg.type === "user" && (
+                      <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="w-4 h-4 text-blue-400" />
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -977,6 +1012,15 @@ function BotIcon({ className }: { className?: string }) {
   );
 }
 
+function UserIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  );
+}
+
 function ThinkIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1070,7 +1114,7 @@ function ThinkBlock({ content, isStreaming }: { content: string; isStreaming?: b
 }
 
 // Tool Call Block 组件
-function ToolCallBlock({ toolCalls, timestamp }: { toolCalls: ToolCall[]; timestamp?: string }) {
+function ToolCallBlock({ toolCalls }: { toolCalls: ToolCall[] }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
@@ -1095,12 +1139,7 @@ function ToolCallBlock({ toolCalls, timestamp }: { toolCalls: ToolCall[]; timest
           >
             <ToolIcon className="w-4 h-4" />
             <span className="font-mono">{tc.name}</span>
-            {timestamp && (
-              <span className="text-xs text-blue-400/60 ml-auto mr-2">
-                {new Date(timestamp).toLocaleTimeString()}
-              </span>
-            )}
-            <ChevronDownIcon className={`w-4 h-4 transition-transform ${expandedIds.has(tc.id) ? "rotate-180" : ""}`} />
+            <ChevronDownIcon className={`w-4 h-4 ml-auto transition-transform ${expandedIds.has(tc.id) ? "rotate-180" : ""}`} />
           </button>
           {expandedIds.has(tc.id) && (
             <div className="px-3 py-2 border-t border-blue-500/30">
@@ -1156,7 +1195,7 @@ const getDisplayText = (value: unknown): string => {
 };
 
 // Tool Result Block 组件
-function ToolResultBlock({ toolResult, timestamp }: { toolResult: ToolResult; timestamp?: string }) {
+function ToolResultBlock({ toolResult }: { toolResult: ToolResult }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 将 content 转换为字符串
@@ -1176,12 +1215,7 @@ function ToolResultBlock({ toolResult, timestamp }: { toolResult: ToolResult; ti
         <ToolIcon className="w-4 h-4" />
         <span className="font-mono">{toolResult.name}</span>
         <span className="text-xs text-green-400/60">result</span>
-        {timestamp && (
-          <span className="text-xs text-green-400/60 ml-auto mr-2">
-            {new Date(timestamp).toLocaleTimeString()}
-          </span>
-        )}
-        <ChevronDownIcon className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`w-4 h-4 ml-auto transition-transform ${isExpanded ? "rotate-180" : ""}`} />
       </button>
       <div className="px-3 py-2 border-t border-green-500/30">
         {isExpanded ? (
@@ -1245,9 +1279,9 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
   const language = className?.replace(/language-/, "") || "code";
 
   return (
-    <figure className="group relative my-3 rounded-lg bg-[#0d1117] border border-zinc-800 overflow-hidden block">
+    <div className="group relative my-3 rounded-lg bg-[#0d1117] border border-zinc-800 overflow-hidden">
       {/* 头部：语言标签和复制按钮 */}
-      <figcaption className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 border-b border-zinc-800">
         <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-mono">
           {language}
         </span>
@@ -1267,15 +1301,20 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
             </>
           )}
         </button>
-      </figcaption>
+      </div>
       {/* 代码内容 */}
       <div className="overflow-x-auto p-4">
         <code ref={codeRef} className={`${className} text-sm font-mono text-zinc-200`}>
           {children}
         </code>
       </div>
-    </figure>
+    </div>
   );
+}
+
+// 段落组件 - 始终使用 div 避免嵌套问题
+function Paragraph({ children, ...props }: any) {
+  return <div className="text-zinc-200 leading-relaxed mb-3 last:mb-0" {...props}>{children}</div>;
 }
 
 // Markdown 渲染组件配置
@@ -1295,7 +1334,7 @@ const markdownComponents: Components = {
       </CodeBlock>
     );
   },
-  // pre 标签 - 使用 CodeBlock 处理，这里返回原始结构
+  // pre 标签 - 直接返回 children，让 CodeBlock 处理
   pre({ children, ...props }: any) {
     return children;
   },
@@ -1323,10 +1362,8 @@ const markdownComponents: Components = {
   h3({ children, ...props }: any) {
     return <h3 className="text-base font-semibold text-white mt-4 mb-2 first:mt-0" {...props}>{children}</h3>;
   },
-  // 段落
-  p({ children, ...props }: any) {
-    return <p className="text-zinc-200 leading-relaxed mb-3 last:mb-0" {...props}>{children}</p>;
-  },
+  // 段落 - 使用 div 代替 p 避免嵌套问题
+  p: Paragraph,
   // 列表
   ul({ children, ...props }: any) {
     return <ul className="list-disc list-inside space-y-1 mb-3 text-zinc-200 pl-2" {...props}>{children}</ul>;
@@ -1449,15 +1486,69 @@ function CollapsibleContent({
   );
 }
 
+// 消息元信息组件（时间 + 复制按钮，显示在气泡外）
+function MessageMeta({ 
+  timestamp, 
+  content,
+  alignRight = false 
+}: { 
+  timestamp?: string; 
+  content: string;
+  alignRight?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!content) return;
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [content]);
+
+  return (
+    <div className={`flex items-center gap-2 mt-1 text-xs text-zinc-500 ${alignRight ? 'justify-end' : 'justify-start'}`}>
+      {alignRight ? (
+        <>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-zinc-700/50 transition-colors"
+            title="复制内容"
+          >
+            {copied ? (
+              <CheckIcon className="w-3 h-3 text-green-400" />
+            ) : (
+              <CopyIcon className="w-3 h-3" />
+            )}
+          </button>
+          <span>{formatMessageTime(timestamp)}</span>
+        </>
+      ) : (
+        <>
+          <span>{formatMessageTime(timestamp)}</span>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-zinc-700/50 transition-colors"
+            title="复制内容"
+          >
+            {copied ? (
+              <CheckIcon className="w-3 h-3 text-green-400" />
+            ) : (
+              <CopyIcon className="w-3 h-3" />
+            )}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // 可折叠的 User 消息内容组件
 function CollapsibleUserContent({
   content,
   isHistory,
-  timestamp,
 }: {
   content: string;
   isHistory?: boolean;
-  timestamp?: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(!isHistory);
   const safeContent = typeof content === 'string' ? content : String(content || '');
@@ -1479,9 +1570,6 @@ function CollapsibleUserContent({
           <span>{isExpanded ? "收起" : `展开全部 (${lines.length} 行)`}</span>
         </button>
       )}
-      <div className="text-xs mt-2 text-zinc-400 text-right">
-        {formatMessageTime(timestamp)}
-      </div>
     </>
   );
 }
