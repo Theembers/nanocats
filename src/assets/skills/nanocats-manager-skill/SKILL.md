@@ -20,7 +20,7 @@ description: 管理 Agent 生命周期、配置、Skills、Teams 及共享配置
 python3 nanocat-api.py <port> <command> [args...]
 ```
 
-> **端口说明**: nanocat-manager 默认端口可能是 18789, 18790, 3000, 3001 等，通过 UI 确认实际端口。`<port>` 是第一个参数。
+> **端口发现**: nanocat-manager 端口可能变化，**使用前必须自动探测**。执行 `nc -z -w1 127.0.0.1 {port}` 测试 3000、18789 等常用端口，连接成功的即为 manager API 端口。
 
 ---
 
@@ -156,9 +156,20 @@ python3 nanocat-api.py 3000 shared-config apply
 
 ---
 
+## 端口自动发现
+
+调用 skill 前，**必须先自动发现 manager API 端口**：
+
+```bash
+# 方法：探测常用端口，返回第一个 open 的
+for port in 3000 18789 8080; do
+  nc -z -w1 127.0.0.1 $port 2>/dev/null && echo "Found: $port" && break
+done
+```
+
 ## 注意事项
 
-1. `<port>` 是 **必需的第一个参数**
+1. **先探测端口，再调用 skill** — 不要假设端口号
 2. 所有 `<xxx>` 占位符需替换为实际值
 3. JSON 内容用单引号包裹
 4. 需要 `requests` 库（通常已预装）

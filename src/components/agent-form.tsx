@@ -119,12 +119,11 @@ export function AgentForm() {
           name="basePath"
           type="text"
           value={formData.basePath}
-          onChange={handleChange}
-          placeholder="~/agents/"
-          className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
+          readOnly
+          className="w-full px-4 py-2.5 rounded-lg bg-zinc-900 border border-white/5 text-zinc-500 cursor-not-allowed"
         />
         <p className="text-sm text-zinc-500">
-          Directory where agent workspace will be created
+          Directory where agent workspace will be created (fixed to ~/agents/)
         </p>
       </div>
 
