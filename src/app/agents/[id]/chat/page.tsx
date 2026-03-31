@@ -1319,24 +1319,30 @@ function Paragraph({ children, ...props }: any) {
 
 // Markdown 渲染组件配置
 const markdownComponents: Components = {
-  // 代码块
-  code({ node, inline, className, children, ...props }: any) {
-    if (inline) {
+  // 代码块/行内代码 - 通过 className 区分
+  code({ node, className, children, ...props }: any) {
+    // 有 className 且包含 language- 前缀的是代码块
+    const isCodeBlock = className && className.includes('language-');
+    
+    if (!isCodeBlock) {
+      // 行内代码 - 字体颜色与代码块保持一致
       return (
-        <code className="px-1.5 py-0.5 rounded bg-zinc-700/50 text-orange-400 text-sm font-mono" {...props}>
+        <code className="px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-200 text-sm font-mono" {...props}>
           {children}
         </code>
       );
     }
+    
+    // 代码块
     return (
       <CodeBlock className={className}>
         {children}
       </CodeBlock>
     );
   },
-  // pre 标签 - 直接返回 children，让 CodeBlock 处理
+  // pre 标签 - 正常渲染，让 code 组件处理
   pre({ children, ...props }: any) {
-    return children;
+    return <pre {...props}>{children}</pre>;
   },
   // 链接
   a({ children, href, ...props }: any) {
