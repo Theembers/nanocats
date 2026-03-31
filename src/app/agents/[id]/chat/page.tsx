@@ -1245,16 +1245,15 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
   const language = className?.replace(/language-/, "") || "code";
 
   return (
-    <span className="group relative block">
-      <span className="absolute right-2 top-2 z-10 flex items-center gap-2">
-        {language && (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-800/50">
-            {language}
-          </span>
-        )}
+    <figure className="group relative my-3 rounded-lg bg-[#0d1117] border border-zinc-800 overflow-hidden block">
+      {/* 头部：语言标签和复制按钮 */}
+      <figcaption className="flex items-center justify-between px-3 py-2 bg-zinc-800/50 border-b border-zinc-800">
+        <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-mono">
+          {language}
+        </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800/80 hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-all"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-700/50 hover:bg-zinc-700 transition-all"
         >
           {copied ? (
             <>
@@ -1268,11 +1267,14 @@ function CodeBlock({ children, className }: { children: React.ReactNode; classNa
             </>
           )}
         </button>
-      </span>
-      <code ref={codeRef} className={className}>
-        {children}
-      </code>
-    </span>
+      </figcaption>
+      {/* 代码内容 */}
+      <div className="overflow-x-auto p-4">
+        <code ref={codeRef} className={`${className} text-sm font-mono text-zinc-200`}>
+          {children}
+        </code>
+      </div>
+    </figure>
   );
 }
 
@@ -1282,7 +1284,7 @@ const markdownComponents: Components = {
   code({ node, inline, className, children, ...props }: any) {
     if (inline) {
       return (
-        <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-orange-400 text-sm font-mono" {...props}>
+        <code className="px-1.5 py-0.5 rounded bg-zinc-700/50 text-orange-400 text-sm font-mono" {...props}>
           {children}
         </code>
       );
@@ -1293,13 +1295,9 @@ const markdownComponents: Components = {
       </CodeBlock>
     );
   },
-  // pre 标签
+  // pre 标签 - 使用 CodeBlock 处理，这里返回原始结构
   pre({ children, ...props }: any) {
-    return (
-      <pre className="relative overflow-x-auto rounded-lg bg-[#0d1117] p-4 text-sm border border-zinc-800" {...props}>
-        {children}
-      </pre>
-    );
+    return children;
   },
   // 链接
   a({ children, href, ...props }: any) {
