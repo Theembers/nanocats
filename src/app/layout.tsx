@@ -49,7 +49,6 @@ export default function RootLayout({
             {/* Navigation */}
             <nav className="flex items-center gap-1">
               <NavLink href="/" label="Agents" />
-              <NavLink href="/teams" label="Teams" />
             </nav>
           </div>
         </header>

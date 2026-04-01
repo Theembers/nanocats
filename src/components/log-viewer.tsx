@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { AgentLog } from "@/lib/types";
 
@@ -135,8 +135,19 @@ export function LogViewer({ agentName }: LogViewerProps) {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const copyToClipboard = useCallback(async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 1500);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  }, []);
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/agents/${agentName}/logs`);
@@ -234,7 +245,7 @@ export function LogViewer({ agentName }: LogViewerProps) {
               <div 
                 key={index} 
                 className={cn(
-                  "flex gap-2 items-center hover:bg-zinc-900 rounded px-1 -mx-1 text-xs leading-normal py-0.5",
+                  "group flex gap-2 items-center hover:bg-zinc-900 rounded px-1 -mx-1 text-xs leading-normal py-0.5",
                   bgClass
                 )}
               >
@@ -249,13 +260,28 @@ export function LogViewer({ agentName }: LogViewerProps) {
                 {levelLabel}
                 <span
                   className={cn(
-                    "truncate",
+                    "truncate flex-1 min-w-0",
                     getContentColor(parsed.level, log.stream)
                   )}
                   title={parsed.raw}
                 >
                   {parsed.message}
                 </span>
+                {/* Copy button - shows on hover */}
+                <button
+                  onClick={() => copyToClipboard(parsed.raw, index)}
+                  className={cn(
+                    "shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-white/10",
+                    copiedIndex === index ? "opacity-100 text-green-400" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                  title="复制日志行"
+                >
+                  {copiedIndex === index ? (
+                    <CheckIcon className="w-3.5 h-3.5" />
+                  ) : (
+                    <CopyIcon className="w-3.5 h-3.5" />
+                  )}
+                </button>
               </div>
             );
           })
@@ -263,5 +289,23 @@ export function LogViewer({ agentName }: LogViewerProps) {
         <div ref={bottomRef} />
       </div>
     </div>
+  );
+}
+
+// Icon Components
+function CopyIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   );
 }

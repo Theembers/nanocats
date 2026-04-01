@@ -6,14 +6,13 @@ import Link from "next/link";
 import { AgentCard } from "@/components/agent-card";
 import { StartupLogPanel } from "@/components/startup-log-panel";
 import { OpenSpaceDashboardCard } from "@/components/openspace-dashboard-card";
-import { AgentInstance, Team } from "@/lib/types";
+import { AgentInstance } from "@/lib/types";
 
 // 动画延迟工具
 const staggerDelay = (index: number) => ({ animationDelay: `${index * 0.1}s` });
 
 export default function DashboardPage() {
   const [agents, setAgents] = useState<AgentInstance[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [nanobotVersion, setNanobotVersion] = useState<string | null>(null);
   const [versionLoading, setVersionLoading] = useState(false);
@@ -31,18 +30,6 @@ export default function DashboardPage() {
       console.error("Failed to fetch agents:", error);
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const fetchTeams = useCallback(async () => {
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setTeams(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch teams:", error);
     }
   }, []);
 
@@ -87,21 +74,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchAgents();
-    fetchTeams();
     fetchNanobotVersion();
     // Agents 轮询：10秒
     const agentsInterval = setInterval(fetchAgents, 10000);
-    // Teams 轮询：30秒
-    const teamsInterval = setInterval(fetchTeams, 30000);
     return () => {
       clearInterval(agentsInterval);
-      clearInterval(teamsInterval);
     };
-  }, [fetchAgents, fetchTeams, fetchNanobotVersion]);
+  }, [fetchAgents, fetchNanobotVersion]);
 
   const runningCount = agents.filter((a) => a.status === "running").length;
   const stoppedCount = agents.filter((a) => a.status === "stopped").length;
-  const activeTeamsCount = teams.filter((t) => t.status === "active").length;
 
   return (
     <div>
@@ -176,25 +158,6 @@ export default function DashboardPage() {
                   <span className="text-white font-semibold">{stoppedCount}</span> Stopped
                 </span>
               </div>
-            </div>
-          </div>
-
-          {/* Teams Stats Card */}
-          <div className="bg-zinc-900/90 p-6 rounded-xl min-h-[138px] flex flex-col" style={{ animationDelay: "0.2s" }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sky-500/70 text-[11px] font-semibold mb-2 uppercase tracking-widest">Teams</p>
-                <p className="font-heading text-4xl font-bold text-sky-400">{teams.length}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-sky-500/10 text-sky-400">
-                <UsersIcon className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-auto pt-4 border-t border-zinc-800/50">
-              <div className="w-2 h-2 rounded-full bg-sky-400" />
-              <span className="text-sm text-zinc-400">
-                <span className="text-white font-semibold">{activeTeamsCount}</span> Active
-              </span>
             </div>
           </div>
 
@@ -287,17 +250,6 @@ function BoxesIcon({ className }: { className?: string }) {
       <path d="M12 8 7.26 5.15" />
       <path d="m12 8 4.74-2.85" />
       <path d="M12 13.5V8" />
-    </svg>
-  );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

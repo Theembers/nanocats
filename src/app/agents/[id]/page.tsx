@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { StartupLogPanel } from "@/components/startup-log-panel";
-import { AgentInstance, Team } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
+import { AgentInstance } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +27,6 @@ export default function AgentDetailPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-  const [addToTeamOpen, setAddToTeamOpen] = useState(false);
-  const [bindingLoading, setBindingLoading] = useState<string | null>(null);
   const [setRoleOpen, setSetRoleOpen] = useState(false);
   const [setRoleLoading, setSetRoleLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"manager" | "member" | "">("");
@@ -54,81 +48,9 @@ export default function AgentDetailPage() {
     }
   };
 
-  const fetchTeams = async () => {
-    setTeamsLoading(true);
-    try {
-      const res = await fetch("/api/teams");
-      if (res.ok) {
-        const data = await res.json();
-        setTeams(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch teams:", error);
-    } finally {
-      setTeamsLoading(false);
-    }
-  };
-
-  const handleBindTeam = async (teamName: string) => {
-    if (!agent) return;
-    setBindingLoading(teamName);
-    setFeedback(null);
-    try {
-      const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // 使用 agent.name 作为 agentId（name 现在是主键）
-        body: JSON.stringify({ agentId: agent.name }),
-      });
-      if (res.ok) {
-        setFeedback({ type: "success", message: `Added to ${teamName} successfully` });
-        await fetchAgent();
-        setAddToTeamOpen(false);
-      } else {
-        const data = await res.json();
-        setFeedback({ type: "error", message: data.error || "Failed to add to team" });
-      }
-    } catch (error) {
-      setFeedback({ type: "error", message: "Failed to add to team" });
-    } finally {
-      setBindingLoading(null);
-    }
-  };
-
-  const handleUnbindTeam = async (teamName: string) => {
-    if (!agent) return;
-    setBindingLoading(teamName);
-    setFeedback(null);
-    try {
-      const res = await fetch(`/api/teams/${teamName}/bind-agent`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        // 使用 agent.name 作为 agentId（name 现在是主键）
-        body: JSON.stringify({ agentId: agent.name }),
-      });
-      if (res.ok) {
-        setFeedback({ type: "success", message: `Removed from ${teamName} successfully` });
-        await fetchAgent();
-      } else {
-        const data = await res.json();
-        setFeedback({ type: "error", message: data.error || "Failed to remove from team" });
-      }
-    } catch (error) {
-      setFeedback({ type: "error", message: "Failed to remove from team" });
-    } finally {
-      setBindingLoading(null);
-    }
-  };
-
   useEffect(() => {
     fetchAgent();
   }, [id]);
-
-  useEffect(() => {
-    if (addToTeamOpen) {
-      fetchTeams();
-    }
-  }, [addToTeamOpen]);
 
   const handleStart = async () => {
     setActionLoading("start");
@@ -478,183 +400,82 @@ export default function AgentDetailPage() {
               </div>
             </div>
 
-                       {/* Role + Teams 在同一行 */}
-            <div className="col-span-3 grid grid-cols-2 gap-4">
-              {/* Role */}
-              <div className="p-4 rounded-lg bg-zinc-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShieldIcon className="w-4 h-4 text-zinc-500" />
-                    <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Role</label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {agent.role ? (
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        agent.role === "manager"
-                          ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                          : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                      }`}>
-                        {agent.role === "manager" ? "Manager" : "Member"}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-zinc-500">No role assigned</span>
-                    )}
-                    <Dialog open={setRoleOpen} onOpenChange={setSetRoleOpen}>
-                      <DialogTrigger
-                        render={
-                          <button
-                            className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors border border-white/10"
-                            onClick={() => {
-                              setSelectedRole(agent.role || "");
-                              setSetRoleOpen(true);
-                            }}
-                          >
-                            SET ROLE
-                          </button>
-                        }
-                      />
-                      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
-                        <DialogHeader>
-                          <DialogTitle className="text-white uppercase tracking-wider">Set Agent Role</DialogTitle>
-                          <DialogDescription className="text-zinc-400">
-                            Assign a role to this agent to enable shared configuration management.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-4 space-y-4">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-medium text-zinc-300">Role</label>
-                            <select
-                              value={selectedRole}
-                              onChange={(e) => setSelectedRole(e.target.value as "manager" | "member" | "")}
-                              className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
-                            >
-                              <option value="">No specific role</option>
-                              <option value="manager">Manager (can manage shared config)</option>
-                              <option value="member">Member (uses shared config)</option>
-                            </select>
-                            <p className="text-sm text-zinc-500">
-                              {selectedRole === "manager" && "Manager agents can manage shared skills and MCP configuration."}
-                              {selectedRole === "member" && "Member agents will use shared skills and MCP configuration."}
-                              {selectedRole === "" && "No role - the agent will not participate in shared configuration."}
-                            </p>
-                          </div>
-                          <div className="flex gap-3 pt-2">
-                            <button
-                              onClick={handleSetRole}
-                              disabled={setRoleLoading}
-                              className="px-4 py-2 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium disabled:opacity-50"
-                            >
-                              {setRoleLoading ? "Saving..." : "Save"}
-                            </button>
-                            <button
-                              onClick={() => setSetRoleOpen(false)}
-                              className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+            {/* Role */}
+            <div className="col-span-3 p-4 rounded-lg bg-zinc-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldIcon className="w-4 h-4 text-zinc-500" />
+                  <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Role</label>
                 </div>
-              </div>
-
-              {/* Teams */}
-              <div className="p-4 rounded-lg bg-zinc-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <UsersIcon className="w-4 h-4 text-zinc-500" />
-                    <label className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Teams</label>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {agent.teamBindings && agent.teamBindings.length > 0 ? (
-                      agent.teamBindings.map((binding) => (
-                        <div key={binding.teamName} className="flex items-center gap-1">
-                          <Link href={`/teams/${binding.teamName}`}>
-                            <Badge
-                              variant="secondary"
-                              className="cursor-pointer hover:bg-zinc-700 transition-colors"
-                            >
-                              {binding.teamName}
-                            </Badge>
-                          </Link>
-                          <button
-                            onClick={() => handleUnbindTeam(binding.teamName)}
-                            disabled={bindingLoading === binding.teamName}
-                            className="w-4 h-4 flex items-center justify-center rounded-full bg-zinc-700 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors text-xs border border-white/10"
-                            title="Unbind"
+                <div className="flex items-center gap-2">
+                  {agent.role ? (
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      agent.role === "manager"
+                        ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                        : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    }`}>
+                      {agent.role === "manager" ? "Manager" : "Member"}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-zinc-500">No role assigned</span>
+                  )}
+                  <Dialog open={setRoleOpen} onOpenChange={setSetRoleOpen}>
+                    <DialogTrigger
+                      render={
+                        <button
+                          className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors border border-white/10"
+                          onClick={() => {
+                            setSelectedRole(agent.role || "");
+                            setSetRoleOpen(true);
+                          }}
+                        >
+                          SET ROLE
+                        </button>
+                      }
+                    />
+                    <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="text-white uppercase tracking-wider">Set Agent Role</DialogTitle>
+                        <DialogDescription className="text-zinc-400">
+                          Assign a role to this agent to enable shared configuration management.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-4 space-y-4">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-zinc-300">Role</label>
+                          <select
+                            value={selectedRole}
+                            onChange={(e) => setSelectedRole(e.target.value as "manager" | "member" | "")}
+                            className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
                           >
-                            {bindingLoading === binding.teamName ? "..." : "×"}
+                            <option value="">No specific role</option>
+                            <option value="manager">Manager (can manage shared config)</option>
+                            <option value="member">Member (uses shared config)</option>
+                          </select>
+                          <p className="text-sm text-zinc-500">
+                            {selectedRole === "manager" && "Manager agents can manage shared skills and MCP configuration."}
+                            {selectedRole === "member" && "Member agents will use shared skills and MCP configuration."}
+                            {selectedRole === "" && "No role - the agent will not participate in shared configuration."}
+                          </p>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            onClick={handleSetRole}
+                            disabled={setRoleLoading}
+                            className="px-4 py-2 rounded-lg bg-orange-500/20 border border-orange-500/50 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400 font-medium disabled:opacity-50"
+                          >
+                            {setRoleLoading ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            onClick={() => setSetRoleOpen(false)}
+                            className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium"
+                          >
+                            Cancel
                           </button>
                         </div>
-                      ))
-                    ) : (
-                      <span className="text-sm text-zinc-500">NOT IN ANY TEAM</span>
-                    )}
-                    <Dialog open={addToTeamOpen} onOpenChange={setAddToTeamOpen}>
-                      <DialogTrigger
-                        render={
-                          <button className="ml-2 px-3 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium transition-colors border border-white/10">
-                            ADD TO TEAM
-                          </button>
-                        }
-                      />
-                      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
-                        <DialogHeader>
-                          <DialogTitle className="text-white uppercase tracking-wider">Add to Team</DialogTitle>
-                          <DialogDescription className="text-zinc-400">
-                            Select a team to add this agent to
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-4 max-h-80 overflow-y-auto">
-                          {teamsLoading ? (
-                            <div className="text-center py-8 text-zinc-500">Loading teams...</div>
-                          ) : teams.length === 0 ? (
-                            <div className="text-center py-8 text-zinc-500">No teams available</div>
-                          ) : (
-                            <div className="space-y-2">
-                              {teams
-                                .filter(
-                                  (team) =>
-                                    !agent.teamBindings?.some(
-                                      (binding) => binding.teamName === team.name
-                                    )
-                                )
-                                .map((team) => (
-                                  <button
-                                    key={team.name}
-                                    onClick={() => handleBindTeam(team.name)}
-                                    disabled={bindingLoading === team.name}
-                                    className="w-full p-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-left transition-colors disabled:opacity-50"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <div className="font-medium text-zinc-200">{team.name}</div>
-                                        <div className="text-sm text-zinc-500">{team.description}</div>
-                                      </div>
-                                      <div className="text-sm text-zinc-500">
-                                        {team.agents?.length || 0} members
-                                      </div>
-                                    </div>
-                                  </button>
-                                ))}
-                              {teams.filter(
-                                (team) =>
-                                  !agent.teamBindings?.some(
-                                    (binding) => binding.teamName === team.name
-                                  )
-                              ).length === 0 && (
-                                <div className="text-center py-8 text-zinc-500">
-                                  All teams already have this agent
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
             </div>

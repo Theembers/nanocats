@@ -50,7 +50,6 @@ export async function findNanobotBinary(): Promise<string> {
     // 其他路径
     "/opt/homebrew/bin/nanobot",
     "/usr/local/bin/nanobot",
-    path.join(homeDir, "workspace/ai/ClawTeam/.venv/bin/nanobot"),
     path.join(homeDir, "workspace/ai/nanobot/.venv/bin/nanobot"),
   ];
 
