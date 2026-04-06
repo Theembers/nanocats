@@ -20,6 +20,9 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Nanocats Manager",
   description: "Manage your nanobot agent instances",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

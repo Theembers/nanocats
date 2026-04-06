@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import path from "path";
+import os from "os";
 
 const execFileAsync = promisify(execFile);
+
+// uv 二进制文件的绝对路径
+const UV_BIN = path.join(os.homedir(), ".local", "bin", "uv");
 
 /**
  * POST /api/nanobot/update - 更新 nanobot
@@ -12,7 +17,7 @@ export async function POST() {
   try {
     const nanobotPath = "/Users/theembersguo/workspace/ai/nanobot";
 
-    const { stdout, stderr } = await execFileAsync("uv", [
+    const { stdout, stderr } = await execFileAsync(UV_BIN, [
       "tool",
       "install",
       "--editable",
