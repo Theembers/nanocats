@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    const skillsDir = path.join(agent.workspacePath, "workspace", "skills");
+    const skillsDir = path.join(agent.workspacePath, "skills");
     
     if (!fs.existsSync(skillsDir)) {
       return NextResponse.json({ skills: [] });

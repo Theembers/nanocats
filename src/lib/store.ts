@@ -13,6 +13,11 @@ const NANOBOT_DIR_PREFIX = ".nanobot-";
 // ==================== 共享配置相关常量 ====================
 
 export const SHARED_CONFIG_DIR = path.join(STORE_DIR, "shared-config");
+
+// ==================== 备份相关常量 ====================
+
+export const BACKUP_DIR = path.join(STORE_DIR, "backups");
+export const BACKUP_AGENTS_FILE = path.join(BACKUP_DIR, "agents.json");
 export const SHARED_SKILLS_DIR = path.join(SHARED_CONFIG_DIR, "skills");
 export const SHARED_SKILLS_CONFIG = path.join(SHARED_CONFIG_DIR, "skills.json");
 export const SHARED_MCP_CONFIG = path.join(SHARED_CONFIG_DIR, "mcp.json");
@@ -236,8 +241,9 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
         continue;
       }
 
-      const workspacePath = path.join(AGENTS_BASE_PATH, entry.name);
-      const configPath = path.join(workspacePath, "config.json");
+      const agentDir = path.join(AGENTS_BASE_PATH, entry.name);
+      const configPath = path.join(agentDir, "config.json");
+      const workspacePath = path.join(agentDir, "workspace");
 
       // 检查是否有 config.json
       if (!fs.existsSync(configPath)) {
@@ -432,9 +438,9 @@ export function setupMemberSymlinks(agent: AgentInstance): void {
 
   ensureSharedConfig();
 
-  const workspaceSkillsDir = path.join(agent.workspacePath, "workspace", "skills");
+  const workspaceSkillsDir = path.join(agent.workspacePath, "skills");
 
-  // 确保 workspace/skills 目录存在
+  // 确保 skills 目录存在
   if (!fs.existsSync(workspaceSkillsDir)) {
     fs.mkdirSync(workspaceSkillsDir, { recursive: true });
   }
@@ -457,9 +463,9 @@ export function applySharedConfigToAgent(agent: AgentInstance): void {
 
   ensureSharedConfig();
 
-  const workspaceSkillsDir = path.join(agent.workspacePath, "workspace", "skills");
+  const workspaceSkillsDir = path.join(agent.workspacePath, "skills");
 
-  // 确保 workspace/skills 目录存在
+  // 确保 skills 目录存在
   if (!fs.existsSync(workspaceSkillsDir)) {
     fs.mkdirSync(workspaceSkillsDir, { recursive: true });
   }
@@ -540,7 +546,7 @@ function applyMcpConfigToAgent(agent: AgentInstance): void {
  */
 function applySkillsConfigToAgent(agent: AgentInstance): void {
   try {
-    const workspaceSkillsDir = path.join(agent.workspacePath, "workspace", "skills");
+    const workspaceSkillsDir = path.join(agent.workspacePath, "skills");
     
     // 读取启用的 skills 列表
     let enabledSkills: string[] = [];
@@ -594,20 +600,36 @@ function applySkillsConfigToAgent(agent: AgentInstance): void {
 
 /**
  * 清理成员 agent 的符号链接
+ * 读取 skills.json 的 enabled 列表，逐一删除各 skill 的 symlink
  */
 export function cleanupMemberSymlinks(agent: AgentInstance): void {
-  const workspaceSkillsDir = path.join(agent.workspacePath, "workspace", "skills");
-  const sharedSkillsSymlink = path.join(workspaceSkillsDir, SHARED_SKILLS_DIR.split("/").pop()!);
+  const workspaceSkillsDir = path.join(agent.workspacePath, "skills");
 
-  if (fs.existsSync(sharedSkillsSymlink)) {
+  // 读取启用的 skills 列表
+  let enabledSkills: string[] = [];
+  if (fs.existsSync(SHARED_SKILLS_CONFIG)) {
     try {
-      const stats = fs.lstatSync(sharedSkillsSymlink);
-      if (stats.isSymbolicLink()) {
-        fs.unlinkSync(sharedSkillsSymlink);
-        console.log(`[SharedConfig] Removed symlink for agent ${agent.name}: ${sharedSkillsSymlink}`);
+      const config = JSON.parse(fs.readFileSync(SHARED_SKILLS_CONFIG, "utf-8"));
+      enabledSkills = config.enabled || [];
+    } catch {
+      console.error(`[SharedConfig] Failed to parse skills.json when cleaning up symlinks`);
+      return;
+    }
+  }
+
+  // 逐一删除各 skill 的符号链接
+  for (const skillName of enabledSkills) {
+    const skillSymlink = path.join(workspaceSkillsDir, skillName);
+    if (fs.existsSync(skillSymlink)) {
+      try {
+        const stats = fs.lstatSync(skillSymlink);
+        if (stats.isSymbolicLink() || stats.isDirectory()) {
+          fs.rmSync(skillSymlink, { recursive: true, force: true });
+          console.log(`[SharedConfig] Removed skill symlink for agent ${agent.name}: ${skillSymlink}`);
+        }
+      } catch (error) {
+        console.error(`[SharedConfig] Failed to remove skill symlink for agent ${agent.name} (${skillName}):`, error);
       }
-    } catch (error) {
-      console.error(`[SharedConfig] Failed to remove symlink for agent ${agent.name}:`, error);
     }
   }
 }
@@ -617,7 +639,7 @@ export function cleanupMemberSymlinks(agent: AgentInstance): void {
  * 用于创建 Manager 角色 agent 时自动安装
  */
 export function setupManagerSkill(agent: AgentInstance): void {
-  const managerSkillDir = path.join(agent.workspacePath, "workspace", "skills", MANAGER_SKILL_NAME);
+  const managerSkillDir = path.join(agent.workspacePath, "skills", MANAGER_SKILL_NAME);
 
   // 如果已存在，跳过
   if (fs.existsSync(managerSkillDir)) {
@@ -705,4 +727,107 @@ export function getMemberAgentNames(): string[] {
  */
 export function getSharedConfigAgentNames(): string[] {
   return getSharedConfigAgents().map((agent) => agent.name);
+}
+
+// ==================== 备份功能 ====================
+
+/**
+ * 确保备份目录存在
+ */
+export function ensureBackupDir(): void {
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+}
+
+/**
+ * 获取备份目录中的 agent 列表
+ * 扫描 ~/.nanocats-manager/backups/ 目录下的 .nanobot-* 目录
+ */
+export function getBackupAgents(): { name: string; backupPath: string; backedUpAt: string }[] {
+  ensureBackupDir();
+  
+  try {
+    const entries = fs.readdirSync(BACKUP_DIR, { withFileTypes: true });
+    const backups: { name: string; backupPath: string; backedUpAt: string }[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith(NANOBOT_DIR_PREFIX)) {
+        continue;
+      }
+
+      const name = entry.name.slice(NANOBOT_DIR_PREFIX.length);
+      const backupPath = path.join(BACKUP_DIR, entry.name);
+      
+      // 获取目录修改时间作为备份时间
+      const stat = fs.statSync(backupPath);
+      
+      backups.push({
+        name,
+        backupPath,
+        backedUpAt: stat.mtime.toISOString(),
+      });
+    }
+
+    return backups;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 假删除 agent（备份整个目录）
+ * 1. 停止运行中的进程
+ * 2. 将整个 agent 目录移动到备份目录
+ * 3. 从主存储中移除
+ * 返回备份信息
+ */
+export function softDeleteAgent(name: string): { name: string; backupPath: string } | undefined {
+  const agents = ensureStore();
+  const index = agents.findIndex((agent) => agent.name === name);
+
+  if (index === -1) {
+    return undefined;
+  }
+
+  const agent = agents[index];
+  const agentDir = path.dirname(agent.configPath);
+  
+  // 检查 agent 目录是否存在
+  if (!fs.existsSync(agentDir)) {
+    console.error(`[Backup] Agent directory does not exist: ${agentDir}`);
+    return undefined;
+  }
+
+  ensureBackupDir();
+  
+  const backupDirName = `${NANOBOT_DIR_PREFIX}${name}`;
+  const backupPath = path.join(BACKUP_DIR, backupDirName);
+
+  // 如果备份目录已存在，先删除旧备份
+  if (fs.existsSync(backupPath)) {
+    try {
+      fs.rmSync(backupPath, { recursive: true, force: true });
+      console.log(`[Backup] Removed old backup: ${backupPath}`);
+    } catch (error) {
+      console.error(`[Backup] Failed to remove old backup: ${backupPath}`, error);
+      return undefined;
+    }
+  }
+
+  // 移动整个 agent 目录到备份
+  try {
+    fs.renameSync(agentDir, backupPath);
+    console.log(`[Backup] Moved agent directory to backup: ${agentDir} -> ${backupPath}`);
+  } catch (error) {
+    console.error(`[Backup] Failed to move agent directory: ${agentDir} -> ${backupPath}`, error);
+    return undefined;
+  }
+
+  // 从主存储中移除
+  agents.splice(index, 1);
+  saveStore(agents);
+
+  console.log(`[Backup] Agent "${name}" has been backed up to: ${backupPath}`);
+  return { name, backupPath };
 }

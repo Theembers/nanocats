@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 源路径：管理员 agent 的 workspace/skills/{skillPath}
-    const sourcePath = path.join(agent.workspacePath, "workspace", "skills", skillPath);
+    const sourcePath = path.join(agent.workspacePath, "skills", skillPath);
     const sourceSkillMd = path.join(sourcePath, "SKILL.md");
 
     if (!fs.existsSync(sourceSkillMd)) {

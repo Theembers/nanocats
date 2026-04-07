@@ -424,7 +424,7 @@ export default function CronPage() {
             </CardContent>
           </Card>
 
-          <FileEditor agentName={id} filePath="workspace/cron/jobs.json" fileName="jobs.json" description="Cron job definitions in JSON format" language="json" />
+          <FileEditor agentName={id} filePath="cron/jobs.json" fileName="jobs.json" description="Cron job definitions in JSON format" language="json" />
         </div>
       ) : (
         <Card className="glass-card border-0 overflow-hidden">

@@ -225,13 +225,18 @@ class ProcessManager {
       console.log(`[Env] Custom env keys passed to process: ${customKeys.join(", ")}`);
     }
 
+    // nanobot 会在 cwd 下 source .env 文件，所以 cwd 必须指向 Agent 根目录（.env 所在目录）
+    // agent.workspacePath = ~/agents/.nanobot-{name}/workspace
+    // agent.configPath = ~/agents/.nanobot-{name}/config.json
+    const agentDir = path.dirname(agent.configPath);
+
     const childProcess = spawn(
       nanobotPath,
       cliArgs,
       {
         detached: false,
         stdio: ["ignore", "pipe", "pipe"],
-        cwd: agent.workspacePath,
+        cwd: agentDir,
         env: envVars,
       }
     );

@@ -12,31 +12,31 @@ const WORKSPACE_FILES = [
   {
     id: "agents",
     name: "AGENTS.md",
-    path: "workspace/AGENTS.md",
+    path: "AGENTS.md",
     description: "Agent personality and behavior configuration",
   },
   {
     id: "soul",
     name: "SOUL.md",
-    path: "workspace/SOUL.md",
+    path: "SOUL.md",
     description: "Core identity and values definition",
   },
   {
     id: "user",
     name: "USER.md",
-    path: "workspace/USER.md",
+    path: "USER.md",
     description: "User preferences and context",
   },
   {
     id: "tools",
     name: "TOOLS.md",
-    path: "workspace/TOOLS.md",
+    path: "TOOLS.md",
     description: "Available tools and capabilities",
   },
   {
     id: "heartbeat",
     name: "HEARTBEAT.md",
-    path: "workspace/HEARTBEAT.md",
+    path: "HEARTBEAT.md",
     description: "Health check and monitoring configuration",
   },
 ];

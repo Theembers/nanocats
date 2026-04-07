@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // 构造 session 目录路径
-    const sessionsDir = path.join(agent.workspacePath, "workspace", "sessions");
+    const sessionsDir = path.join(agent.workspacePath, "sessions");
 
     // 如果目录不存在，返回空数组
     if (!fs.existsSync(sessionsDir)) {

@@ -70,7 +70,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const sessionFileName = `webchat_webchat_web_${name}.jsonl`;
     const sessionFilePath = path.join(
       agent.workspacePath,
-      "workspace",
       "sessions",
       sessionFileName
     );

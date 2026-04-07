@@ -38,7 +38,7 @@ function expandPath(p: string): string {
 /**
  * 默认 agents 基础路径
  */
-const DEFAULT_AGENTS_PATH = "/Users/theembersguo/agents";
+const DEFAULT_AGENTS_PATH = path.join(os.homedir(), "agents");
 
 /**
  * GET /api/agents - List all agent instances

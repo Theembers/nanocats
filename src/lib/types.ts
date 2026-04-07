@@ -12,6 +12,8 @@ export interface AgentInstance {
   pid?: number;
   createdAt: string;
   role?: AgentRole;  // Agent 角色：manager 或 member
+  deleted?: boolean; // 假删除标记
+  deletedAt?: string; // 删除时间
 }
 
 // ==================== Shared Config Types ====================

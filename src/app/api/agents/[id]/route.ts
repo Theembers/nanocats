@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAgent, updateAgent, deleteAgent, updateAgentRole } from "@/lib/store";
+import { getAgent, updateAgent, updateAgentRole, softDeleteAgent } from "@/lib/store";
 import { processManager } from "@/lib/process-manager";
-import fs from "fs";
-import path from "path";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -101,7 +99,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 /**
- * DELETE /api/agents/[id] - Delete agent
+ * DELETE /api/agents/[id] - Delete agent (backup entire directory)
+ * 将整个 agent 目录移动到备份目录 ~/.nanocats-manager/backups/
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
@@ -116,35 +115,24 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Stop the process if running
-    // 使用 agent.name 停止进程
     if (processManager.isRunning(agent.name)) {
       await processManager.stopGateway(agent.name);
     }
 
-    // Delete the agent workspace directory from filesystem
-    try {
-      if (fs.existsSync(agent.workspacePath)) {
-        fs.rmSync(agent.workspacePath, { recursive: true, force: true });
-      }
-    } catch (fsError) {
-      console.error("Failed to delete agent workspace:", fsError);
+    // 假删除：备份整个 agent 目录
+    const backupResult = softDeleteAgent(name);
+    if (!backupResult) {
       return NextResponse.json(
-        { error: "Failed to delete agent workspace files" },
+        { error: "Failed to backup agent" },
         { status: 500 }
       );
     }
 
-    // Remove from store
-    const deleted = deleteAgent(name);
-
-    if (!deleted) {
-      return NextResponse.json(
-        { error: "Failed to delete agent" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: `Agent "${name}" has been backed up to: ${backupResult.backupPath}`,
+      backupPath: backupResult.backupPath,
+    });
   } catch (error) {
     console.error("DELETE /api/agents/[id] error:", error);
     return NextResponse.json(

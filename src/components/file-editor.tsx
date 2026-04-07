@@ -39,10 +39,11 @@ export function FileEditor({
         const data = await res.json();
         setContent(data.content || "");
       } else {
-        setError("Failed to load file");
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(errorData.error || `Failed to load file: ${res.status}`);
       }
     } catch (err) {
-      setError("Failed to load file");
+      setError(err instanceof Error ? err.message : "Failed to load file");
     } finally {
       setLoading(false);
     }

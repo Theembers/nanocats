@@ -146,7 +146,7 @@ export default function SkillsPage() {
                           <div className="flex-1 overflow-hidden p-6">
                             <FileEditor
                               agentName={id}
-                              filePath={`workspace/skills/${skill.path}/SKILL.md`}
+                              filePath={`skills/${skill.path}/SKILL.md`}
                               fileName="SKILL.md"
                               description={`Editing skill: ${skill.name}`}
                               language="markdown"

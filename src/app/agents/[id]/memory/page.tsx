@@ -12,14 +12,14 @@ const MEMORY_FILES = [
   {
     id: "memory",
     name: "MEMORY.md",
-    path: "workspace/memory/MEMORY.md",
+    path: "memory/MEMORY.md",
     description: "Long-term memory and knowledge storage",
   },
   {
     id: "history",
-    name: "HISTORY.md",
-    path: "workspace/memory/HISTORY.md",
-    description: "Conversation history and context",
+    name: "history.jsonl",
+    path: "memory/history.jsonl",
+    description: "Conversation history archive (JSONL format)",
   },
 ];
 
