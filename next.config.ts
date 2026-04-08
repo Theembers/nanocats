@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // 允许开发环境跨域访问
+  allowedDevOrigins: ["192.168.20.200", "localhost"],
 };
 
 export default nextConfig;
