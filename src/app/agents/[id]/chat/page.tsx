@@ -288,10 +288,7 @@ export default function AgentChatPage() {
         break;
 
       case "tool_call":
-        console.log("[tool_call] 处理工具调用:", { content: data.content });
-        // 解析多个工具调用
         const toolHints = parseMultipleToolCalls(data.content);
-        console.log("[tool_call] 解析出", toolHints.length, "个工具调用:", toolHints);
         const newToolExecutingList: ToolExecuting[] = toolHints.map((hint, index) => ({
           id: `tool_exec_${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${index}`,
           name: extractToolName(hint),
@@ -299,14 +296,7 @@ export default function AgentChatPage() {
           timestamp: new Date().toISOString(),
         }));
         setMessages((prev) => {
-          console.log("[tool_call] 更新前的消息状态:", prev.length, "条消息");
           const lastMessage = prev[prev.length - 1];
-          console.log("[tool_call] 最后一条消息:", { 
-            type: lastMessage?.type, 
-            isStreaming: lastMessage?.isStreaming,
-            hasToolExecuting: !!lastMessage?.toolExecuting,
-            toolExecutingLength: lastMessage?.toolExecuting?.length
-          });
           // 如果最后一条是正在流式的 bot 消息，追加工具调用
           if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
             // 添加到当前消息的工具执行列表
@@ -315,11 +305,9 @@ export default function AgentChatPage() {
               ...lastMessage,
               toolExecuting: [...(lastMessage.toolExecuting || []), ...newToolExecutingList],
             };
-            console.log("[tool_call] 更新现有流式消息，toolExecuting:", updated[updated.length - 1].toolExecuting?.length);
             return updated;
           } else {
             // 创建新的流式消息（工具执行中）
-            console.log("[tool_call] 创建新的流式消息");
             return [
               ...prev,
               {
@@ -335,12 +323,10 @@ export default function AgentChatPage() {
         break;
 
       case "delta":
-        console.log("[delta] 处理流式内容:", { content: data.content?.substring(0, 100), is_end: data.is_end, is_resuming: data.is_resuming });
         // 流式内容增量
         setMessages((prev) => {
           const lastMessage = prev[prev.length - 1];
           if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
-            console.log("[delta] 更新现有流式消息，is_resuming:", data.is_resuming, "is_end:", data.is_end);
             // 更新正在流式传输的消息
             // 只有当 content 有内容时才更新，避免空内容覆盖已有内容
             const updated = [...prev];
@@ -352,15 +338,12 @@ export default function AgentChatPage() {
               toolExecuting: data.is_end && !lastMessage.toolExecuting?.length ? [] : lastMessage.toolExecuting,
               isStreaming: !data.is_end,
             };
-            console.log("[delta] 更新后 toolExecuting:", updated[updated.length - 1].toolExecuting?.length);
             // 流结束时清除 typing 状态
             if (data.is_end) {
-              console.log("[delta] 流结束，清除 typing 状态");
               setIsAgentTyping(false);
             }
             return updated;
           } else {
-            console.log("[delta] 无流式消息可更新，创建新消息");
             // 创建新的流式消息
             return [
               ...prev,
@@ -376,15 +359,12 @@ export default function AgentChatPage() {
         break;
 
       case "message":
-        console.log("[message] 处理最终消息:", { content: data.content?.substring(0, 100) });
         // 最终消息，清空中间状态后添加
         setIsAgentTyping(false);
         setMessages((prev) => {
-          console.log("[message] 更新前的消息状态:", prev.length, "条消息");
           const lastMessage = prev[prev.length - 1];
           // 如果最后一条是正在流式的 bot 消息，用最终内容替换
           if (lastMessage && lastMessage.type === "bot" && lastMessage.isStreaming) {
-            console.log("[message] 替换流式消息，清空中间状态");
             // 将 toolExecuting 转换为 toolCalls（与历史记录保持一致）
             const toolCalls = lastMessage.toolExecuting?.map(tool => ({
               id: tool.id,
@@ -402,10 +382,8 @@ export default function AgentChatPage() {
               toolCalls: toolCalls?.length ? toolCalls : undefined,
               isStreaming: false,
             };
-            console.log("[message] 替换后的消息:", updated[updated.length - 1]);
             return updated;
           }
-          console.log("[message] 无流式消息可替换，添加新消息");
           // 否则添加新消息
           return [
             ...prev,
@@ -799,7 +777,6 @@ export default function AgentChatPage() {
               </div>
             ) : (
               messages.map((msg) => {
-                console.log("[消息渲染] msg id:", msg.id, "type:", msg.type, "toolExecuting:", msg.toolExecuting?.length, "toolCalls:", msg.toolCalls?.length, "content:", msg.content?.substring(0, 50));
                 // Tool result 消息独立渲染（绿色头像）
                 if (msg.type === "tool" && msg.toolResult) {
                   return (
@@ -1229,7 +1206,6 @@ function ToolCallBlock({ toolCalls }: { toolCalls: ToolCall[] }) {
 
 // Tool Executing Block 组件（实时工具执行指示器）
 function ToolExecutingBlock({ tools, isExecuting }: { tools: ToolExecuting[]; isExecuting?: boolean }) {
-  console.log("[ToolExecutingBlock] 渲染，tools 数量:", tools?.length, "isExecuting:", isExecuting);
   return (
     <div className="mb-3 space-y-2">
       {tools.map((tool) => (
