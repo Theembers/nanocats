@@ -279,6 +279,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           
           // 解析 tool_calls
           const toolCalls: ToolCall[] = [];
+          let botAttachments: Attachment[] | undefined;
+          
           if (record.tool_calls && Array.isArray(record.tool_calls)) {
             for (const tc of record.tool_calls) {
               toolCalls.push({
@@ -286,6 +288,45 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 name: tc.function?.name || "unknown",
                 arguments: tc.function?.arguments || "{}",
               });
+              
+              // 如果是 message 工具，提取其中的 media 作为 attachments
+              if (tc.function?.name === "message" && tc.function?.arguments) {
+                try {
+                  const args = JSON.parse(tc.function.arguments);
+                  if (args.media && Array.isArray(args.media)) {
+                    for (const mediaPath of args.media) {
+                      const localPath = typeof mediaPath === "string" ? mediaPath : mediaPath.data;
+                      if (localPath && typeof localPath === "string" && fs.existsSync(localPath)) {
+                        const fileName = path.basename(localPath);
+                        const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                        if (!fs.existsSync(uploadsDir)) {
+                          fs.mkdirSync(uploadsDir, { recursive: true });
+                        }
+                        const destPath = path.join(uploadsDir, fileName);
+                        if (!fs.existsSync(destPath)) {
+                          fs.copyFileSync(localPath, destPath);
+                        }
+                        const ext = path.extname(localPath).toLowerCase();
+                        const mimeMap: Record<string, string> = {
+                          ".png": "image/png",
+                          ".jpg": "image/jpeg",
+                          ".jpeg": "image/jpeg",
+                          ".gif": "image/gif",
+                          ".webp": "image/webp",
+                        };
+                        botAttachments = botAttachments || [];
+                        botAttachments.push({
+                          name: fileName,
+                          type: mimeMap[ext] || "image/png",
+                          preview: `/api/agents/${name}/media?file=${fileName}`,
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // 忽略解析错误
+                }
+              }
             }
           }
 
@@ -296,6 +337,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             timestamp,
             thinkContent: think || undefined,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            attachments: botAttachments,
           });
         }
         // 处理 tool 结果消息

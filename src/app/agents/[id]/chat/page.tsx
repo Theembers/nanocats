@@ -80,6 +80,7 @@ export default function AgentChatPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pendingFiles, setPendingFiles] = useState(0);
   const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // 输入框高度 ref，避免每次 onInput 都触发布局计算
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -510,21 +511,23 @@ export default function AgentChatPage() {
     }
   };
 
-  // 处理输入框内容变化（带防抖优化高度调整）
+  const getMaxHeight = () => {
+    return 160;
+  };
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInputValue(value);
 
-    // 防抖调整高度，避免频繁触发 layout thrashing
     if (inputDebounceRef.current) {
       clearTimeout(inputDebounceRef.current);
     }
     inputDebounceRef.current = setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, getMaxHeight()) + "px";
       }
-    }, 16); // ~1 frame
+    }, 16);
   }, []);
 
   const formatFileSize = (bytes: number): string => {
@@ -798,7 +801,7 @@ export default function AgentChatPage() {
                   );
                 }
 
-                const hasBotContent = msg.type === "bot" && (msg.content || msg.isStreaming || msg.toolCalls?.length || msg.toolExecuting?.length || msg.thinkContent);
+                const hasBotContent = msg.type === "bot" && (msg.content || msg.isStreaming || msg.toolCalls?.length || msg.toolExecuting?.length || msg.thinkContent || msg.attachments?.length);
 
                 return (
                   <div
@@ -830,6 +833,30 @@ export default function AgentChatPage() {
                             {/* Tool Executing Block (实时工具执行) */}
                             {msg.toolExecuting && msg.toolExecuting.length > 0 && (
                               <ToolExecutingBlock tools={msg.toolExecuting} isExecuting={msg.isStreaming && !msg.content} />
+                            )}
+                            {/* Bot Attachments (图片等) */}
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {msg.attachments.map((att, idx) => (
+                                  att.type.startsWith('image/') && att.preview ? (
+                                    <img
+                                      key={idx}
+                                      src={att.preview}
+                                      alt={att.name}
+                                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => setPreviewImage(att.preview)}
+                                    />
+                                  ) : (
+                                    <div key={idx} className="flex items-center gap-1.5 bg-zinc-600/50 rounded px-2 py-1 text-xs">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                                        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                      </svg>
+                                      <span>{att.name}</span>
+                                    </div>
+                                  )
+                                ))}
+                              </div>
                             )}
                             {/* Bot 消息内容 */}
                             {(msg.content || msg.isStreaming) && (
@@ -864,8 +891,8 @@ export default function AgentChatPage() {
                                       key={idx}
                                       src={att.preview}
                                       alt={att.name}
-                                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer"
-                                      onClick={() => window.open(att.preview, '_blank')}
+                                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => setPreviewImage(att.preview)}
                                     />
                                   ) : (
                                     <div key={idx} className="flex items-center gap-1.5 bg-zinc-600/50 rounded px-2 py-1 text-xs">
@@ -979,7 +1006,11 @@ export default function AgentChatPage() {
                 disabled={!isConnected}
                 rows={1}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 disabled:opacity-50 resize-none"
-                style={{ height: "auto", overflow: "hidden" }}
+                style={{ 
+                  height: "auto", 
+                  maxHeight: getMaxHeight() + "px",
+                  overflowY: "auto" 
+                }}
               />
               <button
                 onClick={() => {
@@ -1022,6 +1053,29 @@ export default function AgentChatPage() {
           </div>
         </CardContent>
       </Card>
+
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img 
+              src={previewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
