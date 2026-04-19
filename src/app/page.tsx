@@ -18,6 +18,8 @@ export default function DashboardPage() {
   const [versionLoading, setVersionLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState<"start" | "stop" | null>(null);
+  const [stopConfirm, setStopConfirm] = useState(false);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -49,6 +51,34 @@ export default function DashboardPage() {
       setVersionLoading(false);
     }
   }, []);
+
+  const handleStartAll = async () => {
+    try {
+      setBulkAction("start");
+      const res = await fetch("/api/agents/start-all", { method: "POST" });
+      if (res.ok) {
+        await fetchAgents();
+      }
+    } catch (error) {
+      console.error("Failed to start all agents:", error);
+    } finally {
+      setBulkAction(null);
+    }
+  };
+
+  const handleStopAll = async () => {
+    try {
+      setBulkAction("stop");
+      const res = await fetch("/api/agents/stop-all", { method: "POST" });
+      if (res.ok) {
+        await fetchAgents();
+      }
+    } catch (error) {
+      console.error("Failed to stop all agents:", error);
+    } finally {
+      setBulkAction(null);
+    }
+  };
 
   const handleUpdateNanobot = async () => {
     try {
@@ -159,6 +189,46 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleStartAll}
+                disabled={bulkAction !== null || runningCount === agents.length}
+                className="flex-1 h-8 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 hover:border-green-400/50 text-xs font-medium flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {bulkAction === "start" ? (
+                  <LoadingIcon className="w-3 h-3 animate-spin" />
+                ) : (
+                  <PlayIcon className="w-3 h-3" />
+                )}
+                Start All
+              </button>
+              <button
+                onClick={() => {
+                  if (stopConfirm) {
+                    handleStopAll();
+                    setStopConfirm(false);
+                  } else {
+                    setStopConfirm(true);
+                    setTimeout(() => setStopConfirm(false), 3000);
+                  }
+                }}
+                disabled={bulkAction !== null || runningCount === 0}
+                className={`flex-1 h-8 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  stopConfirm
+                    ? "bg-red-500/30 border-red-400/60 text-red-300 hover:bg-red-500/40 hover:border-red-400"
+                    : "bg-red-500/15 border-red-500/30 text-red-400 hover:bg-red-500/25 hover:border-red-400/50"
+                }`}
+              >
+                {bulkAction === "stop" ? (
+                  <LoadingIcon className="w-3 h-3 animate-spin" />
+                ) : stopConfirm ? (
+                  <WarningIcon className="w-3 h-3" />
+                ) : (
+                  <StopIcon className="w-3 h-3" />
+                )}
+                {stopConfirm ? "Confirm?" : "Stop All"}
+              </button>
+            </div>
           </div>
 
           
@@ -258,6 +328,40 @@ function UpdateIcon({ className }: { className?: string }) {
       <path d="M3 3v5h5" />
       <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
       <path d="M16 21h5v-5" />
+    </svg>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
+function StopIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+    </svg>
+  );
+}
+
+function LoadingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function WarningIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }
