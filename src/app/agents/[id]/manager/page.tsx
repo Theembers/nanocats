@@ -7,14 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Breadcrumb } from "@/components/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { JsonViewer } from "@/components/json-viewer";
 
 interface MemberInfo {
   name: string;
@@ -319,51 +312,14 @@ export default function ManagerPage() {
 
         {/* MCP Tab */}
         <TabsContent value="mcp">
-          <Card className="glass-card border-0">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">MCP Configuration</CardTitle>
-                  <CardDescription className="text-zinc-400">
-                    Configure MCP servers for all member agents
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      try {
-                        setMcpConfig(JSON.stringify(JSON.parse(mcpConfig), null, 2));
-                        setFeedback({ type: "success", message: "JSON formatted" });
-                      } catch {
-                        setFeedback({ type: "error", message: "Invalid JSON" });
-                      }
-                    }}
-                    className="px-4 py-2 rounded-lg glass-button text-zinc-200 font-medium"
-                  >
-                    Format
-                  </button>
-                  <button
-                    onClick={saveMcpConfig}
-                    disabled={saving}
-                    className="px-4 py-2 rounded-lg btn-primary text-white font-medium disabled:opacity-50"
-                  >
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                value={mcpConfig}
-                onChange={(e) => setMcpConfig(e.target.value)}
-                className="w-full min-h-[400px] p-4 rounded-lg bg-zinc-900 border border-white/10 text-zinc-200 font-mono text-sm resize-none focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
-                style={{
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                }}
-                placeholder="Enter MCP configuration in JSON format..."
-              />
-            </CardContent>
-          </Card>
+          <JsonViewer
+            value={mcpConfig}
+            onChange={setMcpConfig}
+            fileName="mcp.json"
+            description="Configure MCP servers for all member agents"
+            onSave={saveMcpConfig}
+            saving={saving}
+          />
         </TabsContent>
 
         {/* Members Tab */}

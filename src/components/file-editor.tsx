@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { JsonViewer } from "@/components/json-viewer";
 
 interface FileEditorProps {
   agentName: string;
@@ -62,19 +63,6 @@ export function FileEditor({
     return true;
   };
 
-  const handleFormat = () => {
-    setError(null);
-    if (language === "json") {
-      try {
-        const parsed = JSON.parse(content);
-        setContent(JSON.stringify(parsed, null, 2));
-        setFeedback({ type: "success", message: "JSON formatted successfully" });
-      } catch {
-        setError("Invalid JSON format");
-      }
-    }
-  };
-
   const handleSave = async () => {
     setError(null);
     setFeedback(null);
@@ -115,6 +103,22 @@ export function FileEditor({
     );
   }
 
+  if (language === "json") {
+    return (
+      <JsonViewer
+        value={content}
+        onChange={(val) => {
+          setContent(val);
+          setError(null);
+        }}
+        fileName={fileName}
+        description={description}
+        onSave={handleSave}
+        saving={saving}
+      />
+    );
+  }
+
   return (
     <Card className="glass-card border-0">
       <CardHeader>
@@ -126,14 +130,6 @@ export function FileEditor({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {language === "json" && (
-              <button
-                onClick={handleFormat}
-                className="px-3 py-1.5 rounded-lg glass-button text-sm text-zinc-300"
-              >
-                Format JSON
-              </button>
-            )}
             <button
               onClick={handleSave}
               disabled={saving}
