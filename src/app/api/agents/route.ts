@@ -6,12 +6,13 @@ import {
   getAgents,
   createAgent,
   getNextAvailablePort,
+  getNextWebchatPort,
   scanAndLoadAgentsFromDisk,
   setupManagerSkill,
   setupMemberSymlinks,
   ensureSharedConfig,
 } from "@/lib/store";
-import { nanobotOnboard } from "@/lib/nanobot";
+import { generateConfigFromTemplate } from "@/lib/config-template";
 import { processManager } from "@/lib/process-manager";
 import type { AgentInstance } from "@/lib/types";
 import { AGENTS_DIR } from "@/lib/config";
@@ -94,36 +95,17 @@ export async function POST(request: NextRequest) {
     const workspacePath = path.join(agentDir, "workspace");
 
     const finalPort = port ?? getNextAvailablePort();
+    const webchatPort = getNextWebchatPort();
 
-    // 确保 workspace 目录存在
-    if (!fs.existsSync(workspacePath)) {
-      fs.mkdirSync(workspacePath, { recursive: true });
-    }
-
-    await nanobotOnboard(configPath, workspacePath);
-
-    if (provider || apiKey || model) {
-      if (fs.existsSync(configPath)) {
-        const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-
-        // 确保 agents.defaults 存在
-        if (!configData.agents) configData.agents = {};
-        if (!configData.agents.defaults) configData.agents.defaults = {};
-
-        // 设置 provider 和 model 到 agents.defaults
-        if (provider) configData.agents.defaults.provider = provider;
-        if (model) configData.agents.defaults.model = model;
-
-        // 设置 API key 到对应 provider 配置
-        if (apiKey && provider) {
-          if (!configData.providers) configData.providers = {};
-          if (!configData.providers[provider]) configData.providers[provider] = {};
-          configData.providers[provider].apiKey = apiKey;
-        }
-
-        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), "utf-8");
-      }
-    }
+    generateConfigFromTemplate({
+      configPath,
+      workspacePath,
+      gatewayPort: finalPort,
+      webchatPort,
+      model: model || "MiniMax-M2.7",
+      provider: provider || "minimax",
+      apiKey: apiKey || "",
+    });
 
     // 使用 name 作为主键，不再生成 UUID
     const newAgent: AgentInstance = {

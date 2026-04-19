@@ -187,6 +187,39 @@ export function getNextAvailablePort(): number {
 }
 
 /**
+ * 获取下一个可用的 webchat 端口
+ * 从 19121 开始，独立于 gateway 端口池
+ */
+export function getNextWebchatPort(): number {
+  const BASE_PORT = 19121;
+  const agents = ensureStore();
+
+  // 需要从各 agent 的 config.json 中读取 webchat.port
+  // 这里暂时只检查已知的 agents，后续可以通过扫描 config 优化
+  const usedPorts = new Set<number>();
+
+  for (const agent of agents) {
+    try {
+      if (fs.existsSync(agent.configPath)) {
+        const config = JSON.parse(fs.readFileSync(agent.configPath, "utf-8"));
+        if (config.channels?.webchat?.port) {
+          usedPorts.add(config.channels.webchat.port);
+        }
+      }
+    } catch {
+      // 忽略读取错误
+    }
+  }
+
+  let port = BASE_PORT;
+  while (usedPorts.has(port)) {
+    port++;
+  }
+
+  return port;
+}
+
+/**
  * 从文件系统扫描并加载 agents
  * 扫描 AGENTS_BASE_PATH 下的 .nanobot-* 目录
  * 自动添加到存储中（如果不存在）

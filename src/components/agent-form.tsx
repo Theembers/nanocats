@@ -9,10 +9,10 @@ export function AgentForm() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    basePath: "~/agents/",
-    port: 8080,
-    model: "",
-    provider: "",
+    basePath: "~/nanocats-space/agents/",
+    port: 0,
+    model: "MiniMax-M2.7",
+    provider: "minimax",
     apiKey: "",
     role: "" as "manager" | "member" | "",
   });
@@ -129,19 +129,19 @@ export function AgentForm() {
 
       <div className="space-y-2">
         <label htmlFor="port" className="block text-sm font-medium text-zinc-300">
-          Gateway Port
+          Gateway Port <span className="text-zinc-500 text-xs">(auto-generated if empty)</span>
         </label>
         <input
           id="port"
           name="port"
           type="number"
-          value={formData.port}
+          value={formData.port || ""}
           onChange={handleChange}
-          placeholder="8080"
+          placeholder="18790"
           className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
         />
         <p className="text-sm text-zinc-500">
-          Port for the agent gateway server
+          Leave empty to auto-generate next available port
         </p>
       </div>
 
@@ -155,7 +155,6 @@ export function AgentForm() {
           type="text"
           value={formData.model}
           onChange={handleChange}
-          placeholder="gpt-4o"
           className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
         />
       </div>
@@ -170,14 +169,13 @@ export function AgentForm() {
           type="text"
           value={formData.provider}
           onChange={handleChange}
-          placeholder="openai"
           className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
         />
       </div>
 
       <div className="space-y-2">
         <label htmlFor="apiKey" className="block text-sm font-medium text-zinc-300">
-          API Key
+          API Key <span className="text-zinc-500 text-xs">(optional, used for provider and MCP)</span>
         </label>
         <input
           id="apiKey"
@@ -189,7 +187,7 @@ export function AgentForm() {
           className="w-full px-4 py-2.5 rounded-lg bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all"
         />
         <p className="text-sm text-zinc-500">
-          API key for the LLM provider
+          Used for both provider API key and MCP MiniMax API key
         </p>
       </div>
 
