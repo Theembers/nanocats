@@ -214,7 +214,7 @@ function MessageItem({ record }: { record: SessionRecord }) {
         <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center flex-shrink-0">
           <ToolIcon className="w-4 h-4 text-green-400" />
         </div>
-        <div className="max-w-[85%] space-y-1">
+        <div className="w-full max-w-[85%] space-y-1">
           {/* Role label */}
           <div className="text-xs text-zinc-500">Tool</div>
           <ToolResultBlock name={record.name || "unknown"} content={content} />
@@ -237,7 +237,7 @@ function MessageItem({ record }: { record: SessionRecord }) {
       )}
       
       {/* Content */}
-      <div className={cn("max-w-[75%] space-y-1", isUser && "items-end")}>
+      <div className={cn("w-full max-w-[75%] space-y-1", isUser && "items-end")}>
         {/* Role label */}
         <div className={cn("text-xs text-zinc-500", isUser && "text-right")}>
           {isUser ? "Scheduled Task" : "Assistant"}

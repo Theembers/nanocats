@@ -68,6 +68,9 @@ export function StartupLogPanel({ agentName }: StartupLogPanelProps) {
         setLogs(filtered);
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       console.error("Failed to fetch CLI logs:", error);
     }
   }, [agentName, resetSleepTimer]);

@@ -261,7 +261,7 @@ export default function DashboardPage() {
             <h3 className="font-heading text-2xl font-semibold text-white mb-3">
               No agents yet
             </h3>
-            <p className="text-zinc-400 mb-6 max-w-sm mx-auto">
+            <p className="text-zinc-400 mb-6 mx-auto">
               Create your first nanobot agent to start automating your workflows
             </p>
             <Link href="/agents/new">

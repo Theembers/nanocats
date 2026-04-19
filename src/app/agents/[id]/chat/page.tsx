@@ -721,7 +721,7 @@ export default function AgentChatPage() {
             isLogsBackground ? "bg-black/20 backdrop-blur-sm" : "bg-black/40"
           )} />
 
-          <div className="relative h-full flex flex-col p-4 pt-20 gap-4 max-w-7xl mx-auto w-full">
+          <div className="relative h-full flex flex-col p-4 pt-20 gap-4 mx-auto w-full">
             <div className="shrink-0">
               <Breadcrumb items={[
                 { label: "Dashboard", href: "/" },

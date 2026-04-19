@@ -433,7 +433,7 @@ export default function AgentDetailPage() {
                         </button>
                       }
                     />
-                    <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-md">
+                    <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
                       <DialogHeader>
                         <DialogTitle className="text-white uppercase tracking-wider">Set Agent Role</DialogTitle>
                         <DialogDescription className="text-zinc-400">
