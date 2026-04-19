@@ -271,7 +271,7 @@ export default function AgentChatPage() {
             return [
               ...prev,
               {
-                id: `msg_${Date.now()}`,
+                id: crypto.randomUUID(),
                 type: "bot",
                 content: "",
                 thinkContent: data.content,
@@ -303,7 +303,7 @@ export default function AgentChatPage() {
             return [
               ...prev,
               {
-                id: `msg_${Date.now()}`,
+                id: crypto.randomUUID(),
                 type: "bot",
                 content: "",
                 toolExecuting: newToolExecutingList,
@@ -333,7 +333,7 @@ export default function AgentChatPage() {
             return [
               ...prev,
               {
-                id: `msg_${Date.now()}`,
+                id: crypto.randomUUID(),
                 type: "bot",
                 content: data.content,
                 isStreaming: !data.is_end,
@@ -368,7 +368,7 @@ export default function AgentChatPage() {
           return [
             ...prev,
             {
-              id: `msg_${Date.now()}`,
+              id: crypto.randomUUID(),
               type: "bot",
               content: data.content,
               isStreaming: false,
@@ -456,7 +456,7 @@ export default function AgentChatPage() {
     }
 
     const newMessage: Message = {
-      id: `msg_${Date.now()}`,
+      id: crypto.randomUUID(),
       type: "user",
       content: text,
       timestamp: new Date().toISOString(),
@@ -975,7 +975,7 @@ export default function AgentChatPage() {
                       onClick={() => {
                         if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || pendingFiles > 0) return;
                         const newMessage: Message = {
-                          id: `msg_${Date.now()}`,
+                          id: crypto.randomUUID(),
                           type: "user",
                           content: "/new",
                           timestamp: new Date().toISOString(),
