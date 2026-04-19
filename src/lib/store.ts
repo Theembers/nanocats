@@ -2,25 +2,20 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import type { AgentInstance } from "./types";
-// 编译时嵌入 SKILL.md 内容
 import MANAGER_SKILL_CONTENT from "../assets/skills/nanocats-manager-skill/SKILL.md";
+import {
+  MANAGER_DIR,
+  STORE_FILE,
+  SHARED_CONFIG_DIR,
+  BACKUP_DIR,
+  SHARED_SKILLS_DIR,
+  SHARED_SKILLS_CONFIG,
+  SHARED_MCP_CONFIG,
+  AGENTS_DIR,
+  NANOBOT_DIR_PREFIX,
+} from "./config";
 
-const STORE_DIR = path.join(os.homedir(), ".nanocats-manager");
-const STORE_FILE = path.join(STORE_DIR, "agents-store.json");
-const AGENTS_BASE_PATH = path.join(os.homedir(), "agents");
-const NANOBOT_DIR_PREFIX = ".nanobot-";
-
-// ==================== 共享配置相关常量 ====================
-
-export const SHARED_CONFIG_DIR = path.join(STORE_DIR, "shared-config");
-
-// ==================== 备份相关常量 ====================
-
-export const BACKUP_DIR = path.join(STORE_DIR, "backups");
 export const BACKUP_AGENTS_FILE = path.join(BACKUP_DIR, "agents.json");
-export const SHARED_SKILLS_DIR = path.join(SHARED_CONFIG_DIR, "skills");
-export const SHARED_SKILLS_CONFIG = path.join(SHARED_CONFIG_DIR, "skills.json");
-export const SHARED_MCP_CONFIG = path.join(SHARED_CONFIG_DIR, "mcp.json");
 export const MANAGER_SKILL_NAME = "nanocats-manager-skill";
 
 /**
@@ -28,8 +23,8 @@ export const MANAGER_SKILL_NAME = "nanocats-manager-skill";
  * 同时清理孤儿数据（无法关联到配置文件的记录）
  */
 export function ensureStore(): AgentInstance[] {
-  if (!fs.existsSync(STORE_DIR)) {
-    fs.mkdirSync(STORE_DIR, { recursive: true });
+  if (!fs.existsSync(MANAGER_DIR)) {
+    fs.mkdirSync(MANAGER_DIR, { recursive: true });
   }
 
   if (!fs.existsSync(STORE_FILE)) {
@@ -198,7 +193,7 @@ export function getNextAvailablePort(): number {
  * 自动修复重复的端口分配
  */
 export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
-  if (!fs.existsSync(AGENTS_BASE_PATH)) {
+  if (!fs.existsSync(AGENTS_DIR)) {
     return ensureStore();
   }
 
@@ -234,14 +229,14 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
   }
 
   try {
-    const entries = fs.readdirSync(AGENTS_BASE_PATH, { withFileTypes: true });
+    const entries = fs.readdirSync(AGENTS_DIR, { withFileTypes: true });
 
     for (const entry of entries) {
       if (!entry.isDirectory() || !entry.name.startsWith(NANOBOT_DIR_PREFIX)) {
         continue;
       }
 
-      const agentDir = path.join(AGENTS_BASE_PATH, entry.name);
+      const agentDir = path.join(AGENTS_DIR, entry.name);
       const configPath = path.join(agentDir, "config.json");
       const workspacePath = path.join(agentDir, "workspace");
 
@@ -295,10 +290,9 @@ export function scanAndLoadAgentsFromDisk(): AgentInstance[] {
 
 /**
  * 获取 agent 的 .env 文件路径
- * 路径格式: ~/agents/.nanobot-{name}/.env (与 config.json 同目录)
  */
 export function getAgentEnvPath(agentName: string): string {
-  return path.join(AGENTS_BASE_PATH, `${NANOBOT_DIR_PREFIX}${agentName}`, ".env");
+  return path.join(AGENTS_DIR, `${NANOBOT_DIR_PREFIX}${agentName}`, ".env");
 }
 
 /**

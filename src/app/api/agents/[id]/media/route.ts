@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import os from "os";
+import { getAgentUploadsDir } from "@/lib/config";
 
-// 获取 agent 媒体存储目录（在用户数据目录下）
 function getMediaDir(agentId: string): string {
-  const dir = path.join(os.homedir(), ".nanocats-manager", "uploads", agentId);
+  const dir = getAgentUploadsDir(agentId);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

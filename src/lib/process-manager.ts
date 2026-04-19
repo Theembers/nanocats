@@ -5,11 +5,10 @@ import os from "os";
 import type { AgentInstance, AgentLog } from "./types";
 import { findNanobotBinary } from "./nanobot";
 import { getAgents, getAgent, updateAgentStatus, getAgentEnvContent, parseEnvContent, ensureAgentEnvFile } from "./store";
+import { CLI_LOG_DIR, getAgentEnvPath } from "./config";
 
 const MAX_LOG_LINES = 1000;
 
-// CLI 日志文件路径
-const CLI_LOG_DIR = path.join(os.homedir(), ".nanocats-manager", "logs");
 const CLI_LOG_FILE = path.join(CLI_LOG_DIR, "cli-commands.log");
 
 // 确保日志目录存在
@@ -121,41 +120,47 @@ class ProcessManager {
    * 同时确保 .env 文件存在于 nanobot 工作目录（通过 shell source 命令加载）
    */
   private loadAgentEnvVariables(agentName: string): NodeJS.ProcessEnv {
-    // 继承当前进程的所有环境变量
     const env: NodeJS.ProcessEnv = { ...process.env };
 
-    // 获取 .env 文件路径（与 config.json 同目录）
-    const envPath = path.join(os.homedir(), "agents", `.nanobot-${agentName}`, ".env");
-    console.log(`[Env] Looking for .env file at: ${envPath}`);
-    console.log(`[Env] .env file exists: ${fs.existsSync(envPath)}`);
+    const envPath = getAgentEnvPath(agentName);
+    console.log(`[Env] ====== Agent ${agentName} .env 注入开始 ======`);
+    console.log(`[Env] .env 文件路径: ${envPath}`);
+    console.log(`[Env] .env 文件存在: ${fs.existsSync(envPath)}`);
 
     // 确保 .env 文件存在于 nanobot 工作目录
     // nanobot 使用 shell 的 "source .env" 命令加载，所以文件必须在 cwd 下
     ensureAgentEnvFile(agentName);
-    console.log(`[Env] Ensured .env file exists at workspace`);
+    console.log(`[Env] 已确认 .env 文件存在于 workspace`);
 
     // 获取 agent 的 .env 文件内容
     const envContent = getAgentEnvContent(agentName);
-    if (!envContent) {
-      console.log(`[Env] No .env content found for agent ${agentName}`);
+
+    if (!envContent || !envContent.trim()) {
+      console.log(`[Env] ⚠️  .env 文件为空或不存在，跳过注入`);
+      console.log(`[Env] ====== Agent ${agentName} .env 注入结束 ======\n`);
       return env;
     }
 
-    console.log(`[Env] .env content preview: ${envContent.substring(0, 200)}...`);
+    console.log(`[Env] .env 内容预览 (前200字符): ${envContent.substring(0, 200)}...`);
 
     // 解析并合并到环境变量（作为备用，防止 nanobot 内部不加载）
     try {
       const parsed = parseEnvContent(envContent);
       const keyCount = Object.keys(parsed).length;
-      console.log(`[Env] Parsed ${keyCount} env variables: ${Object.keys(parsed).join(", ")}`);
+      console.log(`[Env] 解析到 ${keyCount} 个环境变量: ${Object.keys(parsed).join(", ")}`);
+
       for (const [key, value] of Object.entries(parsed)) {
         env[key] = value;
       }
-    } catch (error) {
-      console.error(`[Env] Failed to parse .env for agent ${agentName}:`, error);
-    }
 
-    return env;
+      console.log(`[Env] ✅ .env 变量已成功注入到进程环境`);
+      console.log(`[Env] ====== Agent ${agentName} .env 注入结束 ======\n`);
+      return env;
+    } catch (error) {
+      console.error(`[Env] ❌ 解析 .env 失败:`, error);
+      console.log(`[Env] ====== Agent ${agentName} .env 注入结束 ======\n`);
+      return env;
+    }
   }
 
   /**
@@ -218,17 +223,20 @@ class ProcessManager {
 
     // 加载 .env 文件并合并到环境变量
     const envVars = this.loadAgentEnvVariables(agent.name);
-    
+
     // 验证环境变量是否被设置到 env 对象中
     const customKeys = Object.keys(envVars).filter(k => !Object.keys(process.env).includes(k));
     if (customKeys.length > 0) {
-      console.log(`[Env] Custom env keys passed to process: ${customKeys.join(", ")}`);
+      console.log(`[Start] ✅ 检测到 ${customKeys.length} 个自定义环境变量将注入到 agent: ${customKeys.join(", ")}`);
+    } else {
+      console.log(`[Start] ⚠️  没有检测到自定义环境变量（.env 为空或解析失败）`);
     }
 
     // nanobot 会在 cwd 下 source .env 文件，所以 cwd 必须指向 Agent 根目录（.env 所在目录）
     // agent.workspacePath = ~/agents/.nanobot-{name}/workspace
     // agent.configPath = ~/agents/.nanobot-{name}/config.json
     const agentDir = path.dirname(agent.configPath);
+    console.log(`[Start] 工作目录 (cwd): ${agentDir}`);
 
     const childProcess = spawn(
       nanobotPath,
@@ -240,6 +248,8 @@ class ProcessManager {
         env: envVars,
       }
     );
+
+    console.log(`[Start] ✅ Agent ${agent.name} 进程已启动，PID: ${childProcess.pid}`);
 
     const pid = childProcess.pid;
     if (!pid) {

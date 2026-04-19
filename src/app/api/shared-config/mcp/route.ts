@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
-import { SHARED_MCP_CONFIG, ensureSharedConfig } from "@/lib/store";
+import { SHARED_MCP_CONFIG } from "@/lib/config";
+import { ensureSharedConfig } from "@/lib/store";
 
 interface McpConfig {
   mcpServers: Record<string, any>;

@@ -14,10 +14,8 @@ import {
 import { nanobotOnboard } from "@/lib/nanobot";
 import { processManager } from "@/lib/process-manager";
 import type { AgentInstance } from "@/lib/types";
+import { AGENTS_DIR } from "@/lib/config";
 
-/**
- * Sanitize name for use in file paths
- */
 function sanitizeName(name: string): string {
   return name
     .toLowerCase()
@@ -25,9 +23,6 @@ function sanitizeName(name: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-/**
- * Expand ~ to home directory
- */
 function expandPath(p: string): string {
   if (p.startsWith("~")) {
     return path.join(os.homedir(), p.slice(1));
@@ -35,10 +30,7 @@ function expandPath(p: string): string {
   return p;
 }
 
-/**
- * 默认 agents 基础路径
- */
-const DEFAULT_AGENTS_PATH = path.join(os.homedir(), "agents");
+const DEFAULT_AGENTS_PATH = AGENTS_DIR;
 
 /**
  * GET /api/agents - List all agent instances

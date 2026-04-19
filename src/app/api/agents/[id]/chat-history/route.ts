@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgent } from "@/lib/store";
 import fs from "fs";
 import path from "path";
-import os from "os";
+import { getAgentUploadsDir } from "@/lib/config";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                   try {
                     if (fs.existsSync(localPath)) {
                       const fileName = path.basename(localPath);
-                      const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                      const uploadsDir = getAgentUploadsDir(name);
                       if (!fs.existsSync(uploadsDir)) {
                         fs.mkdirSync(uploadsDir, { recursive: true });
                       }
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                   try {
                     if (fs.existsSync(localPath)) {
                       const fileName = path.basename(localPath);
-                      const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                      const uploadsDir = getAgentUploadsDir(name);
                       if (!fs.existsSync(uploadsDir)) {
                         fs.mkdirSync(uploadsDir, { recursive: true });
                       }
@@ -225,7 +225,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
               try {
                 if (fs.existsSync(localPath)) {
                   const fileName = path.basename(localPath);
-                  const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                  const uploadsDir = getAgentUploadsDir(name);
                   if (!fs.existsSync(uploadsDir)) {
                     fs.mkdirSync(uploadsDir, { recursive: true });
                   }
@@ -298,7 +298,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                       const localPath = typeof mediaPath === "string" ? mediaPath : mediaPath.data;
                       if (localPath && typeof localPath === "string" && fs.existsSync(localPath)) {
                         const fileName = path.basename(localPath);
-                        const uploadsDir = path.join(os.homedir(), ".nanocats-manager", "uploads", name);
+                        const uploadsDir = getAgentUploadsDir(name);
                         if (!fs.existsSync(uploadsDir)) {
                           fs.mkdirSync(uploadsDir, { recursive: true });
                         }

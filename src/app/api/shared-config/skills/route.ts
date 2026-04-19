@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import {
-  SHARED_SKILLS_DIR,
-  SHARED_SKILLS_CONFIG,
-  ensureSharedConfig,
-} from "@/lib/store";
+import { SHARED_SKILLS_DIR, SHARED_SKILLS_CONFIG } from "@/lib/config";
+import { ensureSharedConfig } from "@/lib/store";
 
 interface SharedSkill {
   name: string;

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { AgentCard } from "@/components/agent-card";
 import { StartupLogPanel } from "@/components/startup-log-panel";
-import { OpenSpaceDashboardCard } from "@/components/openspace-dashboard-card";
+
 import { AgentInstance } from "@/lib/types";
 
 // 动画延迟工具
@@ -161,10 +161,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* OpenSpace Dashboard Card */}
-          <div style={{ animationDelay: "0.3s" }}>
-            <OpenSpaceDashboardCard />
-          </div>
+          
         </div>
       </div>
 

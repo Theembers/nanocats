@@ -8,10 +8,9 @@ import { AgentInstance } from "@/lib/types";
 import os from "os";
 import path from "path";
 
-// 构建 env 文件路径（在客户端构建，避免导入服务端模块）
 function getEnvFilePath(agentName: string): string {
   const homeDir = os.homedir();
-  return path.join(homeDir, "agents", `.nanobot-${agentName}`, ".env");
+  return path.join(homeDir, "nanocats-space", "agents", `.nanobot-${agentName}`, ".env");
 }
 
 export default function EnvEditorPage() {

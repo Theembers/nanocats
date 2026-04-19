@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { SHARED_SKILLS_DIR, SHARED_SKILLS_CONFIG } from "@/lib/store";
+import { SHARED_SKILLS_DIR, SHARED_SKILLS_CONFIG } from "@/lib/config";
 
 interface RouteParams {
   params: Promise<{ name: string }>;

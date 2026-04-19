@@ -36,12 +36,12 @@ export interface McpConfig {
 
 export interface CreateAgentInput {
   name: string;
-  basePath?: string;  // 默认 ~/agents/
+  basePath?: string;  // 默认 ~/nanocats-space/agents/
   port?: number;
   provider?: string;
   apiKey?: string;
   model?: string;
-  role?: AgentRole;  // Agent 角色
+  role?: AgentRole;
 }
 
 export interface AgentLog {
